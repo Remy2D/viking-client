@@ -1,0 +1,15 @@
+haven.PoseMorph$$Res
+haven.VertexBuf$ColorArray
+haven.VertexBuf$ColorDecode
+haven.VertexBuf$NormalArray
+haven.VertexBuf$NormalDecode
+haven.VertexBuf$TexelArray
+haven.VertexBuf$TexelDecode
+haven.VertexBuf$VertexArray
+haven.VertexBuf$VertexDecode
+haven.resutil.BumpMap$BiTangents
+haven.resutil.BumpMap$BitDecode
+haven.resutil.BumpMap$TanDecode
+haven.resutil.BumpMap$Tangents
+haven.resutil.OverTex$CDecode
+haven.resutil.OverTex$OTexC

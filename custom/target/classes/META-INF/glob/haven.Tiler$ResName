@@ -1,0 +1,5 @@
+haven.resutil.CaveTile$Factory
+haven.resutil.GroundTile$Fac
+haven.resutil.TerrainTile$Factory
+haven.resutil.TerrainTile$RidgeTile$RFactory
+haven.resutil.WaterTile$Fac

@@ -146,7 +146,7 @@ public class Main {
     private static Map<String, String> load(String bundle, String langcode) {
         Properties props = new Properties();
 
-        InputStream is = Main.class.getClassLoader().getResourceAsStream("l10n/" + bundle + "_" + langcode + ".properties");
+        InputStream is = Main.class.getClassLoader().getResourceAsStream("/l10n/" + bundle + "_" + langcode + ".properties");
         if (is == null)
             return null;
 

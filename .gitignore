@@ -6,7 +6,7 @@
 *.iml
 *.zip
 amber-*.zip
-/l10n/*_new.properties
+/legacy/l10n/*_new.properties
 /bin
 /.settings
 /doc/javadoc

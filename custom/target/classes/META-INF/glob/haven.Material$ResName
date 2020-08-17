@@ -1,0 +1,16 @@
+haven.Light$$cel
+haven.Light$$light
+haven.Material$$mlink
+haven.Material$$nofacecull
+haven.Material$$order
+haven.Material$Colors
+haven.States$$colmask
+haven.States$$maskdepth
+haven.States$$vcol
+haven.TexGL$$tex
+haven.resutil.BumpMap$$bump
+haven.resutil.EnvMap
+haven.resutil.LatentMat$$latent
+haven.resutil.OverTex$$ctex
+haven.resutil.TexAnim
+haven.resutil.TexPal$$res

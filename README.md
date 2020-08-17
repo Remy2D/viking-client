@@ -1,6 +1,3 @@
-## Purus Pasta Hafen Client
+## Viking Client
 
-Version 2 of Purus Pasta HnH client
-
-Please use Pasta-Launcher to launch the client.
-https://github.com/puruscor/Pasta-Launcher/releases
+Fork of amber.purus client
