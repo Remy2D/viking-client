@@ -56,7 +56,7 @@ public class MapFile {
     public final Map<Long, SMarker> smarkers = new HashMap<>();
     public int markerseq = 0;
     public final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
-.
+
     public MapFile(ResCache store, String filename) {
         this.store = store;
         this.filename = filename;
