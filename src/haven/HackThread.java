@@ -26,13 +26,12 @@
 
 package haven;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class HackThread extends Thread {
     public HackThread(ThreadGroup tg, Runnable target, String name) {
-    /* Hack #1: Override stupid security-managers' whims to move
-     * threads into whimsical thread-groups. */
+        /* Hack #1: Override stupid security-managers' whims to move
+         * threads into whimsical thread-groups. */
         super((tg == null) ? tg() : tg, target, name);
     }
 

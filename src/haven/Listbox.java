@@ -40,7 +40,7 @@ public abstract class Listbox<T> extends ListWidget<T> {
 
     protected void drawsel(GOut g) {
         g.chcolor(255, 255, 0, 128);
-        g.frect(Coord.z, g.sz);
+        g.frect(Coord.z, g.sz());
         g.chcolor();
     }
 
@@ -78,8 +78,16 @@ public abstract class Listbox<T> extends ListWidget<T> {
             change(item);
     }
 
+    public Coord idxc(int idx) {
+        return (new Coord(0, (idx - sb.val) * itemh));
+    }
+
+    public int idxat(Coord c) {
+        return ((c.y / itemh) + sb.val);
+    }
+
     public T itemat(Coord c) {
-        int idx = (c.y / itemh) + sb.val;
+        int idx = idxat(c);
         if (idx >= listitems())
             return (null);
         return (listitem(idx));
@@ -115,9 +123,9 @@ public abstract class Listbox<T> extends ListWidget<T> {
     }
 
     public void resize(Coord sz) {
-	super.resize(sz);
-    this.h = Math.max(sz.y / itemh, 1);
-	sb.resize(sz.y);
-	sb.c = new Coord(sz.x - sb.sz.x, 0);
+        super.resize(sz);
+        this.h = Math.max(sz.y / itemh, 1);
+        sb.resize(sz.y);
+        sb.c = new Coord(sz.x - sb.sz.x, 0);
     }
 }

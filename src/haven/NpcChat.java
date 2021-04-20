@@ -26,9 +26,8 @@
 
 package haven;
 
+import java.util.*;
 import java.awt.Color;
-import java.util.LinkedList;
-import java.util.List;
 
 public class NpcChat extends Window {
     Textlog out;

@@ -26,43 +26,9 @@
 
 package haven;
 
-import java.awt.Graphics;
-import java.awt.image.BufferedImage;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.function.Supplier;
-
-import haven.factories.BackwaterFactory;
-import haven.factories.BullmythFactory;
-import haven.factories.CenteroflearningFactory;
-import haven.factories.FecundearthFactory;
-import haven.factories.FoundingmythosFactory;
-import haven.factories.GamekeepingFactory;
-import haven.factories.GuardedmarchesFactory;
-import haven.factories.HeraldicswanFactory;
-import haven.factories.LocalcuisineFactory;
-import haven.factories.MountaintraditionFactory;
-import haven.factories.SeamarriageFactory;
-import haven.factories.WoodlandrealmFactory;
-import haven.res.ui.tt.ArmorFactory;
-import haven.res.ui.tt.WearFactory;
-import haven.factories.*;
-import haven.res.ui.tt.ArmorFactory;
-import haven.res.ui.tt.WearFactory;
-import haven.res.ui.tt.attrmod.AttrMod;
-import haven.res.ui.tt.slots.SlotFactory;
-
-import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.*;
+import java.lang.reflect.*;
 import java.awt.image.BufferedImage;
 import java.awt.Graphics;
 
@@ -103,35 +69,38 @@ public abstract class ItemInfo {
     @Resource.PublishedCode(name = "tt", instancer = FactMaker.class)
     public static interface InfoFactory {
         public default ItemInfo build(Owner owner, Raw raw, Object... args) {
-            return(build(owner, args));
+            return (build(owner, args));
         }
+
         @Deprecated
         public default ItemInfo build(Owner owner, Object... args) {
-            throw(new AbstractMethodError("info factory missing either build bmethod"));
+            throw (new AbstractMethodError("info factory missing either build bmethod"));
         }
     }
 
     public static class FactMaker implements Resource.PublishedCode.Instancer {
-        public InfoFactory make(Class<?> cl) throws InstantiationException, IllegalAccessException {
-            if(InfoFactory.class.isAssignableFrom(cl))
-                return(cl.asSubclass(InfoFactory.class).newInstance());
+        public InfoFactory make(Class<?> cl, Resource ires, Object... argv) {
+            if (InfoFactory.class.isAssignableFrom(cl))
+                return (Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(InfoFactory.class), ires, argv));
             try {
                 Function<Object[], ItemInfo> make = Utils.smthfun(cl, "mkinfo", ItemInfo.class, Owner.class, Object[].class);
-                return(new InfoFactory() {
+                return (new InfoFactory() {
                     public ItemInfo build(Owner owner, Raw raw, Object... args) {
-                        return(make.apply(new Object[]{owner, args}));
+                        return (make.apply(new Object[]{owner, args}));
                     }
                 });
-            } catch(NoSuchMethodException e) {}
+            } catch (NoSuchMethodException e) {
+            }
             try {
                 Function<Object[], ItemInfo> make = Utils.smthfun(cl, "mkinfo", ItemInfo.class, Owner.class, Raw.class, Object[].class);
-                return(new InfoFactory() {
+                return (new InfoFactory() {
                     public ItemInfo build(Owner owner, Raw raw, Object... args) {
-                        return(make.apply(new Object[]{owner, raw, args}));
+                        return (make.apply(new Object[]{owner, raw, args}));
                     }
                 });
-            } catch(NoSuchMethodException e) {}
-            return(null);
+            } catch (NoSuchMethodException e) {
+            }
+            return (null);
         }
     }
 
@@ -229,7 +198,7 @@ public abstract class ItemInfo {
         }
 
         public Name(Owner owner, String str) {
-            this(owner, Text.render(Resource.getLocContent(str)));
+            this(owner, Text.render(str));
         }
 
         public BufferedImage tipimg() {
@@ -266,7 +235,7 @@ public abstract class ItemInfo {
         }
 
         public void layout(Layout l) {
-            BufferedImage t = tipimg((l.width == 0) ? 200 : l.width);
+            BufferedImage t = tipimg((l.width == 0) ? UI.scale(200) : l.width);
             if (t != null)
                 l.cmp.add(t, new Coord(0, l.cmp.sz.y + 10));
         }
@@ -276,36 +245,13 @@ public abstract class ItemInfo {
         }
     }
 
-
-
     public static class Contents extends Tip {
         public final List<ItemInfo> sub;
-        private static final Text.Line ch = Text.render(Resource.getLocString(Resource.BUNDLE_LABEL, "Contents:"));
-        public double content = 0;
-        public boolean isseeds;
+        private static final Text.Line ch = Text.render("Contents:");
 
         public Contents(Owner owner, List<ItemInfo> sub) {
             super(owner);
             this.sub = sub;
-
-            for (ItemInfo info : sub) {
-                if (info instanceof ItemInfo.Name) {
-                    ItemInfo.Name name = (ItemInfo.Name) info;
-                    if (name.str != null) {
-                        // determine whether we are dealing with seeds by testing for
-                        // the absence of decimal separator (this will work irregardless of current localization)
-                        int amountend = name.str.text.indexOf(' ');
-                        isseeds = name.str.text.lastIndexOf('.', amountend) < 0;
-                        if (amountend > 0) {
-                            try {
-                                content = Double.parseDouble(name.str.text.substring(0, amountend));
-                                break;
-                            } catch (NumberFormatException nfe) {
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         public BufferedImage tipimg() {
@@ -410,56 +356,22 @@ public abstract class ItemInfo {
         return (null);
     }
 
-
-    private static final Map<String, ItemInfo.InfoFactory> customFactories = new HashMap<>(14);
-
-    static {
-        customFactories.put("paginae/gov/enact/backwater", new BackwaterFactory());
-        customFactories.put("paginae/gov/enact/bullmyth", new BullmythFactory());
-        customFactories.put("paginae/gov/enact/centeroflearning", new CenteroflearningFactory());
-        customFactories.put("paginae/gov/enact/fecundearth", new FecundearthFactory());
-        customFactories.put("paginae/gov/enact/foundingmythos", new FoundingmythosFactory());
-        customFactories.put("paginae/gov/enact/gamekeeping", new GamekeepingFactory());
-        customFactories.put("paginae/gov/enact/guardedmarches", new GuardedmarchesFactory());
-        customFactories.put("paginae/gov/enact/heraldicswan", new HeraldicswanFactory());
-        customFactories.put("paginae/gov/enact/localcuisine", new LocalcuisineFactory());
-        customFactories.put("paginae/gov/enact/mountaintradition", new MountaintraditionFactory());
-        customFactories.put("paginae/gov/enact/seamarriage", new SeamarriageFactory());
-        customFactories.put("paginae/gov/enact/woodlandrealm", new WoodlandrealmFactory());
-
-        customFactories.put("ui/tt/armor", new ArmorFactory());
-        customFactories.put("ui/tt/wear", new WearFactory());
-
-        customFactories.put("ui/tt/attrmod", new AttrMod.Fac());
-
-		customFactories.put("ui/tt/slots", new SlotFactory());
-	}
-
     public static List<ItemInfo> buildinfo(Owner owner, Raw raw) {
         List<ItemInfo> ret = new ArrayList<ItemInfo>();
-        for(Object o : raw.data) {
+        for (Object o : raw.data) {
             if (o instanceof Object[]) {
                 Object[] a = (Object[]) o;
-                Resource ttres= null;
-                InfoFactory f = null;
+                Resource ttres;
                 if (a[0] instanceof Integer) {
                     ttres = owner.glob().sess.getres((Integer) a[0]).get();
                 } else if (a[0] instanceof Resource) {
                     ttres = (Resource) a[0];
                 } else if (a[0] instanceof Indir) {
                     ttres = (Resource) ((Indir) a[0]).get();
-                } else if (a[0] instanceof InfoFactory) {
-                    f = (InfoFactory) a[0];
                 } else {
                     throw (new ClassCastException("Unexpected info specification " + a[0].getClass()));
                 }
-
-                if (f == null) {
-                    f = customFactories.get(ttres.name);
-                    if (f == null)
-                        f = ttres.getcode(InfoFactory.class, true);
-                }
-
+                InfoFactory f = ttres.getcode(InfoFactory.class, true);
                 ItemInfo inf = f.build(owner, raw, a);
                 if (inf != null)
                     ret.add(inf);
@@ -473,7 +385,7 @@ public abstract class ItemInfo {
     }
 
     public static List<ItemInfo> buildinfo(Owner owner, Object[] rawinfo) {
-        return(buildinfo(owner, new Raw(rawinfo)));
+        return (buildinfo(owner, new Raw(rawinfo)));
     }
 
     private static String dump(Object arg) {
@@ -519,21 +431,21 @@ public abstract class ItemInfo {
         }
 
         public static <I, R> Function<List<ItemInfo>, Supplier<R>> map1(Class<I> icl, Function<I, Supplier<R>> data) {
-            return(info -> {
+            return (info -> {
                 I inf = find(icl, info);
-                if(inf == null)
-                    return(() -> null);
-                return(data.apply(inf));
+                if (inf == null)
+                    return (() -> null);
+                return (data.apply(inf));
             });
         }
 
         public static <I, R> Function<List<ItemInfo>, Supplier<R>> map1s(Class<I> icl, Function<I, R> data) {
-            return(info -> {
+            return (info -> {
                 I inf = find(icl, info);
-                if(inf == null)
-                    return(() -> null);
+                if (inf == null)
+                    return (() -> null);
                 R ret = data.apply(inf);
-                return(() -> ret);
+                return (() -> ret);
             });
         }
     }

@@ -26,42 +26,27 @@
 
 package haven;
 
-import static haven.Inventory.sqsz;
-import static haven.Text.num10Fnd;
-import haven.automation.WItemDestroyCallback;
-import haven.ItemInfo.AttrCache;
-import haven.res.ui.tt.Wear;
-import haven.res.ui.tt.q.qbuff.QBuff;
-
 import java.awt.Color;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-
-import com.sun.java.accessibility.util.GUIInitializedListener;
-
-import haven.ItemInfo.AttrCache;
-import haven.automation.WItemDestroyCallback;
-import haven.res.ui.tt.Wear;
-import haven.res.ui.tt.q.qbuff.QBuff;
 import java.util.*;
 import java.util.function.*;
 
+import haven.ItemInfo.AttrCache;
+import haven.purus.Config;
+import haven.purus.pbot.api.Callback;
+import haven.purus.pbot.api.PBotItem;
+import haven.purus.pbot.api.PBotSession;
+import haven.res.ui.tt.q.quality.Quality;
+
+import static haven.ItemInfo.find;
 import static haven.Inventory.sqsz;
-import static haven.Text.num10Fnd;
 
 public class WItem extends Widget implements DTarget {
     public static final Resource missing = Resource.local().loadwait("gfx/invobjs/missing");
     public final GItem item;
-    public static final Color famountclr = new Color(24, 116, 205);
-    private static final Color qualitybg = new Color(20, 20, 20, 255 - Config.qualitybgtransparency);
-    public static final Color[] wearclr = new Color[]{
-            new Color(233, 0, 14), new Color(218, 128, 87), new Color(246, 233, 87), new Color(145, 225, 60)
-    };
-
-    private WItemDestroyCallback destroycb;
+    private Resource cspr = null;
+    private Message csdt = Message.nil;
 
     public WItem(GItem item) {
         super(sqsz);
@@ -80,7 +65,7 @@ public class WItem extends Widget implements DTarget {
         BufferedImage img = ItemInfo.longtip(info);
         Resource.Pagina pg = item.res.get().layer(Resource.pagina);
         if (pg != null)
-            img = ItemInfo.catimgs(0, img, RichText.render("\n" + pg.text, 200).img);
+            img = ItemInfo.catimgs(0, img, RichText.render("\n" + pg.text, UI.scale(200)).img);
         return (img);
     }
 
@@ -126,7 +111,7 @@ public class WItem extends Widget implements DTarget {
         double now = Utils.rtime();
         if (prev == this) {
         } else if (prev instanceof WItem) {
-            double ps = ((WItem)prev).hoverstart;
+            double ps = ((WItem) prev).hoverstart;
             if (now - ps < 1.0)
                 hoverstart = now;
             else
@@ -156,54 +141,56 @@ public class WItem extends Widget implements DTarget {
         }
     }
 
-    private List<ItemInfo> info() {return(item.info());}
+    private List<ItemInfo> info() {
+        return (item.info());
+    }
+
     public final AttrCache<Color> olcol = new AttrCache<>(this::info, info -> {
         Color ret = null;
-        for(ItemInfo inf : info) {
-            if(inf instanceof GItem.ColorInfo) {
-                Color c = ((GItem.ColorInfo)inf).olcol();
-                if(c != null)
-                    ret = (ret == null)?c:Utils.preblend(ret, c);
+        for (ItemInfo inf : info) {
+            if (inf instanceof GItem.ColorInfo) {
+                Color c = ((GItem.ColorInfo) inf).olcol();
+                if (c != null)
+                    ret = (ret == null) ? c : Utils.preblend(ret, c);
             }
         }
         Color fret = ret;
-        return(() -> fret);
+        return (() -> fret);
     });
-
     public final AttrCache<GItem.InfoOverlay<?>[]> itemols = new AttrCache<>(this::info, info -> {
         ArrayList<GItem.InfoOverlay<?>> buf = new ArrayList<>();
-        for(ItemInfo inf : info) {
-            if(inf instanceof GItem.OverlayInfo)
-                buf.add(GItem.InfoOverlay.create((GItem.OverlayInfo<?>)inf));
+        for (ItemInfo inf : info) {
+            if (inf instanceof GItem.OverlayInfo)
+                buf.add(GItem.InfoOverlay.create((GItem.OverlayInfo<?>) inf));
         }
         GItem.InfoOverlay<?>[] ret = buf.toArray(new GItem.InfoOverlay<?>[0]);
-        return(() -> ret);
+        return (() -> ret);
     });
-    
     public final AttrCache<Double> itemmeter = new AttrCache<>(this::info, AttrCache.map1(GItem.MeterInfo.class, minf -> {
         GItem itm = WItem.this.item;
         if (minf != null) {
             double meter = minf.meter();
-            if (itm.studytime > 0 && parent instanceof InventoryStudy) {
-                int timeleft = (int) (itm.studytime * (1.0 - meter));
-                int hoursleft = timeleft / 60;
-                int minutesleft = timeleft - hoursleft * 60;
-                itm.metertex = Text.renderstroked(String.format("%d:%02d", hoursleft, minutesleft), Color.WHITE, Color.BLACK, num10Fnd).tex();
+            if (itm.studytime > 0 && parent instanceof Inventory) {
+                int timeleft = (int) Math.floor(itm.studytime * (1.0 - meter));
+                int hoursleft = timeleft / 3600;
+                int minutesleft = timeleft % 3600 / 60;
+                itm.metertex = Text.std.renderstroked(String.format("%d:%02d", hoursleft, minutesleft), Color.white, Color.black).tex();
             } else {
-                itm.metertex = Text.renderstroked(String.format("%d%%", (int) (meter * 100)), Color.WHITE, Color.BLACK, num10Fnd).tex();
+                itm.metertex = Text.std.renderstroked(String.format("%d%%", (int) (meter * 100)), Color.white, Color.black).tex();
             }
             return minf::meter;
         }
         itm.metertex = null;
+
         return minf::meter;
     }));
 
     private GSprite lspr = null;
 
     public void tick(double dt) {
-    /* XXX: This is ugly and there should be a better way to
-     * ensure the resizing happens as it should, but I can't think
-	 * of one yet. */
+        /* XXX: This is ugly and there should be a better way to
+         * ensure the resizing happens as it should, but I can't think
+         * of one yet. */
         GSprite spr = item.spr();
         if ((spr != null) && (spr != lspr)) {
             Coord sz = new Coord(spr.sz());
@@ -226,124 +213,79 @@ public class WItem extends Widget implements DTarget {
             drawmain(g, spr);
             g.defstate();
             GItem.InfoOverlay<?>[] ols = itemols.get();
-            if(ols != null) {
-                for(GItem.InfoOverlay<?> ol : ols)
+            if (ols != null) {
+                for (GItem.InfoOverlay<?> ol : ols)
                     ol.draw(g);
             }
-            Double meter = item.meter > 0 ? Double.valueOf(item.meter / 100.0) : itemmeter.get();
-            if (Config.itemmeterbar && meter != null && meter > 0) {
-                g.chcolor(220, 60, 60, 255);
-                g.frect(Coord.z, new Coord((int) (sz.x / (100 / (meter * 100))), 4));
+            Double meter = (item.meter > 0) ? Double.valueOf(item.meter / 100.0) : itemmeter.get();
+            if (meter == null && item.wear != null) {
+                meter = item.wear;
+            }
+            if ((meter != null) && (meter > 0)) {
+	    	/*
+		g.chcolor(255, 255, 255, 64);
+		Coord half = sz.div(2);
+		g.prect(half, half.inv(), half, meter * Math.PI * 2);
+		g.chcolor();
+	    	 */
+                g.chcolor(Color.RED);
+                g.frect(Coord.z, new Coord((int) Math.floor(this.sz.x * meter), UI.scale(3)));
                 g.chcolor();
-            }
-
-            QBuff quality = item.quality();
-            if (Config.showquality) {
-                if (quality != null && quality.qtex != null) {
-                    Coord btm = new Coord(0, sz.y - 12);
-                    Tex t = Config.qualitywhole ? quality.qwtex : quality.qtex;
-                    if (Config.qualitybg) {
-                        g.chcolor(qualitybg);
-                        g.frect(btm, t.sz().add(1, -1));
-                        g.chcolor();
-                    }
-                    g.image(t, btm);
-                }
-            }
-
-            if (item.metertex != null)
                 g.image(item.metertex, Coord.z);
-
-            ItemInfo.Contents cnt = item.getcontents();
-            if (cnt != null && cnt.content > 0)
-                drawamountbar(g, cnt.content, cnt.isseeds);
-
-
-            try {
-                for (ItemInfo info : item.info()) {
-                    if (info instanceof Wear) {
-                        double d = ((Wear) info).d;
-                        double m = ((Wear) info).m;
-                        double p = (m - d) / m;
-                        int h = (int) (p * (double) sz.y);
-                        g.chcolor(wearclr[p == 1.0 ? 3 : (int) (p / 0.25)]);
-                        g.frect(new Coord(sz.x - 3, sz.y - h), new Coord(3, h));
-                        g.chcolor();
-                        break;
-                    }
-                }
-            } catch (Exception e) { // fail silently if info is not ready
             }
         } else {
             g.image(missing.layer(Resource.imgc).tex(), Coord.z, sz);
         }
     }
 
-    private void drawamountbar(GOut g, double content, boolean isseeds) {
-        double capacity;
-        String name = item.getname();
-        if (name.contains("Waterskin"))
-            capacity = 3.0D;
-        else if (name.contains("Bucket"))
-            capacity = isseeds ? 1000D : 10.0D;
-        else if (name.contains("Waterflask"))
-            capacity = 2.0D;
-        else
-            return;
-
-        int h = (int) (content / capacity * sz.y) - 1;
-        if (h < 0)
-            return;
-
-        g.chcolor(famountclr);
-        g.frect(new Coord(sz.x - 4, sz.y - h - 1), new Coord(3, h));
-        g.chcolor();
-    }
-
     public boolean mousedown(Coord c, int btn) {
         if (btn == 1) {
-        	if(ui.gui.itemClickCallback != null) {
-        		ui.gui.itemClickCallback.itemClick(this);
-        		return true;
-        	}
-            if (ui.modctrl && ui.modmeta)
-                wdgmsg("drop-identical", this.item);
-            else if (ui.modctrl && ui.modshift) {
-                String name = ItemInfo.find(ItemInfo.Name.class, item.info()).str.text;
-                name = name.replace(' ', '_');
-                if (!Resource.language.equals("en")) {
-                    int i = name.indexOf('(');
-                    if (i > 0)
-                        name = name.substring(i + 1, name.length() - 1);
+            if (gameui().autodropItmCb) {
+                String name = item.resource().name;
+                if (name != null) {
+                    Config.autodropItems.val.put(name, true);
+                    Config.autodropItems.setVal(Config.autodropItems.val);
+                    gameui().msg("Adding item " + name);
+                    if (gameui().opts.dw != null)
+                        gameui().opts.dw.refresh();
+                } else {
+                    gameui().error("Adding item failed! Name of item couldn't be fetched.");
                 }
-                try {
-                    WebBrowser.self.show(new URL(String.format("http://ringofbrodgar.com/wiki/%s", name)));
-                } catch (MalformedURLException e) {
-                } catch (Exception e) {
-                    getparent(GameUI.class).error("Could not launch web browser.");
+                gameui().autodropItmCb = false;
+                return true;
+            }
+            synchronized (gameui().itemCallbacks) {
+                if (gameui().itemCallbacks.size() > 0) {
+                    for (Pair<Callback, PBotSession> cb : gameui().itemCallbacks) {
+                        new Thread(() -> cb.a.callback(new PBotItem(item, cb.b)), "PBot cb runner").start();
+                    }
+                    gameui().itemCallbacks.clear();
+                    return true;
                 }
-            } else if (ui.modshift && !ui.modmeta) {
-                // server side transfer all identical: pass third argument -1 (or 1 for single item)
-                item.wdgmsg("transfer", c);
-            } else if (ui.modctrl)
-                item.wdgmsg("drop", c);
-            else if (ui.modmeta)
-                wdgmsg("transfer-identical", this.item);
-            else
+            }
+            if (ui.modshift) {
+                if (ui.modmeta) {
+                    item.wdgmsg("transfer-identical", item.getname());
+                    return true;
+                }
+                int n = ui.modctrl ? -1 : 1;
+                item.wdgmsg("transfer", c, n);
+            } else if (ui.modctrl) {
+                int n = ui.modmeta ? -1 : 1;
+                item.wdgmsg("drop", c, n);
+            } else {
                 item.wdgmsg("take", c);
-            return (true);
-        } else if (btn == 2) {
-            if (ui.modmeta)
-                wdgmsg("transfer-identical-eq", this.item);
+            }
             return (true);
         } else if (btn == 3) {
-            if (ui.modmeta && !(parent instanceof Equipory))
-                wdgmsg("transfer-identical-asc", this.item);
-            else
-                item.wdgmsg("iact", c, ui.modflags());
+            item.wdgmsg("iact", c, ui.modflags());
             return (true);
         }
         return (false);
+    }
+
+    public Coord invLoc() {
+        return this.c.div(sqsz);
     }
 
     public boolean drop(Coord cc, Coord ul) {
@@ -355,27 +297,11 @@ public class WItem extends Widget implements DTarget {
         return (true);
     }
 
-    @Override
-    public void reqdestroy() {
-        super.reqdestroy();
-        if (destroycb != null)
-            destroycb.notifyDestroy();
-    }
-
-    public void registerDestroyCallback(WItemDestroyCallback cb) {
-        this.destroycb = cb;
-    }
-    
-    public Coord size() {
-        Indir<Resource> res = item.getres().indir();
-    	if (res.get() != null) {
-			Tex tex = res.get().layer(Resource.imgc).tex();
-			if(tex == null)
-				return new Coord(1, 1);
-			else
-				return tex.sz().div(30);
-		} else {
-			return new Coord(1, 1);
-		}
+    public double quality() {
+        Optional<ItemInfo> qInfo = this.info().stream().filter((info) -> info instanceof Quality).findFirst();
+        if (qInfo.isEmpty())
+            return -1;
+        else
+            return ((Quality) qInfo.get()).q;
     }
 }

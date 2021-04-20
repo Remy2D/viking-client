@@ -26,9 +26,8 @@
 
 package haven;
 
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
-import java.util.HashMap;
+import java.util.*;
+import java.lang.ref.*;
 
 public class IDSet<T> {
     private final HashMap<WRef<T>, WRef<T>> bk = new HashMap<WRef<T>, WRef<T>>();
@@ -69,8 +68,8 @@ public class IDSet<T> {
                 bk.put(ref, ref);
                 return (ob);
             } else {
-        /* Should never return null, since ob is referenced in
-         * this frame during the entirety of the lookup. */
+                /* Should never return null, since ob is referenced in
+                 * this frame during the entirety of the lookup. */
                 return (old.get());
             }
         }

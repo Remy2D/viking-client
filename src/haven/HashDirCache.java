@@ -26,44 +26,37 @@
 
 package haven;
 
-import java.io.DataInput;
-import java.io.DataOutput;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.RandomAccessFile;
+import java.util.*;
+import java.io.*;
+import java.nio.file.*;
+import java.nio.channels.*;
 import java.net.URI;
-import java.nio.channels.FileLock;
-import java.nio.channels.FileLockInterruptionException;
-import java.nio.file.AccessDeniedException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.WeakHashMap;
+
+import static haven.Utils.pj;
 
 public class HashDirCache implements ResCache {
-    private final File base;
+    private final Path base;
     public final URI id;
     private final long idhash;
 
-    public static File findbase() {
+    public static Path findbase() {
         try {
             windows:
             {
                 String path = System.getenv("APPDATA");
                 if (path == null)
                     break windows;
-                File appdata = new File(path);
-                if (!appdata.exists() || !appdata.isDirectory() || !appdata.canRead() || !appdata.canWrite())
+                Path appdata = Utils.path(path);
+                if (!Files.exists(appdata) || !Files.isDirectory(appdata) || !Files.isReadable(appdata) || !Files.isWritable(appdata))
                     break windows;
-                File base = new File(new File(appdata, "Haven and Hearth"), "data");
-                if (!base.exists() && !base.mkdirs())
-                    break windows;
+                Path base = pj(appdata, "Haven and Hearth", "data");
+                if (!Files.exists(base)) {
+                    try {
+                        Files.createDirectories(base);
+                    } catch (IOException e) {
+                        break windows;
+                    }
+                }
                 return (base);
             }
             fallback:
@@ -71,12 +64,17 @@ public class HashDirCache implements ResCache {
                 String path = System.getProperty("user.home", null);
                 if (path == null)
                     break fallback;
-                File home = new File(path);
-                if (!home.exists() || !home.isDirectory() || !home.canRead() || !home.canWrite())
+                Path home = Utils.path(path);
+                if (!Files.exists(home) || !Files.isDirectory(home) || !Files.isReadable(home) || !Files.isWritable(home))
                     break fallback;
-                File base = new File(new File(home, ".haven"), "data");
-                if (!base.exists() && !base.mkdirs())
-                    break fallback;
+                Path base = pj(home, ".haven", "data");
+                if (!Files.exists(base)) {
+                    try {
+                        Files.createDirectories(base);
+                    } catch (IOException e) {
+                        break fallback;
+                    }
+                }
                 return (base);
             }
         } catch (SecurityException e) {
@@ -84,10 +82,21 @@ public class HashDirCache implements ResCache {
         throw (new UnsupportedOperationException("Found no reasonable place to store local files"));
     }
 
-    public HashDirCache(URI id) {
+    private HashDirCache(URI id) {
         this.base = findbase();
         this.id = id;
         this.idhash = namehash(0, id.toString());
+    }
+
+    private static final Map<URI, HashDirCache> current = new CacheMap<>();
+
+    public static HashDirCache get(URI id) {
+        synchronized (current) {
+            HashDirCache ret = current.get(id);
+            if (ret == null)
+                current.put(id, ret = new HashDirCache(id));
+            return (ret);
+        }
     }
 
     private static URI mkurn(String id) {
@@ -98,8 +107,8 @@ public class HashDirCache implements ResCache {
         }
     }
 
-    public HashDirCache(String id) {
-        this(mkurn(id));
+    public static HashDirCache get(String id) {
+        return (get(mkurn(id)));
     }
 
     private long namehash(long h, String name) {
@@ -128,34 +137,68 @@ public class HashDirCache implements ResCache {
         }
     }
 
+    private Header readhead(ReadableByteChannel ch) throws IOException {
+        return (readhead(new DataInputStream(Channels.newInputStream(ch))));
+    }
+
     private void writehead(DataOutput fp, String name) throws IOException {
         fp.writeByte(1);
         fp.writeUTF(id.toString());
         fp.writeUTF(name);
     }
 
-    private static class LockedFile {
-        final RandomAccessFile f;
-        final FileLock l;
+    private void writehead(WritableByteChannel ch, String name) throws IOException {
+        writehead(new DataOutputStream(Channels.newOutputStream(ch)), name);
+    }
 
-        LockedFile(RandomAccessFile f, FileLock l) {
+    private static class LockedFile implements AutoCloseable {
+        FileChannel f;
+        FileLock l;
+
+        LockedFile(FileChannel f, FileLock l) {
             this.f = f;
             this.l = l;
         }
+
+        void release() throws IOException {
+            if (l != null) {
+                l.release();
+                l = null;
+            }
+        }
+
+        public void close() throws IOException {
+            release();
+            if (f != null) {
+                f.close();
+                f = null;
+            }
+        }
+    }
+
+    private static FileChannel open2(Path path, OpenOption... mode) throws IOException {
+        /* XXX: Sometimes, this is getting strange and weird OS errors
+         * on Windows. For example, file sharing violations are
+         * sometimes returned even though Java always opens
+         * RandomAccessFiles in non-exclusive mode, and other times,
+         * permission is spuriously denied. I've had zero luck in
+         * trying to find a root cause for these errors, so just
+         * assume the error is transient and retry. :P */
+        return (Utils.ioretry(() -> FileChannel.open(path, mode)));
     }
 
     /* These locks should never have to be waited for long at all, so
      * blocking interruptions until complete should be perfectly
      * okay. */
-    private static LockedFile lock2(File path) throws IOException {
+    private static LockedFile lock2(Path path) throws IOException {
         boolean intr = false;
         try {
             while (true) {
                 try {
-                    RandomAccessFile fp = null;
+                    FileChannel fp = null;
                     try {
-                        fp = new RandomAccessFile(path, "rw");
-                        FileLock lk = fp.getChannel().lock();
+                        fp = open2(path, StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+                        FileLock lk = fp.lock(0, 1, false);
                         LockedFile ret = new LockedFile(fp, lk);
                         fp = null;
                         return (ret);
@@ -174,55 +217,106 @@ public class HashDirCache implements ResCache {
         }
     }
 
-    private static final Map<File, Object> monitors = new WeakHashMap<File, Object>();
+    private static class CacheFile implements AutoCloseable {
+        final Path p;
+        final Header h;
+        FileChannel f;
 
-    private File lookup(String name, boolean creat) throws IOException {
-        long h = namehash(idhash, name);
-        File lfn = new File(base, String.format("%016x.0", h));
-        if (!lfn.exists() && !creat)
-            return (null);
-        Object mon;
-        synchronized (monitors) {
-        /* Apparently, Java doesn't allow two threads in one JVM
-	     * to lock the same file... */
-            if ((mon = monitors.get(lfn)) == null)
-                monitors.put(lfn, mon = new Object());
+        CacheFile(Path p, Header h, LockedFile lf) throws IOException {
+            this.p = p;
+            this.h = h;
+            this.f = lf.f;
+            lf.release();
+            lf.f = null;
         }
-        synchronized (mon) {
-            LockedFile lf = lock2(lfn);
-            try {
-                for (int idx = 0; ; idx++) {
-                    File path = new File(base, String.format("%016x.%d", h, idx));
-                    if (!path.exists() && !creat)
-                        return (null);
-                    RandomAccessFile fp = (idx == 0) ? lf.f : new RandomAccessFile(path, "rw");
-                    try {
-                        Header head = readhead(fp);
-                        if (head == null) {
-                            if (!creat)
-                                return (null);
-                            fp.setLength(0);
-                            writehead(fp, name);
-                            return (path);
-                        }
-                        if (head.cid.equals(id.toString()) && head.name.equals(name))
-                            return (path);
-                    } finally {
-                        if (idx != 0)
-                            fp.close();
-                    }
-                }
-            } finally {
-                lf.l.release();
-                lf.f.close();
+
+        FileChannel acquire() {
+            FileChannel ret = this.f;
+            this.f = null;
+            return (ret);
+        }
+
+        public void close() throws IOException {
+            if (f != null) {
+                f.close();
+                f = null;
             }
         }
     }
 
-    private Iterator<String> list(boolean filter) {
-        final File[] files = base.listFiles(f -> (f.getName().length() >= 18) &&
-                (f.getName().charAt(16) == '.') &&
-                Utils.strcheck(f.getName().substring(17), Character::isDigit));
+    private static final Map<Path, int[]> monitors = new HashMap<>();
+    private static boolean monwarned = false;
+
+    private CacheFile lookup(String name, boolean creat) throws IOException {
+        long h = namehash(idhash, name);
+        Path lfn = pj(base, String.format("%016x.0", h));
+        if (!Files.exists(lfn) && !creat)
+            return (null);
+        int[] mon;
+        synchronized (monitors) {
+            if (!monwarned && (monitors.size() > 100)) {
+                Warning.warn("HashDirCache monitors growing suspiciously many: " + monitors.size());
+                monwarned = true;
+            }
+            /* Apparently, Java doesn't allow two threads in one JVM
+             * to lock the same file... */
+            if ((mon = monitors.get(lfn)) == null)
+                monitors.put(lfn, mon = new int[]{1});
+            else
+                mon[0]++;
+        }
+        try {
+            synchronized (mon) {
+                try (LockedFile lf = lock2(lfn)) {
+                    for (int idx = 0; ; idx++) {
+                        Path path = pj(base, String.format("%016x.%d", h, idx));
+                        if (!Files.exists(path) && !creat)
+                            return (null);
+                        FileChannel fp = (idx == 0) ? lf.f : open2(path, StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
+                        try {
+                            Header head = readhead(fp);
+                            if (head == null) {
+                                if (!creat)
+                                    return (null);
+                                fp.truncate(0);
+                                writehead(fp, name);
+                                head = new Header();
+                                head.cid = id.toString();
+                                head.name = name;
+                                return (new CacheFile(path, head, lf));
+                            }
+                            if (head.cid.equals(id.toString()) && head.name.equals(name))
+                                return (new CacheFile(path, head, lf));
+                        } finally {
+                            if (idx != 0)
+                                fp.close();
+                        }
+                    }
+                }
+            }
+        } finally {
+            synchronized (monitors) {
+                mon[0]--;
+                if (mon[0] < 0) {
+                    throw (new AssertionError(String.format("monitor refcount %d for %s (%s)", mon[0], lfn, name)));
+                } else if (mon[0] == 0) {
+                    if (monitors.remove(lfn) != mon)
+                        throw (new AssertionError(String.format("monitor identity crisis for %s (%s)", lfn, name)));
+                }
+            }
+        }
+    }
+
+    private static DirectoryStream.Filter<Path> fnfilter(java.util.function.Predicate<String> filter) {
+        return (p -> filter.test(p.getFileName().toString()));
+    }
+
+    private Iterator<String> list(boolean filter) throws IOException {
+        Iterator<Path> files =
+                Files.newDirectoryStream(base, fnfilter(f -> (f.length() >= 18) &&
+                        (f.charAt(16) == '.') &&
+                        Utils.strcheck(f.substring(17), Character::isDigit)))
+                        .iterator();
         return (new Iterator<String>() {
             int i = 0;
             String next = null;
@@ -231,8 +325,8 @@ public class HashDirCache implements ResCache {
                 if (next != null)
                     return (true);
                 try {
-                    for (; i < files.length; i++) {
-                        RandomAccessFile fp = new RandomAccessFile(files[i], "rw");
+                    while (files.hasNext()) {
+                        FileChannel fp = open2(files.next(), StandardOpenOption.READ);
                         try {
                             Header head = readhead(fp);
                             if (head == null)
@@ -262,139 +356,151 @@ public class HashDirCache implements ResCache {
         });
     }
 
-    private Iterator<String> list() {
+    private Iterator<String> list() throws IOException {
         return (list(true));
     }
 
     public OutputStream store(String name) throws IOException {
-        final File path = lookup(name, true);
-        File dir = path.getParentFile();
-        final File tmp = File.createTempFile("cache", ".new", dir);
-        final RandomAccessFile fp = new RandomAccessFile(tmp, "rw");
+        Path path;
+        try (CacheFile cf = lookup(name, true)) {
+            path = cf.p;
+        }
+        Path dir = path.getParent();
+        Path tmp = Files.createTempFile(dir, "cache", ".new");
+        FileChannel fp = open2(tmp, StandardOpenOption.READ, StandardOpenOption.WRITE, StandardOpenOption.CREATE);
         writehead(fp, name);
+        OutputStream st = Channels.newOutputStream(fp);
         return (new OutputStream() {
             public void write(int b) throws IOException {
-                fp.write(b);
+                st.write(b);
             }
 
             public void write(byte[] buf, int off, int len) throws IOException {
-                fp.write(buf, off, len);
+                st.write(buf, off, len);
             }
 
             public void close() throws IOException {
-                fp.close();
-                try {
-                    Files.move(tmp.toPath(), path.toPath(), StandardCopyOption.ATOMIC_MOVE);
-                } catch (AccessDeniedException e) { // ignored
-                }
+                st.close();
+                Utils.ioretry(() -> {
+                    try {
+                        return (Files.move(tmp, path, StandardCopyOption.ATOMIC_MOVE));
+                    } catch (AtomicMoveNotSupportedException e) {
+                        return (Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING));
+                    }
+                });
             }
         });
     }
 
     public InputStream fetch(String name) throws IOException {
-        File path = lookup(name, false);
-        if (path == null)
-            throw (new FileNotFoundException(name));
-        final RandomAccessFile fp = new RandomAccessFile(path, "r");
-        Header head = readhead(fp);
-        if ((head == null) || !head.cid.equals(id.toString()) || !head.name.equals(name))
-            throw (new AssertionError());
-        return (new InputStream() {
-            public int read() throws IOException {
-                return (fp.read());
-            }
-
-            public int read(byte[] buf, int off, int len) throws IOException {
-                return (fp.read(buf, off, len));
-            }
-
-            public void close() throws IOException {
-                fp.close();
-            }
-        });
+        try (CacheFile cf = lookup(name, false)) {
+            if (cf == null)
+                throw (new FileNotFoundException(name));
+            FileChannel fp = cf.acquire();
+            return (Channels.newInputStream(fp));
+        }
     }
 
     public void remove(String name) throws IOException {
-        File path = lookup(name, false);
-        if (path == null)
-            throw (new FileNotFoundException(name));
-        path.delete();
+        try (CacheFile cf = lookup(name, false)) {
+            if (cf == null)
+                throw (new FileNotFoundException(name));
+            cf.close();
+            Files.deleteIfExists(cf.p);
+        }
     }
 
     public String toString() {
-        return ("FileCache(" + id + ")");
+        return ("HashDirCache(" + id + ")");
+    }
+
+    public static HashDirCache forjnlp() {
+        try {
+            javax.jnlp.BasicService basic = (javax.jnlp.BasicService) javax.jnlp.ServiceManager.lookup("javax.jnlp.BasicService");
+            if (basic == null)
+                return (null);
+            return (get(basic.getCodeBase().toURI()));
+        } catch (NoClassDefFoundError e) {
+            return (null);
+        } catch (Exception e) {
+            return (null);
+        }
     }
 
     public static HashDirCache create() {
         HashDirCache ret;
         try {
+            if ((ret = forjnlp()) != null)
+                return (ret);
+            if (Config.cachebase != null)
+                return (get(Config.cachebase.toURI()));
             if (Config.resurl != null)
-                return (new HashDirCache(Config.resurl.toURI()));
-            return (new HashDirCache("default"));
+                return (get(Config.resurl.toURI()));
+            return (get("default"));
         } catch (Exception e) {
             return (null);
         }
     }
 
     public static void main(String[] args) throws IOException {
-	if(args.length < 2) {
-	    System.err.println("usage: HashDirCache [-h] ID-URI COMMAND [ARGS...]");
-	    System.exit(1);
-	}
-	HashDirCache cache;
-	if(args[0].indexOf(':') >= 0)
-	    cache = new HashDirCache(URI.create(args[0]));
-	else
-	    cache = new HashDirCache(args[0]);
-	switch(args[1]) {
-	case "ls":
-	    for(Iterator<String> i = cache.list(); i.hasNext();) {
-		String nm = i.next();
-		System.out.println(nm);
-	    }
-	    break;
-	case "cat":
-	    InputStream fp;
-	    try {
-		fp = cache.fetch(args[2]);
-	    } catch(FileNotFoundException e) {
-		System.err.printf("%s: not found\n", args[2]);
-		System.exit(1);
-		break;
-	    }
-	    byte[] buf = new byte[1024];
-	    while(true) {
-		int n = fp.read(buf);
-		if(n < 0)
-		    break;
-		System.out.write(buf, 0, n);
-	    }
-	    break;
-	case "purge":
-	    int n = 0;
-	    for(Iterator<String> i = cache.list(); i.hasNext();) {
-		String nm = i.next();
-		try {
-		    cache.remove(nm);
-		    n++;
-		} catch(FileNotFoundException e) {
-		    System.err.printf("%s: not found\n", nm);
-		}
-	    }
-	    System.err.printf("%s: %d files purged\n", cache.id, n);
-	    break;
-	case "rm":
-	    for(int i = 2; i < args.length; i++) {
-		try {
-		    cache.remove(args[i]);
-		} catch(FileNotFoundException e) {
-		    System.err.printf("%s: not found\n", args[i]);
-		}
-	    }
-	    break;
-	default:
-	    System.err.printf("%s: no such command\n", args[2]);
-	    break;
-	}
+        if (args.length < 2) {
+            System.err.println("usage: HashDirCache [-h] ID-URI COMMAND [ARGS...]");
+            System.exit(1);
+        }
+        HashDirCache cache;
+        if (args[0].indexOf(':') >= 0)
+            cache = get(URI.create(args[0]));
+        else
+            cache = get(args[0]);
+        switch (args[1]) {
+            case "ls":
+                for (Iterator<String> i = cache.list(); i.hasNext(); ) {
+                    String nm = i.next();
+                    System.out.println(nm);
+                }
+                break;
+            case "cat":
+                InputStream fp;
+                try {
+                    fp = cache.fetch(args[2]);
+                } catch (FileNotFoundException e) {
+                    System.err.printf("%s: not found\n", args[2]);
+                    System.exit(1);
+                    break;
+                }
+                byte[] buf = new byte[1024];
+                while (true) {
+                    int n = fp.read(buf);
+                    if (n < 0)
+                        break;
+                    System.out.write(buf, 0, n);
+                }
+                break;
+            case "purge":
+                int n = 0;
+                for (Iterator<String> i = cache.list(); i.hasNext(); ) {
+                    String nm = i.next();
+                    try {
+                        cache.remove(nm);
+                        n++;
+                    } catch (FileNotFoundException e) {
+                        System.err.printf("%s: not found\n", nm);
+                    }
+                }
+                System.err.printf("%s: %d files purged\n", cache.id, n);
+                break;
+            case "rm":
+                for (int i = 2; i < args.length; i++) {
+                    try {
+                        cache.remove(args[i]);
+                    } catch (FileNotFoundException e) {
+                        System.err.printf("%s: not found\n", args[i]);
+                    }
+                }
+                break;
+            default:
+                System.err.printf("%s: no such command\n", args[2]);
+                break;
+        }
     }
 }

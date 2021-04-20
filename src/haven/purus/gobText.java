@@ -1,51 +1,80 @@
 package haven.purus;
 
 import haven.*;
+import haven.render.*;
 
 import java.awt.*;
+import java.util.HashMap;
+import java.util.Objects;
 
-public class gobText extends Sprite {
-	// Text custom text above gob
+public class GobText extends Sprite implements RenderTree.Node, PView.Render2D {
+    private static final Text.Foundry font = new Text.Foundry(Text.mono.deriveFont(Font.BOLD, UI.scale(10))).aa(true);
+    private static final HashMap<CachedTexKey, CachedTexVal> texts = new HashMap<>();
 
-	private Tex tex;
-	private static Matrix4f mv = new Matrix4f();
-	private Projection proj;
-	private Coord wndsz;
-	private Location.Chain loc;
-	private Camera camp;
-	private int height;
+    private static class CachedTexKey {
+        Color col;
+        String text;
 
-	public gobText(String text, int height) {
-		super(null, null);
-		update(text);
-		this.height = height;
-	}
+        CachedTexKey(String text, Color col) {
+            this.col = col;
+            this.text = text;
+        }
 
-	public void draw(GOut g) {
-		float[] c = mv.load(camp.fin(Matrix4f.id)).mul1(loc.fin(Matrix4f.id)).homoc();
-		Coord sc = proj.get2dCoord(c, wndsz);
-		sc.x -= tex.sz().x/2;
-		sc.y -= height; // 10 default?
-		g.image(tex, sc);
-	}
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (o == null || getClass() != o.getClass())
+                return false;
+            CachedTexKey that = (CachedTexKey) o;
+            return Objects.equals(col, that.col) && Objects.equals(text, that.text);
+        }
 
-	public boolean setup(RenderList rl) {
-		rl.prepo(last);
-		GLState.Buffer buf = rl.state();
-		proj = buf.get(PView.proj);
-		wndsz = buf.get(PView.wnd).sz();
-		loc = buf.get(PView.loc);
-		camp = buf.get(PView.cam);
-		return true;
-	}
+        @Override
+        public int hashCode() {
+            return Objects.hash(col, text);
+        }
+    }
 
-	public void update(String text) {
-		String str = text;
-		tex = Text.render(text, Color.white).tex();
-	}
+    private static class CachedTexVal {
+        Tex tex;
+        int cnt = 1;
 
-	public Object staticp() {
-		return CONSTANS;
-	}
+        CachedTexVal(Tex tex) {
+            this.tex = tex;
+        }
+    }
 
+    public final String text;
+    private Tex tex;
+    private int zOfs;
+    private Color col;
+
+    public GobText(Gob g, String text, Color col, int zOfs) {
+        super(null, null);
+        this.text = text;
+        this.tex = font.renderstroked(text, col, Color.BLACK).tex();
+        this.zOfs = zOfs;
+        this.col = col;
+        CachedTexVal ctv = texts.get(new CachedTexKey(text, col));
+        if (ctv != null) {
+            ctv.cnt++;
+            this.tex = ctv.tex;
+        } else {
+            texts.put(new CachedTexKey(text, col), new CachedTexVal(this.tex));
+        }
+    }
+
+    public void draw(GOut g, Pipe state) {
+        Coord sc = Homo3D.obj2view(new Coord3f(0, 0, 6 + zOfs), state, Area.sized(g.sz())).round2();
+        g.aimage(tex, sc, 0.5, 0.5);
+    }
+
+    @Override
+    public void removed(RenderTree.Slot slot) {
+        CachedTexVal ctv = texts.get(new CachedTexKey(text, col));
+        if (ctv != null && --ctv.cnt == 0) {
+            texts.remove(new CachedTexKey(text, col));
+        }
+    }
 }

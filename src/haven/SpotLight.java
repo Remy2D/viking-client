@@ -28,8 +28,6 @@ package haven;
 
 import java.awt.Color;
 
-import javax.media.opengl.GL2;
-
 public class SpotLight extends PosLight {
     public float[] dir;
     public float exp, cut;
@@ -64,19 +62,21 @@ public class SpotLight extends PosLight {
         this.cut = 90.0f;
     }
 
+    /* XXXRENDER
     public void enable(GOut g, int idx) {
-        super.enable(g, idx);
-        BGL gl = g.gl;
-        gl.glLightfv(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_DIRECTION, dir, 0);
-        gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_EXPONENT, exp);
-        gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_CUTOFF, cut);
+	super.enable(g, idx);
+	BGL gl = g.gl;
+	gl.glLightfv(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_DIRECTION, dir, 0);
+	gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_EXPONENT, exp);
+	gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_CUTOFF, cut);
     }
 
     public void disable(GOut g, int idx) {
-        BGL gl = g.gl;
-        gl.glLightfv(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_DIRECTION, defdir, 0);
-        gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_EXPONENT, 0.0f);
-        gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_CUTOFF, 180.0f);
-        super.disable(g, idx);
+	BGL gl = g.gl;
+	gl.glLightfv(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_DIRECTION, defdir, 0);
+	gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_EXPONENT, 0.0f);
+	gl.glLightf(GL2.GL_LIGHT0 + idx, GL2.GL_SPOT_CUTOFF, 180.0f);
+	super.disable(g, idx);
     }
+    */
 }

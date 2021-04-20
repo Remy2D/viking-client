@@ -26,9 +26,7 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class ResData {
     public Indir<Resource> res;
@@ -44,7 +42,7 @@ public class ResData {
     }
 
     public int hashCode() {
-	return(Objects.hash(res, sdt));
+        return (Objects.hash(res, sdt));
     }
 
     public boolean equals(Object other) {
@@ -69,6 +67,6 @@ public class ResData {
     }
 
     public String toString() {
-	    return(String.format("(%s, %s)", res, sdt));
+        return (String.format("(%s, %s)", res, sdt));
     }
 }

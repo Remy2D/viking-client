@@ -26,16 +26,16 @@
 
 package haven;
 
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.awt.image.Raster;
-import java.util.Random;
+import java.util.*;
+import java.awt.image.*;
+
+import haven.render.VectorFormat;
 
 public abstract class Mipmapper {
-    public abstract byte[] gen4(Coord dim, byte[] data, int fmt);
+    public abstract byte[] gen4(Coord dim, byte[] data, VectorFormat fmt);
 
     public static abstract class Mipmapper3 extends Mipmapper {
-        public abstract byte[] gen3(Coord dim, byte[] data, int fmt);
+        public abstract byte[] gen3(Coord dim, byte[] data, VectorFormat fmt);
     }
 
     public static Coord nextsz(Coord dim) {
@@ -46,7 +46,7 @@ public abstract class Mipmapper {
     }
 
     public static final Mipmapper3 avg = new Mipmapper3() {
-        public byte[] gen4(Coord dim, byte[] data, int fmt) {
+        public byte[] gen4(Coord dim, byte[] data, VectorFormat fmt) {
             int dst = dim.x * 4;
             dim = dim.div(2);
             boolean lx = false, ly = false;
@@ -130,7 +130,7 @@ public abstract class Mipmapper {
             return (ndata);
         }
 
-        public byte[] gen3(Coord dim, byte[] data, int fmt) {
+        public byte[] gen3(Coord dim, byte[] data, VectorFormat fmt) {
             int dst = dim.x * 3;
             dim = dim.div(2);
             boolean lx = false, ly = false;
@@ -200,7 +200,7 @@ public abstract class Mipmapper {
     };
 
     public static final Mipmapper rnd = new Mipmapper() {
-        public byte[] gen4(Coord dim, byte[] data, int fmt) {
+        public byte[] gen4(Coord dim, byte[] data, VectorFormat fmt) {
             Random rnd = new Random();
             int dst = dim.x * 4;
             dim = dim.div(2);
@@ -237,7 +237,7 @@ public abstract class Mipmapper {
     };
 
     public static final Mipmapper cnt = new Mipmapper() {
-        public byte[] gen4(Coord dim, byte[] data, int fmt) {
+        public byte[] gen4(Coord dim, byte[] data, VectorFormat fmt) {
             int dst = dim.x * 4;
             dim = dim.div(2);
             boolean lx = false, ly = false;
@@ -336,7 +336,7 @@ public abstract class Mipmapper {
     };
 
     public static final Mipmapper dav = new Mipmapper() {
-        public byte[] gen4(Coord dim, byte[] data, int fmt) {
+        public byte[] gen4(Coord dim, byte[] data, VectorFormat fmt) {
             int dst = dim.x * 4;
             dim = dim.div(2);
             boolean lx = false, ly = false;
@@ -437,7 +437,7 @@ public abstract class Mipmapper {
     public static final Mipmapper lanczos = new Mipmapper() {
         final PUtils.Convolution filter = new PUtils.Lanczos(2);
 
-        public byte[] gen4(Coord dim, byte[] data, int fmt) {
+        public byte[] gen4(Coord dim, byte[] data, VectorFormat fmt) {
             BufferedImage img = PUtils.rasterimg(Raster.createInterleavedRaster(new DataBufferByte(data, data.length),
                     dim.x, dim.y, dim.x * 4, 4, new int[]{0, 1, 2, 3}, null));
             dim = nextsz(dim);

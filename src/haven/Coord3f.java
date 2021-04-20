@@ -54,7 +54,7 @@ public class Coord3f {
     }
 
     public boolean equals(Object o) {
-	return((o instanceof Coord3f) && equals((Coord3f)o));
+        return ((o instanceof Coord3f) && equals((Coord3f) o));
     }
 
     public Coord3f add(float ax, float ay, float az) {
@@ -174,6 +174,10 @@ public class Coord3f {
 
     public float[] to4a(float w) {
         return (new float[]{x, y, z, w});
+    }
+
+    public Coord round2() {
+        return (new Coord((int) Math.round(x), (int) Math.round(y)));
     }
 
     public String toString() {

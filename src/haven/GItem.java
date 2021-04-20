@@ -26,17 +26,14 @@
 
 package haven;
 
-import haven.res.ui.tt.q.qbuff.QBuff;
-import integrations.food.FoodService;
-import integrations.food.IconService;
+import haven.purus.Config;
+import haven.purus.food.FoodService;
+import haven.purus.food.IconService;
 
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Graphics;
 import java.awt.image.BufferedImage;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-
-import static haven.Text.num10Fnd;
+import java.util.*;
 
 public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owner {
     public Indir<Resource> res;
@@ -45,13 +42,13 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
     public int num = -1;
     private GSprite spr;
     private ItemInfo.Raw rawinfo;
-    public List<ItemInfo> info = Collections.emptyList();
-    public QBuff quality;
+    private List<ItemInfo> info = Collections.emptyList();
+    public String name;
+    public double studytime = 0;
     public Tex metertex;
-    public double studytime = 0.0;
-    public boolean drop = false;
-    private double dropTimer = 0;
-    private boolean postProcessed = false;
+    private boolean dropcheck = false;
+    public Double wear = null;
+
 
     @RName("item")
     public static class $_ implements Factory {
@@ -68,6 +65,7 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
 
     public interface OverlayInfo<T> {
         public T overlay();
+
         public void drawoverlay(GOut g, T data);
     }
 
@@ -85,33 +83,33 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
         }
 
         public static <S> InfoOverlay<S> create(OverlayInfo<S> inf) {
-            return(new InfoOverlay<S>(inf));
+            return (new InfoOverlay<S>(inf));
         }
     }
 
     public interface NumberInfo extends OverlayInfo<Tex> {
         public int itemnum();
+
         public default Color numcolor() {
-            return(Color.WHITE);
+            return (Color.WHITE);
         }
 
         public default Tex overlay() {
-            return(new TexI(GItem.NumberInfo.numrender(itemnum(), numcolor())));
+            return (new TexI(GItem.NumberInfo.numrender(itemnum(), numcolor())));
         }
 
         public default void drawoverlay(GOut g, Tex tex) {
-            g.aimage(tex, new Coord(g.sz.x, 0), 1, 0);
+            g.aimage(tex, g.sz().sub(0, g.sz().y), 1, 0);
         }
 
         public static BufferedImage numrender(int num, Color col) {
-            return Text.renderstroked(num + "", col, Color.BLACK).img;
+            return (Utils.outline2(Text.render(Integer.toString(num), col).img, Utils.contrast(col)));
         }
     }
 
     public interface MeterInfo {
         public double meter();
     }
-
 
     public static class Amount extends ItemInfo implements NumberInfo {
         private final int num;
@@ -133,18 +131,6 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
 
     public GItem(Indir<Resource> res) {
         this(res, Message.nil);
-    }
-
-    public String getname() {
-        if (rawinfo == null) {
-            return "";
-        }
-
-        try {
-            return ItemInfo.find(ItemInfo.Name.class, info()).str.text;
-        } catch (Exception ex) {
-            return "";
-        }
     }
 
     private Random rnd = null;
@@ -177,11 +163,6 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
         if (spr == null) {
             try {
                 spr = this.spr = GSprite.create(this, res.get(), sdt.clone());
-                if (!postProcessed) {
-                    dropItMaybe();
-                    postProcessed = true;
-                }
-                IconService.checkIcon(info(), spr);
             } catch (Loading l) {
             }
         }
@@ -189,13 +170,21 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
     }
 
     public void tick(double dt) {
-    	super.tick(dt);
-        if(drop) {
-        	dropTimer += dt;
-        	if(dropTimer > 0.1) {
-        		dropTimer = 0;
-        		wdgmsg("drop", Coord.z);
-        	}
+        if (!dropcheck) {
+            new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (haven.purus.Config.autodropItems.val.containsKey(getres().name) && Config.autodropItems.val.get(getres().name)) {
+                            wdgmsg("drop", Coord.z, 1);
+                        }
+                    } catch (Loading l) {
+                        l.waitfor(this, waiting -> {
+                        });
+                    }
+                }
+            }.run();
+            dropcheck = true;
         }
         GSprite spr = spr();
         if (spr != null)
@@ -203,14 +192,17 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
     }
 
     public List<ItemInfo> info() {
-        if (info == null && rawinfo != null) {
+        if (info == null) {
             info = ItemInfo.buildinfo(this, rawinfo);
-			info.add(new ItemInfo.AdHoc(this, (Config.resinfo ? ("\n" + this.getres().name) : "")));
-			try {
-                // getres() can throw Loading, ignore it
-                FoodService.checkFood(info, getres().name);
-            } catch (Exception ex) {
-			}
+            if (Config.resinfo.val) {
+                try {
+                    info.add(new ItemInfo.AdHoc(this, getres().name));
+                } catch (Error e) {
+                    // Ignored
+                }
+            }
+            FoodService.checkFood(info, getres().name);
+            IconService.checkIcon(info, spr);
         }
         return (info);
     }
@@ -236,84 +228,72 @@ public class GItem extends AWidget implements ItemInfo.SpriteOwner, GSprite.Owne
             }
         } else if (name == "tt") {
             info = null;
-            if (rawinfo != null)
-                quality = null;
             rawinfo = new ItemInfo.Raw(args);
         } else if (name == "meter") {
-            meter = (int)((Number)args[0]).doubleValue();
-            metertex = Text.renderstroked(String.format("%d%%", meter), Color.WHITE, Color.BLACK, num10Fnd).tex();
+            meter = (int) ((Number) args[0]).doubleValue();
         }
     }
 
-    public void qualitycalc(List<ItemInfo> infolist) {
-        for (ItemInfo info : infolist) {
-            if (info instanceof QBuff) {
-                this.quality = (QBuff) info;
-                break;
-            }
+    public String getName() {
+        if (name != null)
+            return name; // Lets hope that names of items don't change
+        if (rawinfo == null) {
+            return "";
         }
-    }
-
-    public QBuff quality() {
-        if (quality == null) {
-            try {
-                for (ItemInfo info : info()) {
-                    if (info instanceof ItemInfo.Contents) {
-                        qualitycalc(((ItemInfo.Contents) info).sub);
-                        return quality;
-                    }
-                }
-                qualitycalc(info());
-            } catch (Loading l) {
-            }
-        }
-        return quality;
-    }
-
-    public ItemInfo.Contents getcontents() {
         try {
-            for (ItemInfo info : info()) {
-                if (info instanceof ItemInfo.Contents)
-                    return (ItemInfo.Contents) info;
-            }
-        } catch (Exception e) { // fail silently if info is not ready
+            name = ItemInfo.find(ItemInfo.Name.class, info()).str.text;
+            return name;
+        } catch (Exception e) {
+            return "";
         }
-        return null;
     }
 
-    private void dropItMaybe() {
-        Resource curs = ui.root.getcurs(Coord.z);
-        if (Config.dropEverything) {
-            this.wdgmsg("drop", Coord.z);
-        } else {
-            String name = this.resource().basename();
-            if ((Config.dropSoil && name.equals("soil")))
-                this.wdgmsg("drop", Coord.z);
-            if (curs != null && curs.name.equals("gfx/hud/curs/mine") &&
-                    (Config.dropMinedStones && Config.mineablesStone.contains(name) ||
-                    Config.dropMinedOre && Config.mineablesOre.contains(name) ||
-                    Config.dropMinedOrePrecious && Config.mineablesOrePrecious.contains(name) ||
-                    Config.dropMinedCurios && Config.mineablesCurios.contains(name)))
-                this.wdgmsg("drop", Coord.z);
+    public WItem witem() {
+        try {
+            if (this.parent instanceof Inventory)
+                return ((Inventory) this.parent).wmap.get(this);
+            else
+                return ((Equipory) this.parent).wmap.get(this).stream().findFirst().get();
+        } catch (NullPointerException e) {
+            return null;
         }
     }
 
     public Coord size() {
-    	try {
-			Indir<Resource> res = getres().indir();
-			if(res.get() != null && res.get().layer(Resource.imgc) != null) {
-				Tex tex = res.get().layer(Resource.imgc).tex();
-				if(tex == null)
-					return new Coord(1, 1);
-				else
-					return tex.sz().div(30);
-			} else {
-				return new Coord(1, 1);
-			}
-		} catch(Loading l) {
+        try {
+            Indir<Resource> res = getres().indir();
+            if (res.get() != null && res.get().layer(Resource.imgc) != null) {
+                Tex tex = res.get().layer(Resource.imgc).tex();
+                if (tex == null)
+                    return new Coord(1, 1);
+                else
+                    return UI.unscale(tex.sz()).div(30);
+            } else {
+                return new Coord(1, 1);
+            }
+        } catch (Loading l) {
 
-		}
-    	return new Coord(1, 1);
+        }
+        return new Coord(1, 1);
     }
 
+    public String getname() {
+        if (rawinfo == null) {
+            return "";
+        }
+
+        try {
+            return ItemInfo.find(ItemInfo.Name.class, info()).str.text;
+        } catch (Exception ex) {
+            return "";
+        }
+    }
+
+    @Override
+    public void wdgmsg(Widget sender, String msg, Object... args) {
+        if (msg.equals("take") && this.parent != null && this.parent instanceof StudyInventory && Config.studyLock.val) {
+            return;
+        }
+        super.wdgmsg(sender, msg, args);
+    }
 }

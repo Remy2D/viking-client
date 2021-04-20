@@ -26,9 +26,8 @@
 
 package haven;
 
+import java.util.*;
 import java.awt.event.KeyEvent;
-import java.util.ArrayList;
-import java.util.List;
 
 public abstract class ConsoleHost extends Widget {
     public static Text.Foundry cmdfoundry = new Text.Foundry(Text.mono, 12, new java.awt.Color(245, 222, 179));
@@ -110,7 +109,7 @@ public abstract class ConsoleHost extends Widget {
                 cmdtext = cmdfoundry.render(":" + (cmdtextf = cmdline.line));
             g.image(cmdtext.tex(), c);
             int lx = cmdtext.advance(cmdline.point + 1);
-            g.line(c.add(lx + 1, 2), c.add(lx + 1, 14), 1);
+            g.line(c.add(lx + UI.scale(1), UI.scale(2)), c.add(lx + UI.scale(1), UI.scale(14)), UI.scale(1));
         }
     }
 

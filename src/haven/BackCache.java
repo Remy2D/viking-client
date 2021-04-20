@@ -26,10 +26,8 @@
 
 package haven;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
+import java.util.*;
+import java.util.function.*;
 
 public class BackCache<K, V> {
     public final Function<K, V> load;
@@ -38,48 +36,48 @@ public class BackCache<K, V> {
     private final Map<K, V> cache;
 
     public BackCache(int size, Function<K, V> load, BiConsumer<K, V> store, BiConsumer<K, V> dispose) {
-	this.load = load;
-	this.store = store;
-	this.dispose = dispose;
-	this.cache = new Cache(size);
+        this.load = load;
+        this.store = store;
+        this.dispose = dispose;
+        this.cache = new Cache(size);
     }
 
     public BackCache(int size, Function<K, V> load, BiConsumer<K, V> store) {
-	this(size, load, store, null);
+        this(size, load, store, null);
     }
 
     private class Cache extends LinkedHashMap<K, V> {
-	private final int size;
+        private final int size;
 
-	private Cache(int size) {
-	    super(size, 0.75f, true);
-	    this.size = size;
-	}
+        private Cache(int size) {
+            super(size, 0.75f, true);
+            this.size = size;
+        }
 
-	protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
-	    if(size() > size) {
-		if(dispose != null)
-		    dispose.accept(eldest.getKey(), eldest.getValue());
-		return(true);
-	    }
-	    return(false);
-	}
+        protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+            if (size() > size) {
+                if (dispose != null)
+                    dispose.accept(eldest.getKey(), eldest.getValue());
+                return (true);
+            }
+            return (false);
+        }
     }
 
     public boolean cached(K key) {
-	return(cache.containsKey(key));
+        return (cache.containsKey(key));
     }
 
     public V get(K key) {
-	if(cache.containsKey(key))
-	    return(cache.get(key));
-	V ret = load.apply(key);
-	cache.put(key, ret);
-	return(ret);
+        if (cache.containsKey(key))
+            return (cache.get(key));
+        V ret = load.apply(key);
+        cache.put(key, ret);
+        return (ret);
     }
 
     public void put(K key, V val) {
-	store.accept(key, val);
-	cache.put(key, val);
+        store.accept(key, val);
+        cache.put(key, val);
     }
 }

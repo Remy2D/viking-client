@@ -27,50 +27,119 @@
 package haven;
 
 import java.awt.Graphics;
+import java.awt.image.*;
 import java.awt.color.ColorSpace;
-import java.awt.image.BufferedImage;
-import java.awt.image.ColorModel;
-import java.awt.image.ComponentColorModel;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.PixelInterleavedSampleModel;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
 import java.nio.ByteBuffer;
 
-import javax.media.opengl.GL;
-import javax.media.opengl.GL2;
+import haven.render.*;
+import haven.render.Texture2D.Sampler2D;
+import haven.render.DataBuffer;
 
-public class TexI extends TexGL {
-    public static ComponentColorModel glcm = new ComponentColorModel(ColorSpace.getInstance(ColorSpace.CS_sRGB), new int[]{8, 8, 8, 8}, true, false, ComponentColorModel.TRANSLUCENT, DataBuffer.TYPE_BYTE);
-    public BufferedImage back;
-    public boolean mutable;
-    private int fmt = GL.GL_RGBA;
-    public Mipmapper mmalg = Mipmapper.avg;
+public class TexI implements Tex {
+    public static ComponentColorModel glcm = new ComponentColorModel(ColorSpace.getInstance(ColorSpace.CS_sRGB), new int[]{8, 8, 8, 8}, true, false, ComponentColorModel.TRANSLUCENT, java.awt.image.DataBuffer.TYPE_BYTE);
+    public final BufferedImage back;
+    protected final Coord sz;
+    protected final Coord tdim;
 
-    public TexI(BufferedImage img) {
-        super(Utils.imgsz(img));
-        back = img;
-        mutable = false;
+    public TexI(BufferedImage back, boolean round) {
+        this.back = back;
+        this.sz = Utils.imgsz(back);
+        if (round)
+            this.tdim = new Coord(Tex.nextp2(sz.x), Tex.nextp2(sz.y));
+        else
+            this.tdim = sz;
     }
 
-    public TexI(Coord sz) {
-        super(sz);
-        mutable = true;
+    public TexI(BufferedImage back) {
+        this(back, true);
     }
 
-    /* Java's image model is a little bit complex, so these may not be
-     * entirely correct. They should be corrected if oddities are
-     * detected. */
-    public static int detectfmt(BufferedImage img) {
+    public Coord sz() {
+        return (sz);
+    }
+
+    private ColorTex st = null;
+
+    public ColorTex st() {
+        ColorTex st = this.st;
+        if (st == null) {
+            synchronized (this) {
+                if (this.st == null) {
+                    Texture2D tex = new Texture2D(tdim.x, tdim.y, DataBuffer.Usage.STATIC, new VectorFormat(4, NumberFormat.UNORM8), new VectorFormat(4, NumberFormat.UNORM8),
+                            (img, env) -> {
+                                if (img.level != 0)
+                                    return (null);
+                                FillBuffer buf = env.fillbuf(img);
+                                if (Utils.eq(tdim, sz) && Utils.eq(detectfmt(back), img.tex.efmt)) {
+                                    buf.pull(ByteBuffer.wrap(((DataBufferByte) back.getRaster().getDataBuffer()).getData()));
+                                } else {
+                                    buf.pull(ByteBuffer.wrap(convert(back, tdim)));
+                                }
+                                return (buf);
+                            });
+                    Sampler2D data = new Sampler2D(tex);
+                    data.magfilter(Texture.Filter.NEAREST).minfilter(Texture.Filter.NEAREST);
+                    st = this.st = new ColorTex(data);
+                }
+            }
+        }
+        return (st);
+    }
+
+    public TexI magfilter(Texture.Filter filter) {
+        st().data.magfilter(filter);
+        return (this);
+    }
+
+    public TexI minfilter(Texture.Filter filter) {
+        st().data.minfilter(filter);
+        return (this);
+    }
+
+    public TexI filter(Texture.Filter filter) {
+        magfilter(filter);
+        minfilter(filter);
+        return (this);
+    }
+
+    public TexI wrapmode(Texture.Wrapping mode) {
+        st().data.wrapmode(mode);
+        return (this);
+    }
+
+    public void render(GOut g, float[] gc, float[] tc) {
+        float ix = 1.0f / tdim.x, iy = 1.0f / tdim.y;
+        float[] data = {
+                gc[2], gc[3], tc[2] * ix, tc[3] * iy,
+                gc[4], gc[5], tc[4] * ix, tc[5] * iy,
+                gc[0], gc[1], tc[0] * ix, tc[1] * iy,
+                gc[6], gc[7], tc[6] * ix, tc[7] * iy,
+        };
+        g.usestate(st());
+        g.drawt(Model.Mode.TRIANGLE_STRIP, data);
+        g.usestate(ColorTex.slot);
+    }
+
+    public void dispose() {
+        synchronized (this) {
+            if (st != null) {
+                st.data.dispose();
+                st = null;
+            }
+        }
+    }
+
+    /* Java's image model is a wee bit complex, so these may not be
+     * entirely correct. */
+    public static VectorFormat detectfmt(BufferedImage img) {
         ColorModel cm = img.getColorModel();
         if (!(img.getSampleModel() instanceof PixelInterleavedSampleModel))
-            return (-1);
+            return (null);
         PixelInterleavedSampleModel sm = (PixelInterleavedSampleModel) img.getSampleModel();
         int[] cs = cm.getComponentSize();
         int[] off = sm.getBandOffsets();
-    /*
-    System.err.print(this + ": " + cm.getNumComponents() + ", (");
+	/*
+	System.err.print(this + ": " + cm.getNumComponents() + ", (");
 	for(int i = 0; i < off.length; i++)
 	    System.err.print(((i > 0)?" ":"") + off[i]);
 	System.err.print("), (");
@@ -81,102 +150,38 @@ public class TexI extends TexGL {
 	*/
         if ((cm.getNumComponents() == 4) && (off.length == 4)) {
             if (((cs[0] == 8) && (cs[1] == 8) && (cs[2] == 8) && (cs[3] == 8)) &&
-                    (cm.getTransferType() == DataBuffer.TYPE_BYTE) &&
+                    (cm.getTransferType() == java.awt.image.DataBuffer.TYPE_BYTE) &&
                     (cm.getTransparency() == java.awt.Transparency.TRANSLUCENT)) {
                 if ((off[0] == 0) && (off[1] == 1) && (off[2] == 2) && (off[3] == 3))
-                    return (GL.GL_RGBA);
-                if ((off[0] == 2) && (off[1] == 1) && (off[2] == 0) && (off[3] == 3))
-                    return (GL.GL_BGRA);
+                    return (new VectorFormat(4, NumberFormat.UNORM8));
+		/* XXXRENDER: Support component swizzling:
+		if((off[0] == 2) && (off[1] == 1) && (off[2] == 0) && (off[3] == 3))
+		    return(GL.GL_BGRA);
+		*/
             }
         } else if ((cm.getNumComponents() == 3) && (off.length == 3)) {
             if (((cs[0] == 8) && (cs[1] == 8) && (cs[2] == 8)) &&
-                    (cm.getTransferType() == DataBuffer.TYPE_BYTE) &&
+                    (cm.getTransferType() == java.awt.image.DataBuffer.TYPE_BYTE) &&
                     (cm.getTransparency() == java.awt.Transparency.OPAQUE)) {
                 if ((off[0] == 0) && (off[1] == 1) && (off[2] == 2))
-                    return (GL.GL_RGB);
-                if ((off[0] == 2) && (off[1] == 1) && (off[2] == 0))
-                    return (GL2.GL_BGR);
+                    return (new VectorFormat(3, NumberFormat.UNORM8));
+		/* XXXRENDER: Support component swizzling:
+		if((off[0] == 2) && (off[1] == 1) && (off[2] == 0))
+		    return(GL2.GL_BGR);
+		*/
             }
         }
-        return (-1);
-    }
-
-    protected void fill(GOut g) {
-        BGL gl = g.gl;
-        Coord sz = Utils.imgsz(back);
-        int ifmt = detectfmt(back);
-        if ((ifmt == GL.GL_RGBA) || (ifmt == GL.GL_BGRA)) {
-            byte[] pixels = ((DataBufferByte) back.getRaster().getDataBuffer()).getData();
-            if (mutable)
-                pixels = Utils.splice(pixels, 0);
-            if (sz.equals(tdim)) {
-                gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, fmt, tdim.x, tdim.y, 0, ifmt, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(pixels));
-                if (mipmap)
-                    genmipmap(gl, 1, tdim, pixels, ifmt);
-            } else {
-                gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, fmt, tdim.x, tdim.y, 0, ifmt, GL.GL_UNSIGNED_BYTE, null);
-                gl.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, 0, 0, sz.x, sz.y, ifmt, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(pixels));
-            }
-        } else if ((ifmt == GL.GL_RGB) || (ifmt == GL2.GL_BGR)) {
-            gl.glPixelStorei(GL.GL_UNPACK_ALIGNMENT, 1);
-            byte[] pixels = ((DataBufferByte) back.getRaster().getDataBuffer()).getData();
-            if (mutable)
-                pixels = Utils.splice(pixels, 0);
-            if (sz.equals(tdim)) {
-                gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, fmt, tdim.x, tdim.y, 0, ifmt, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(pixels));
-                if (mipmap)
-                    genmipmap3(gl, 1, tdim, pixels, ifmt);
-            } else {
-                gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, fmt, tdim.x, tdim.y, 0, ifmt, GL.GL_UNSIGNED_BYTE, null);
-                gl.glTexSubImage2D(GL.GL_TEXTURE_2D, 0, 0, 0, sz.x, sz.y, ifmt, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(pixels));
-            }
-        } else {
-	    /* System.err.println("Weird: " + this); */
-            byte[] pixels = convert(back, tdim);
-            gl.glTexImage2D(GL.GL_TEXTURE_2D, 0, fmt, tdim.x, tdim.y, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(pixels));
-            if (mipmap)
-                genmipmap(gl, 1, tdim, pixels, GL.GL_RGBA);
-        }
-    }
-
-    private void genmipmap(BGL gl, int lev, Coord dim, byte[] data, int ifmt) {
-        Coord ndim = Mipmapper.nextsz(dim);
-        byte[] ndata = mmalg.gen4(dim, data, ifmt);
-        gl.glTexImage2D(GL.GL_TEXTURE_2D, lev, fmt, ndim.x, ndim.y, 0, ifmt, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(ndata));
-        if ((ndim.x > 1) || (ndim.y > 1))
-            genmipmap(gl, lev + 1, ndim, ndata, ifmt);
-    }
-
-    private void genmipmap3(BGL gl, int lev, Coord dim, byte[] data, int ifmt) {
-        if (mmalg instanceof Mipmapper.Mipmapper3) {
-            Coord ndim = Mipmapper.nextsz(dim);
-            byte[] ndata = ((Mipmapper.Mipmapper3) mmalg).gen3(dim, data, ifmt);
-            gl.glTexImage2D(GL.GL_TEXTURE_2D, lev, fmt, ndim.x, ndim.y, 0, ifmt, GL.GL_UNSIGNED_BYTE, ByteBuffer.wrap(ndata));
-            if ((ndim.x > 1) || (ndim.y > 1))
-                genmipmap3(gl, lev + 1, ndim, ndata, ifmt);
-        } else {
-            genmipmap(gl, lev, dim, convert(back, dim), GL.GL_RGBA);
-        }
-    }
-
-    public int getRGB(Coord c) {
-        return (back.getRGB(c.x, c.y));
-    }
-
-    public TexI mkmask() {
-        TexI n = new TexI(back);
-        n.fmt = GL.GL_ALPHA;
-        return (n);
+        return (null);
     }
 
     public static BufferedImage mkbuf(Coord sz) {
-        WritableRaster buf = Raster.createInterleavedRaster(DataBuffer.TYPE_BYTE, sz.x, sz.y, 4, null);
+        WritableRaster buf = Raster.createInterleavedRaster(java.awt.image.DataBuffer.TYPE_BYTE, sz.x, sz.y, 4, null);
         BufferedImage tgt = new BufferedImage(glcm, buf, false, null);
         return (tgt);
     }
 
     public static byte[] convert(BufferedImage img, Coord tsz, Coord ul, Coord sz) {
-        WritableRaster buf = Raster.createInterleavedRaster(DataBuffer.TYPE_BYTE, tsz.x, tsz.y, 4, null);
+        WritableRaster buf = Raster.createInterleavedRaster(java.awt.image.DataBuffer.TYPE_BYTE, tsz.x, tsz.y, 4, null);
         BufferedImage tgt = new BufferedImage(glcm, buf, false, null);
         Graphics g = tgt.createGraphics();
         g.drawImage(img, 0, 0, sz.x, sz.y, ul.x, ul.y, ul.x + sz.x, ul.y + sz.y, null);

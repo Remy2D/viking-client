@@ -26,11 +26,7 @@
 
 package haven;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 
 public interface ResCache {
     public OutputStream store(String name) throws IOException;
@@ -41,7 +37,7 @@ public interface ResCache {
 
     public static class StupidJavaCodeContainer {
         private static ResCache makeglobal() {
-	    return(HashDirCache.create());
+            return (HashDirCache.create());
         }
     }
 

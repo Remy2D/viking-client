@@ -26,11 +26,7 @@
 
 package haven;
 
-import java.io.Closeable;
-import java.io.Flushable;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 
 public class StreamMessage extends Message implements Closeable, Flushable {
     private final InputStream bkin;
@@ -74,7 +70,9 @@ public class StreamMessage extends Message implements Closeable, Flushable {
         rh = 0;
         int rv;
         try {
-            rv = bkin.read(rbuf, rt, rbuf.length - rt);
+            do {
+                rv = bkin.read(rbuf, rt, rbuf.length - rt);
+            } while (rv == 0);
         } catch (IOException e) {
             throw (new IOError(e));
         }

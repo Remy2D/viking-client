@@ -26,42 +26,28 @@
 
 package haven;
 
+import haven.purus.MultiSession;
 import haven.purus.alarms.AlarmManager;
+import haven.purus.pbot.Py4j;
+import io.sentry.Sentry;
 
-import java.awt.Dimension;
-import java.awt.DisplayMode;
-import java.awt.GraphicsDevice;
-import java.awt.Image;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.io.ByteArrayOutputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
-import java.io.Writer;
-import java.util.Collection;
-import java.util.Map;
-import java.util.TreeMap;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.util.*;
+import java.lang.reflect.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
-
-public class MainFrame extends java.awt.Frame implements Runnable, Console.Directory {
-    HavenPanel p;
+public class MainFrame extends java.awt.Frame implements Console.Directory {
+    UIPanel p;
     private final ThreadGroup g;
-    public final Thread mt;
+    public static MainFrame mf;
+    private Thread mt;
     DisplayMode fsmode = null, prefs = null;
-    private static final String TITLE = "Haven and Hearth Purus Pasta v" + Config.version + " | Based On Amber Client";
 
     static {
         try {
             javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
-
-            // Since H&H IPs aren't likely to change (at least mid client run), and the client constantly needs to fetch
-            // resources from the server, we enable "cache forever" policy so to overcome sporadic UnknownHostException
-            // due to flaky DNS. Bad practice, but still better than forcing the user to modify hosts file.
-            // NOTE: this needs to be done early as possible before InetAddressCachePolicy is initialized.
-            java.security.Security.setProperty("networkaddress.cache.ttl" , "-1");
         } catch (Exception e) {
         }
     }
@@ -156,21 +142,10 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
         cmdmap.put("fs", new Console.Command() {
             public void run(Console cons, String[] args) {
                 if (args.length >= 2) {
-                    Runnable r;
-                    if (Utils.atoi(args[1]) != 0) {
-                        r = new Runnable() {
-                            public void run() {
-                                setfs();
-                            }
-                        };
-                    } else {
-                        r = new Runnable() {
-                            public void run() {
-                                setwnd();
-                            }
-                        };
-                    }
-                    getToolkit().getSystemEventQueue().invokeLater(r);
+                    if (Utils.atoi(args[1]) != 0)
+                        getToolkit().getSystemEventQueue().invokeLater(MainFrame.this::setfs);
+                    else
+                        getToolkit().getSystemEventQueue().invokeLater(MainFrame.this::setwnd);
                 }
             }
         });
@@ -194,6 +169,7 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
 
     public MainFrame(Coord isz) {
         super("Haven and Hearth");
+        mf = this;
         Coord sz;
         if (isz == null) {
             sz = Utils.getprefc("wndsz", new Coord(800, 600));
@@ -203,8 +179,8 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
             sz = isz;
         }
         this.g = new ThreadGroup(HackThread.tg(), "Haven client");
-        this.mt = new HackThread(this.g, this, "Haven main thread");
-        p = new HavenPanel(sz.x, sz.y);
+        JOGLPanel p = new JOGLPanel(sz);
+        this.p = p;
         if (fsmode == null) {
             Coord pfm = Utils.getprefc("fsmode", null);
             if (pfm != null)
@@ -222,18 +198,17 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
         p.requestFocus();
         seticon();
         setVisible(true);
-        p.init();
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent e) {
-                g.interrupt();
+                mt.interrupt();
             }
 
             public void windowActivated(WindowEvent e) {
-                p.bgmode = false;
+                p.background(false);
             }
 
             public void windowDeactivated(WindowEvent e) {
-                p.bgmode = true;
+                p.background(true);
             }
         });
         if ((isz == null) && Utils.getprefb("wndmax", false))
@@ -243,12 +218,12 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
     private void savewndstate() {
         if (prefs == null) {
             if (getExtendedState() == NORMAL)
-        /* Apparent, getSize attempts to return the "outer
-         * size" of the window, including WM decorations, even
-		 * though setSize sets the "inner size" of the
-		 * window. Therefore, use the Panel's size instead; it
-		 * ought to correspond to the inner size at all
-		 * times. */ {
+                /* Apparent, getSize attempts to return the "outer
+                 * size" of the window, including WM decorations, even
+                 * though setSize sets the "inner size" of the
+                 * window. Therefore, use the Panel's size instead; it
+                 * ought to correspond to the inner size at all
+                 * times. */ {
                 Dimension dim = p.getSize();
                 Utils.setprefc("wndsz", new Coord(dim.width, dim.height));
             }
@@ -256,37 +231,172 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
         }
     }
 
-    public void run() {
-        if (Thread.currentThread() != this.mt)
-            throw (new RuntimeException("MainFrame is being run from an invalid context"));
-        Thread ui = new HackThread(p, "Haven UI thread");
-        ui.start();
-        try {
+    private Thread ui;
+    AtomicInteger sessions = new AtomicInteger(0);
+
+    public void sessionCreate() {
+        sessions.incrementAndGet();
+        new HackThread(() -> {
+            UI ui = null;
             try {
-                Session sess = null;
-                while (true) {
-                    UI.Runner fun;
-                    if (sess == null) {
-                        Bootstrap bill = new Bootstrap(Config.defserv, Config.mainport);
-                        if ((Config.authuser != null) && (Config.authck != null)) {
-                            bill.setinitcookie(Config.authuser, Config.authck);
-                            Config.authck = null;
-                        }
-                        fun = bill;
-                        setTitle(TITLE);
-                    } else {
-                        fun = new RemoteUI(sess);
-                        setTitle(TITLE + " \u2013 " + sess.username);
-                    }
-                    sess = fun.run(p.newui(sess));
-                }
+                ///
+                sessions.incrementAndGet();
+                UI.Runner fun = new Bootstrap();
+                String t = fun.title();
+                if (t == null)
+                    setTitle("Haven and Hearth");
+                ui = p.newui(fun);
+                MultiSession.addSession(ui);
+                MultiSession.setActiveSession(ui);
+                fun = fun.run(ui);
+                MultiSession.closeSession(ui);
+
+                setTitle("Haven and Hearth \u2013 " + t);
+                ui = p.newui(fun);
+                MultiSession.addSession(ui);
+                MultiSession.setActiveSession(ui);
+                fun = fun.run(ui);
+                MultiSession.closeSession(ui);
+                sessions.decrementAndGet();
             } catch (InterruptedException e) {
+
+            } finally {
+                if (sessions.decrementAndGet() == 0)
+                    sessionCreate();
             }
             savewndstate();
-        } finally {
-            ui.interrupt();
-            dispose();
+        }, "Session thread").start();
+    }
+
+    /*public void run() {
+		if(Thread.currentThread() != this.mt)
+			throw (new RuntimeException("MainFrame is being run from an invalid context"));
+		ui = new HackThread(p, "Haven UI thread");
+		ui.start();
+		sessionCreate();
+		try {
+			synchronized(ui) {
+				ui.wait();
+			}
+		} catch(InterruptedException e) {
+		}
+	}*/
+
+    public static Session connect(Object[] args) {
+        String username;
+        byte[] cookie;
+        if ((Config.authuser != null) && (Config.authck != null)) {
+            username = Config.authuser;
+            cookie = Config.authck;
+        } else {
+            if ((username = Utils.getpref("tokenname@" + Config.defserv, null)) == null)
+                throw (new RuntimeException("No explicit or saved username"));
+            String token = Utils.getpref("savedtoken@" + Config.defserv, null);
+            if (token == null)
+                throw (new RuntimeException("No saved token"));
+            try {
+                AuthClient cl = new AuthClient((Config.authserv == null) ? Config.defserv : Config.authserv, Config.authport);
+                try {
+                    if ((username = cl.trytoken(username, Utils.hex2byte(token))) == null)
+                        throw (new RuntimeException("Authentication with saved token failed"));
+                    cookie = cl.getcookie();
+                } finally {
+                    cl.close();
+                }
+            } catch (IOException e) {
+                throw (new RuntimeException(e));
+            }
         }
+        Session sess;
+        try {
+            sess = new Session(new java.net.InetSocketAddress(java.net.InetAddress.getByName(Config.defserv), Config.mainport), username, cookie, args);
+        } catch (IOException e) {
+            throw (new RuntimeException(e));
+        }
+        boolean irq = false;
+        try {
+            synchronized (sess) {
+                while (sess.state != "") {
+                    if (sess.connfailed != 0)
+                        throw (new RuntimeException(String.format("connection failure: %d", sess.connfailed)));
+                    try {
+                        sess.wait();
+                    } catch (InterruptedException e) {
+                        irq = true;
+                    }
+                }
+            }
+        } finally {
+            if (irq)
+                Thread.currentThread().interrupt();
+        }
+        return (sess);
+    }
+
+    private void uiloop() throws InterruptedException {
+        UI.Runner fun = null;
+        while (true) {
+            if (fun == null)
+                fun = new Bootstrap();
+            String t = fun.title();
+            if (t == null)
+                setTitle("Haven and Hearth");
+            else
+                setTitle("Haven and Hearth \u2013 " + t);
+            fun = fun.run(p.newui(fun));
+        }
+    }
+
+    private void run(UI.Runner task) {
+        synchronized (this) {
+            if (this.mt != null)
+                throw (new RuntimeException("MainFrame is already running"));
+            this.mt = Thread.currentThread();
+        }
+        ui = new HackThread(p, "Haven UI thread");
+        ui.start();
+        sessionCreate();
+        try {
+            synchronized (ui) {
+                ui.wait();
+            }
+        } catch (InterruptedException ie) {
+
+        }
+	    /*try {
+		try {
+		    if(task == null) {
+		    	sessionCreate();
+		    	try {
+						ui.wait();
+				} catch(InterruptedException ie) {
+
+				}
+			//uiloop();
+		    } else {
+			while(task != null)
+			    task = task.run(p.newui(task));
+		    }
+		} catch(InterruptedException e) {
+		} finally {
+		    p.newui(null);
+		}
+		/*
+		savewndstate();
+	    } finally {
+		ui.interrupt();
+		try {
+		    ui.join(5000);
+		} catch(InterruptedException e) {}
+		if(ui.isAlive())
+		    Warning.warn("ui thread failed to terminate");
+		dispose();
+	    }
+	} finally {
+	    synchronized(this) {
+		this.mt = null;
+	    }
+	}*/
     }
 
     public static void setupres() {
@@ -316,11 +426,66 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
     }
 
     static {
-        WebBrowser.self = DesktopBrowser.create();
+        if ((WebBrowser.self = JnlpBrowser.create()) == null)
+            WebBrowser.self = DesktopBrowser.create();
+    }
+
+    private static void netxsurgery() throws Exception {
+        /* Force off NetX codebase classloading. */
+        Class<?> nxc;
+        try {
+            nxc = Class.forName("net.sourceforge.jnlp.runtime.JNLPClassLoader");
+        } catch (ClassNotFoundException e1) {
+            try {
+                nxc = Class.forName("netx.jnlp.runtime.JNLPClassLoader");
+            } catch (ClassNotFoundException e2) {
+                throw (new Exception("No known NetX on classpath"));
+            }
+        }
+        ClassLoader cl = MainFrame.class.getClassLoader();
+        if (!nxc.isInstance(cl)) {
+            throw (new Exception("Not running from a NetX classloader"));
+        }
+        Field cblf, lf;
+        try {
+            cblf = nxc.getDeclaredField("codeBaseLoader");
+            lf = nxc.getDeclaredField("loaders");
+        } catch (NoSuchFieldException e) {
+            throw (new Exception("JNLPClassLoader does not conform to its known structure"));
+        }
+        cblf.setAccessible(true);
+        lf.setAccessible(true);
+        Set<Object> loaders = new HashSet<Object>();
+        Stack<Object> open = new Stack<Object>();
+        open.push(cl);
+        while (!open.empty()) {
+            Object cur = open.pop();
+            if (loaders.contains(cur))
+                continue;
+            loaders.add(cur);
+            Object curl;
+            try {
+                curl = lf.get(cur);
+            } catch (IllegalAccessException e) {
+                throw (new Exception("Reflection accessibility not available even though set"));
+            }
+            for (int i = 0; i < Array.getLength(curl); i++) {
+                Object other = Array.get(curl, i);
+                if (nxc.isInstance(other))
+                    open.push(other);
+            }
+        }
+        for (Object cur : loaders) {
+            try {
+                cblf.set(cur, null);
+            } catch (IllegalAccessException e) {
+                throw (new Exception("Reflection accessibility not available even though set"));
+            }
+        }
     }
 
     private static void javabughack() throws InterruptedException {
-	    /* Work around a stupid deadlock bug in AWT. */
+        /* Work around a stupid deadlock bug in AWT. */
         try {
             javax.swing.SwingUtilities.invokeAndWait(new Runnable() {
                 public void run() {
@@ -330,35 +495,34 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
                 }
             });
         } catch (java.lang.reflect.InvocationTargetException e) {
-	        /* Oh, how I love Swing! */
+            /* Oh, how I love Swing! */
             throw (new Error(e));
+        }
+        /* Work around another deadl bug in Sun's JNLP client. */
+        javax.imageio.spi.IIORegistry.getDefaultInstance();
+        try {
+            netxsurgery();
+        } catch (Exception e) {
         }
     }
 
     private static void main2(String[] args) {
         Config.cmdline(args);
-
-        if (Config.playerposfile != null)
-            new Thread(new PlayerPosStreamer(), "Player position thread").start();
-
         try {
             javabughack();
         } catch (InterruptedException e) {
             return;
         }
         setupres();
+        UI.Runner fun = null;
+        if (Config.servargs != null)
+            fun = new RemoteUI(connect(Config.servargs));
         MainFrame f = new MainFrame(null);
         if (Utils.getprefb("fullscreen", false))
             f.setfs();
-        f.mt.start();
-        try {
-            f.mt.join();
-        } catch (InterruptedException e) {
-            f.g.interrupt();
-            return;
-        }
-        dumplist(Resource.remote().loadwaited(), null);
-        dumplist(Resource.remote().cached(), null);
+        f.run(fun);
+        dumplist(Resource.remote().loadwaited(), Config.loadwaited);
+        dumplist(Resource.remote().cached(), Config.allused);
         if (ResCache.global != null) {
             try {
                 Writer w = new OutputStreamWriter(ResCache.global.store("tmp/allused"), "UTF-8");
@@ -374,20 +538,24 @@ public class MainFrame extends java.awt.Frame implements Runnable, Console.Direc
     }
 
     public static void main(final String[] args) {
-	    /* Set up the error handler as early as humanly possible. */
-        final haven.error.ErrorHandler hg = new haven.error.ErrorHandler();
-        hg.sethandler(new haven.error.ErrorGui(null) {
-            public void errorsent() {
-                hg.interrupt();
+        /* Set up the error handler as early as humanly possible. */
+        ThreadGroup g = new ThreadGroup("Haven main group");
+        Py4j.start();
+        String ed;
+        if (!(ed = Utils.getprop("haven.errorurl", "")).equals("")) {
+            try {
+                final haven.error.ErrorHandler hg = new haven.error.ErrorHandler(new java.net.URL(ed));
+                hg.sethandler(new haven.error.ErrorGui(null) {
+                    public void errorsent() {
+                        hg.interrupt();
+                    }
+                });
+                g = hg;
+                new DeadlockWatchdog(hg).start();
+            } catch (java.net.MalformedURLException e) {
             }
-        });
-        ThreadGroup g = hg;
-
-        Thread main = new HackThread(g, new Runnable() {
-            public void run() {
-                main2(args);
-            }
-        }, "Haven main thread");
+        }
+        Thread main = new HackThread(g, () -> main2(args), "Haven main thread");
         main.start();
         AlarmManager.init();
     }

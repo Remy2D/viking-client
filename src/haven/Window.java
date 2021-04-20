@@ -26,27 +26,26 @@
 
 package haven;
 
-import haven.res.ui.tt.Wear;
+import haven.purus.BetterBelt;
+import haven.purus.BetterWindow;
+import haven.res.ui.tt.wear.Wear;
 import haven.resutil.Curiosity;
-import haven.resutil.FoodInfo;
 
-import java.awt.*;
+import java.awt.Color;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map.Entry;
+import java.util.Map;
 import java.util.stream.Collectors;
 
-import static haven.PUtils.blurmask2;
-import static haven.PUtils.rasterimg;
+import static haven.PUtils.*;
 
 public class Window extends Widget implements DTarget {
     public static final Tex bg = Resource.loadtex("gfx/hud/wnd/lg/bg");
     public static final Tex bgl = Resource.loadtex("gfx/hud/wnd/lg/bgl");
     public static final Tex bgr = Resource.loadtex("gfx/hud/wnd/lg/bgr");
     public static final Tex cl = Resource.loadtex("gfx/hud/wnd/lg/cl");
-    public static final TexI cm = new TexI(Resource.loadimg("gfx/hud/wnd/lg/cm"));
+    public static final TexI cm = new TexI(Resource.loadsimg("gfx/hud/wnd/lg/cm"));
     public static final Tex cr = Resource.loadtex("gfx/hud/wnd/lg/cr");
     public static final Tex tm = Resource.loadtex("gfx/hud/wnd/lg/tm");
     public static final Tex tr = Resource.loadtex("gfx/hud/wnd/lg/tr");
@@ -56,18 +55,22 @@ public class Window extends Widget implements DTarget {
     public static final Tex bl = Resource.loadtex("gfx/hud/wnd/lg/bl");
     public static final Tex bm = Resource.loadtex("gfx/hud/wnd/lg/bm");
     public static final Tex br = Resource.loadtex("gfx/hud/wnd/lg/br");
-    public static final Coord tlm = new Coord(18, 30), brm = new Coord(13, 22);
-    public static final Coord cpo = new Coord(36, 15);
+    public static final Tex sizer = Resource.loadtex("gfx/hud/wnd/sizer");
+    public static final Coord tlm = UI.scale(18, 30);
+    public static final Coord brm = UI.scale(13, 22);
+    public static final Coord cpo = UI.rscale(36, 16.4);
     public static final int capo = 7, capio = 2;
-    public static final Coord dlmrgn = new Coord(23, 14), dsmrgn = new Coord(9, 9);
+    public static final Coord dlmrgn = UI.scale(23, 14);
+    public static final Coord dsmrgn = UI.scale(9, 9);
     public static final BufferedImage ctex = Resource.loadimg("gfx/hud/fonttex");
-    public static final Text.Furnace cf = new Text.Imager(new PUtils.TexFurn(new Text.Foundry(Text.sans, Text.cfg.wndCap).aa(true), ctex)) {
+    public static final Text.Furnace cf = new Text.Imager(new PUtils.TexFurn(new Text.Foundry(Text.fraktur, 15).aa(true), ctex)) {
         protected BufferedImage proc(Text text) {
-            return (rasterimg(blurmask2(text.img.getRaster(), 1, 1, Color.BLACK)));
+            // return(rasterimg(blurmask2(text.img.getRaster(), 1, 1, Color.BLACK)));
+            return (rasterimg(blurmask2(text.img.getRaster(), UI.rscale(0.75), UI.rscale(1.0), Color.BLACK)));
         }
     };
     public static final IBox wbox = new IBox("gfx/hud/wnd", "tl", "tr", "bl", "br", "extvl", "extvr", "extht", "exthb") {
-        final Coord co = new Coord(3, 3), bo = new Coord(2, 2);
+        final Coord co = UI.scale(3, 3), bo = UI.scale(2, 2);
 
         public Coord btloff() {
             return (super.btloff().sub(bo));
@@ -86,25 +89,27 @@ public class Window extends Widget implements DTarget {
         }
     };
     private static final BufferedImage[] cbtni = new BufferedImage[]{
-            Resource.loadimg("gfx/hud/wnd/lg/cbtnu"),
-            Resource.loadimg("gfx/hud/wnd/lg/cbtnd"),
-            Resource.loadimg("gfx/hud/wnd/lg/cbtnh")};
+            Resource.loadsimg("gfx/hud/wnd/lg/cbtnu"),
+            Resource.loadsimg("gfx/hud/wnd/lg/cbtnd"),
+            Resource.loadsimg("gfx/hud/wnd/lg/cbtnh")};
     public final Coord tlo, rbo, mrgn;
     public final IButton cbtn;
     public boolean dt = false;
     public Text cap;
-    public final String origcap;
     public Coord wsz, ctl, csz, atl, asz, cptl, cpsz;
     public int cmw;
-    private UI.Grab dm = null;
-    private Coord doff;
+    public UI.Grab dm = null;
+    public Coord doff;
+    public boolean decohide = false;
 
     @RName("wnd")
     public static class $_ implements Factory {
         public Widget create(UI ui, Object[] args) {
-            Coord sz = (Coord) args[0];
+            Coord sz = UI.scale((Coord) args[0]);
             String cap = (args.length > 1) ? (String) args[1] : null;
             boolean lg = (args.length > 2) ? ((Integer) args[2] != 0) : false;
+            if (cap != null && cap.equals("Belt"))
+                return new BetterBelt(sz, cap, lg, Coord.z, Coord.z);
             return (new Window(sz, cap, lg, Coord.z, Coord.z));
         }
     }
@@ -113,34 +118,10 @@ public class Window extends Widget implements DTarget {
         this.tlo = tlo;
         this.rbo = rbo;
         this.mrgn = lg ? dlmrgn : dsmrgn;
-        origcap = cap;
         cbtn = add(new IButton(cbtni[0], cbtni[1], cbtni[2]));
-        chcap(Resource.getLocString(Resource.BUNDLE_WINDOW, cap));
-	resize2(sz);
+        chcap(cap);
+        resize2(sz);
         setfocustab(true);
-        if(cap.equals("Table")) {
-            add(new Button(200, "Feast All!") {
-                @Override
-                public void click() {
-                	for(Widget wdg = this.parent.lchild; wdg != null; wdg = wdg.prev) {
-                		if(wdg instanceof Button) {
-                			Button btn = (Button)wdg;
-                			if(btn.text.text.equals("Feast!"))
-                			    btn.click();
-						}
-					}
-                    for(Widget wdg = this.parent.lchild; wdg!=null; wdg = wdg.prev) {
-                        if(wdg instanceof Inventory) {
-                            for(WItem item : ((Inventory) wdg).wmap.values()) {
-                                FoodInfo fi = ItemInfo.find(FoodInfo.class, item.item.info());
-                                if(fi != null)
-                                    item.item.wdgmsg("take", Coord.z);
-                            }
-                        }
-                    }
-                }
-            }, new Coord(0, 375));
-        }
     }
 
     public Window(Coord sz, String cap, boolean lg) {
@@ -164,62 +145,78 @@ public class Window extends Widget implements DTarget {
 
     public void cdraw(GOut g) {
     }
-    
-    // Input time as minutes
-    String sensibleTimeFormat(Double time) {
-    	StringBuilder sb = new StringBuilder();
-    	int days = new Double(time/1440).intValue();
-    	time -= days*1440;
-    	int hours = new Double(time/60).intValue();
-    	time -= hours*60;
-    	int minutes = time.intValue();
-    	if(days>0) {
-    		sb.append(days + "d ");
-    	}
-    	sb.append(hours + "h ");
-    	sb.append(minutes + "m");
-    	return sb.toString();
+
+    protected void drawbg(GOut g) {
+        Coord bgc = new Coord();
+        Coord cbr = ctl.add(csz);
+        for (bgc.y = ctl.y; bgc.y < cbr.y; bgc.y += bg.sz().y) {
+            for (bgc.x = ctl.x; bgc.x < cbr.x; bgc.x += bg.sz().x)
+                g.image(bg, bgc, ctl, cbr);
+        }
+        bgc.x = ctl.x;
+        for (bgc.y = ctl.y; bgc.y < cbr.y; bgc.y += bgl.sz().y)
+            g.image(bgl, bgc, ctl, cbr);
+        bgc.x = cbr.x - bgr.sz().x;
+        for (bgc.y = ctl.y; bgc.y < cbr.y; bgc.y += bgr.sz().y)
+            g.image(bgr, bgc, ctl, cbr);
     }
+
+    String sensibleTimeFormat(Double time) {
+        time /= 60;
+        StringBuilder sb = new StringBuilder();
+        int days = new Double(time / 1440).intValue();
+        time -= days * 1440;
+        int hours = new Double(time / 60).intValue();
+        time -= hours * 60;
+        int minutes = time.intValue();
+        if (days > 0) {
+            sb.append(days + "d ");
+        }
+        sb.append(hours + "h ");
+        sb.append(minutes + "m");
+        return sb.toString();
+    }
+
     private static HashMap<String, Long> recentlyTakenCutlery = new HashMap<>();
+
     protected void drawframe(GOut g) {
-    	// Study Table total LP and durations of curiosities
-    	try {
-	    	if(cap.text.equals("Study Desk")) {
-	    		int sizeY = 250;
-	    		int totalLP = 0;
-	    		HashMap<String, Double> studyTimes = new HashMap<String, Double>();
-	    		for(Widget wdg = this.lchild; wdg!=null; wdg = wdg.prev) {
-	    			if(wdg instanceof Inventory) {
-	    				for(WItem item:((Inventory)wdg).wmap.values()) {
-	    					Curiosity ci = ItemInfo.find(Curiosity.class, item.item.info());
-	    					if(ci != null) {
-								totalLP += ci.exp;
-							}
-	    					studyTimes.put(item.item.getname(), studyTimes.get(item.item.getname()) == null ? item.item.studytime : studyTimes.get(item.item.getname())+item.item.studytime);
-	    				}
-	    			}
-	    		}
-	    		g.image(Text.labelFnd.render("Total LP: " + String.format("%,d", totalLP)).tex(), new Coord(30, 271));
-				int y = 285;
-				List<Entry<String, Double>> lst = studyTimes.entrySet().stream().sorted((e1, e2)-> e1.getValue().compareTo(e2.getValue())).collect(Collectors.toList());
-				for(Entry<String, Double> entry : lst) {
-					if(entry.getValue() > 24*60)
-						g.image(Text.labelFnd.render(entry.getKey() + ": " + sensibleTimeFormat(entry.getValue()), Color.green).tex(), new Coord(30, y));
-					else
-						g.image(Text.labelFnd.render(entry.getKey() + ": " + sensibleTimeFormat(entry.getValue()), Color.red).tex(), new Coord(30, y));
-					y += 15;
-					sizeY += 15;
-				}
-	    		resize(230, sizeY);
-            } else if(cap.text.equals("Table")) {
-	    	    for(Widget w = this.lchild; w != null; w = w.prev) {
-	    	        if(w instanceof Inventory) {
-	    	            for(WItem item:((Inventory) w).wmap.values()) {
-	    	                for(ItemInfo ii:item.item.info())
-	    	                    if(ii instanceof Wear) {
-                                    Wear wr = (Wear)ii;
-                                    if(wr.d == wr.m-1 && item.item.getres() != null && (!recentlyTakenCutlery.containsKey(item.item.getres().name) || System.currentTimeMillis() - recentlyTakenCutlery.get(item.item.getres().name) > 1000*60)) { // About to break
-	    	                            item.item.wdgmsg("transfer", Coord.z);
+        try {
+            if (cap.text.equals("Study Desk")) {
+                int sizeY = UI.scale(250);
+                int totalLP = 0;
+                HashMap<String, Double> studyTimes = new HashMap<String, Double>();
+                for (Widget wdg = this.lchild; wdg != null; wdg = wdg.prev) {
+                    if (wdg instanceof Inventory) {
+                        for (WItem item : ((Inventory) wdg).wmap.values()) {
+                            Curiosity ci = ItemInfo.find(Curiosity.class, item.item.info());
+                            if (ci != null) {
+                                totalLP += ci.exp;
+                            }
+                            studyTimes.put(item.item.getname(), studyTimes.get(item.item.getname()) == null ? item.item.studytime : studyTimes.get(item.item.getname()) + item.item.studytime);
+                        }
+                    }
+                }
+                g.image(Text.render("Total LP: " + String.format("%,d", totalLP)).tex(), UI.scale(30, 271));
+                int y = UI.scale(285);
+                List<Map.Entry<String, Double>> lst = studyTimes.entrySet().stream().sorted((e1, e2) -> e1.getValue().compareTo(e2.getValue())).collect(Collectors.toList());
+                for (Map.Entry<String, Double> entry : lst) {
+                    if (entry.getValue() > 24 * 60 * 60)
+                        g.image(Text.render(entry.getKey() + ": " + sensibleTimeFormat(entry.getValue()), Color.green).tex(), new Coord(UI.scale(30), y));
+                    else
+                        g.image(Text.render(entry.getKey() + ": " + sensibleTimeFormat(entry.getValue()), Color.red).tex(), new Coord(UI.scale(30), y));
+                    y += UI.scale(15);
+                    sizeY += UI.scale(15);
+                }
+                resize(UI.scale(230), sizeY);
+            } else if (cap.text.equals("Table")) {
+                for (Widget w = this.lchild; w != null; w = w.prev) {
+                    if (w instanceof Inventory) {
+                        for (WItem item : ((Inventory) w).wmap.values()) {
+                            for (ItemInfo ii : item.item.info())
+                                if (ii instanceof Wear) {
+                                    Wear wr = (Wear) ii;
+                                    if (wr.d == wr.m - 1 && item.item.getres() != null && (!recentlyTakenCutlery.containsKey(item.item.getres().name) || System.currentTimeMillis() - recentlyTakenCutlery.get(item.item.getres().name) > 1000 * 60)) { // About to break
+                                        item.item.wdgmsg("transfer", Coord.z);
                                         ui.gui.msg("Detected cutlery that is about to break! Taking to inventory! You may want to polish it.", Color.yellow);
                                         recentlyTakenCutlery.put(item.item.getres().name, System.currentTimeMillis());
                                     }
@@ -228,9 +225,9 @@ public class Window extends Widget implements DTarget {
                     }
                 }
             }
-    	} catch(Loading l) {
-    		
-    	}
+        } catch (Loading l) {
+        }
+
         Coord mdo, cbr;
         g.image(cl, tlo);
         mdo = tlo.add(cl.sz().x, 0);
@@ -267,31 +264,16 @@ public class Window extends Widget implements DTarget {
         g.image(br, tlo.add(wsz.sub(br.sz())));
     }
 
-    public void draw(GOut g) {
-        Coord bgc = new Coord();
-        for (bgc.y = ctl.y; bgc.y < ctl.y + csz.y; bgc.y += bg.sz().y) {
-            for (bgc.x = ctl.x; bgc.x < ctl.x + csz.x; bgc.x += bg.sz().x)
-                g.image(bg, bgc, ctl, csz);
-        }
-        bgc.x = ctl.x;
-        for (bgc.y = ctl.y; bgc.y < ctl.y + csz.y; bgc.y += bgl.sz().y)
-            g.image(bgl, bgc, ctl, csz);
-        bgc.x = ctl.x + csz.x - bgr.sz().x;
-        for (bgc.y = ctl.y; bgc.y < ctl.y + csz.y; bgc.y += bgr.sz().y)
-            g.image(bgr, bgc, ctl, csz);
+    protected void drawwnd(GOut g) {
+        if (!decohide)
+            drawbg(g);
         cdraw(g.reclip(atl, asz));
-        drawframe(g);
-    /*
-    wbox.draw(g, wtl, wsz);
-	if(cap != null) {
-	    int w = cap.sz().x;
-	    int y = wtl.y - capo;
-	    g.image(cl, new Coord(wtl.x + (wsz.x / 2) - (w / 2) - cl.sz().x, y));
-	    g.image(cm, new Coord(wtl.x + (wsz.x / 2) - (w / 2), y), new Coord(w, cm.sz().y));
-	    g.image(cr, new Coord(wtl.x + (wsz.x / 2) + (w / 2), y));
-	    g.image(cap.tex(), new Coord(wtl.x + (wsz.x / 2) - (w / 2), y + capio));
-	}
-	*/
+        if (!decohide)
+            drawframe(g);
+    }
+
+    public void draw(GOut g) {
+        drawwnd(g);
         super.draw(g);
     }
 
@@ -311,10 +293,6 @@ public class Window extends Widget implements DTarget {
         return (max);
     }
 
-    private void placecbtn() {
-        cbtn.c = xlate(new Coord(ctl.x + csz.x - cbtn.sz.x, ctl.y).add(2, -2), false);
-    }
-
     private void resize2(Coord sz) {
         asz = sz;
         csz = asz.add(mrgn.mul(2));
@@ -322,28 +300,37 @@ public class Window extends Widget implements DTarget {
         this.sz = wsz.add(tlo).add(rbo);
         ctl = tlo.add(tlm);
         atl = ctl.add(mrgn);
-        cmw = (cap == null) ? 0 : (cap.sz().x);
+        cmw = (cap == null) ? 0 : cap.sz().x;
         cmw = Math.max(cmw, wsz.x / 4);
         cptl = new Coord(ctl.x, tlo.y);
         cpsz = tlo.add(cpo.x + cmw, cm.sz().y).sub(cptl);
-        cmw = cmw - (cl.sz().x - cpo.x) - 5;
+        cmw = cmw - (cl.sz().x - cpo.x) - UI.scale(5);
         cbtn.c = xlate(tlo.add(wsz.x - cbtn.sz.x, 0), false);
         for (Widget ch = child; ch != null; ch = ch.next)
             ch.presize();
     }
 
     public void resize(Coord sz) {
-	resize2(sz);
+        resize2(sz);
+    }
+
+    public void decohide(boolean h) {
+        this.decohide = h;
+        cbtn.show(!h);
+    }
+
+    public boolean decohide() {
+        return (decohide);
     }
 
     public void uimsg(String msg, Object... args) {
-        if (msg == "pack") {
-            pack();
-        } else if (msg == "dt") {
+        if (msg == "dt") {
             dt = (Integer) args[0] != 0;
         } else if (msg == "cap") {
             String cap = (String) args[0];
             chcap(cap.equals("") ? null : cap);
+        } else if (msg == "dhide") {
+            decohide((Integer) args[0] != 0);
         } else {
             super.uimsg(msg, args);
         }
@@ -356,21 +343,32 @@ public class Window extends Widget implements DTarget {
             return (c.sub(atl));
     }
 
+    public void drag(Coord off) {
+        dm = ui.grabmouse(this);
+        doff = off;
+    }
+
+    public boolean checkhit(Coord c) {
+        if (decohide)
+            return (c.isect(atl, asz));
+        Coord cpc = c.sub(cptl);
+        return (c.isect(ctl, csz) || (c.isect(cptl, cpsz) && (cm.back.getRaster().getSample(cpc.x % cm.back.getWidth(), cpc.y, 3) >= 128)));
+    }
+
     public boolean mousedown(Coord c, int button) {
         if (super.mousedown(c, button)) {
             parent.setfocus(this);
             raise();
             return (true);
         }
-        Coord cpc = c.sub(cptl);
-        if (c.isect(ctl, csz) || (c.isect(cptl, cpsz) && (cm.back.getRaster().getSample(cpc.x % cm.back.getWidth(), cpc.y, 3) >= 128))) {
-            if (button == 1) {
-                dm = ui.grabmouse(this);
-                doff = c;
+        if (!decohide) {
+            if (checkhit(c)) {
+                if (button == 1)
+                    drag(c);
+                parent.setfocus(this);
+                raise();
+                return (true);
             }
-            parent.setfocus(this);
-            raise();
-            return (true);
         }
         return (false);
     }
@@ -379,8 +377,6 @@ public class Window extends Widget implements DTarget {
         if (dm != null) {
             dm.remove();
             dm = null;
-            if (!origcap.equals("Options"))
-                Utils.setprefc(origcap + "_c", this.c);
         } else {
             super.mouseup(c, button);
         }
@@ -404,9 +400,9 @@ public class Window extends Widget implements DTarget {
     }
 
     public boolean keydown(java.awt.event.KeyEvent ev) {
-        if(super.keydown(ev))
+        if (super.keydown(ev))
             return (true);
-        if(ev.getKeyChar() == 27) {
+        if (key_esc.match(ev)) {
             wdgmsg("close");
             return (true);
         }
@@ -426,6 +422,8 @@ public class Window extends Widget implements DTarget {
     }
 
     public Object tooltip(Coord c, Widget prev) {
+        if (!checkhit(c))
+            return (super.tooltip(c, prev));
         Object ret = super.tooltip(c, prev);
         if (ret != null)
             return (ret);
@@ -433,7 +431,12 @@ public class Window extends Widget implements DTarget {
             return ("");
     }
 
-    public boolean ismousegrab() {
-        return dm != null;
+    public static void main(String[] args) {
+        Window wnd = new Window(new Coord(300, 200), "Inventory", true);
+        new haven.rs.DrawBuffer(haven.rs.Context.getdefault().env(), new Coord(512, 512))
+                .draw(g -> {
+                    wnd.draw(g);
+                    g.getimage(img -> Debug.dumpimage(img, args[0]));
+                });
     }
 }

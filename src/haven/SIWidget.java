@@ -26,7 +26,7 @@
 
 package haven;
 
-import java.awt.image.BufferedImage;
+import java.awt.image.*;
 
 public abstract class SIWidget extends Widget {
     private Tex surf = null;

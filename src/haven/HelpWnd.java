@@ -26,26 +26,30 @@
 
 package haven;
 
-public class HelpWnd extends Window {
+import haven.purus.BetterWindow;
+
+public class HelpWnd extends BetterWindow {
     public static final RichText.Foundry fnd;
     public Indir<Resource> res;
     private Indir<Resource> showing = null;
     private final RichTextBox text;
 
     static {
-        fnd = new RichText.Foundry();
+        /* XXX: This should use the shown resource's respool. */
+        fnd = new RichText.Foundry(Resource.remote());
         fnd.aa = true;
     }
 
     public HelpWnd(Indir<Resource> res) {
-        super(new Coord(300, 430), "Help");
+        super(Coord.z, "Help!", true);
         this.res = res;
-        this.text = add(new RichTextBox(new Coord(300, 400), "", fnd), Coord.z);
-        add(new Button(100, "Dismiss") {
+        this.text = add(new RichTextBox(UI.scale(300, 400), "", fnd), Coord.z);
+        add(new Button(UI.scale(100), "Dismiss") {
             public void click() {
                 HelpWnd.this.wdgmsg("close");
             }
-        }, new Coord(100, 410));
+        }, UI.scale(100, 410));
+        pack();
     }
 
     public void tick(double dt) {

@@ -122,7 +122,7 @@ public class MessageBuf extends Message {
     }
 
     public void fin(java.nio.ByteBuffer buf) {
-	buf.put(wbuf, 0, wh);
+        buf.put(wbuf, 0, wh);
     }
 
     public String toString() {

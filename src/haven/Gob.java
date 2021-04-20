@@ -26,124 +26,148 @@
 
 package haven;
 
-import haven.purus.mapper.Mapper;
-import haven.resutil.BPRadSprite;
-import haven.resutil.WaterTile;
-import integrations.map.Navigation;
-import integrations.mapv4.MappingClient;
-
 import java.awt.*;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.function.*;
 
-public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
+import haven.purus.*;
+import haven.purus.Config;
+import haven.purus.alarms.AlarmManager;
+import haven.purus.mapper.Mapper;
+import haven.render.*;
+import haven.resutil.WaterTile;
+
+public class Gob implements RenderTree.Node, Sprite.Owner, Skeleton.ModOwner, Skeleton.HasPose {
     public Coord2d rc;
-    public Coord sc;
-    public Coord3f sczu;
     public double a;
     public boolean virtual = false;
+    int clprio = 0;
     public long id;
-    public int frame;
     public final Glob glob;
-    Map<Class<? extends GAttrib>, GAttrib> attr = new HashMap<Class<? extends GAttrib>, GAttrib>();
-    public Collection<Overlay> ols = new LinkedList<Overlay>() {
-        public boolean add(Overlay item) {
-	        /* XXX: Remove me once local code is changed to use addol(). */
-            if(glob.oc.getgob(id) != null) {
-                // FIXME: extend ols with a method for adding sprites without triggering changed.
-                if (item.id != Sprite.GROWTH_STAGE_ID && item != animalradius)
-                    glob.oc.changed(Gob.this);
-            }
-            return(super.add(item));
-        }
-    };
-
+    Map<Class<? extends GAttrib>, GAttrib> attr = new ConcurrentHashMap<>();
+    public final Collection<Overlay> ols = new LinkedBlockingDeque<>();
+    public final Collection<RenderTree.Slot> slots = new ArrayList<>(1);
+    private final Collection<SetupMod> setupmods = new ArrayList<>();
     private final Collection<ResAttr.Cell<?>> rdata = new LinkedList<ResAttr.Cell<?>>();
     private final Collection<ResAttr.Load> lrdata = new LinkedList<ResAttr.Load>();
-    public int cropstgmaxval = 0;
-    private Overlay gobpath = null;
-    private Overlay bowvector = null;
-    private static final Material.Colors dframeEmpty = new Material.Colors(new Color(87, 204, 73, 255));
-    private static final Material.Colors dframeDone = new Material.Colors(new Color(209, 42, 42, 255));
-	private static final Material.Colors ttEmpty = new Material.Colors(new Color(209, 42, 42, 255));
-	private static final Material.Colors ttDone = new Material.Colors(new Color(87, 204, 73, 255));
-    private static final Material.Colors potDone = new Material.Colors(new Color(0, 0, 0, 255));
-    private static final Gob.Overlay animalradius = new Gob.Overlay(new BPRadSprite(100.0F, -10.0F, BPRadSprite.smatDanger));
-    public Boolean knocked = null;  // knocked will be null if pose update request hasn't been received yet
-    public Type type = null;
-    private Overlay ploverlay;
+    private static final MixColor dFrameDone = new MixColor(255, 0, 0, 64);
+    private static final MixColor dFrameEmpty = new MixColor(0, 255, 0, 64);
+    private static final MixColor ttEmpty = new MixColor(255, 0, 0, 64);
+    private static final MixColor ttDone = new MixColor(0, 255, 0, 64);
+    private static final HashSet<Long> alarmPlayed = new HashSet<Long>();
 
-	public enum Type {
-        OTHER(0), DFRAME(1), TREE(2), BUSH(3), BOULDER(4), PLAYER(5), SIEGE_MACHINE(6), MAMMOTH(7), OLDTRUNK(9), GARDENPOT(10), MUSSEL(11), LOC_RESOURCE(12), FU_YE_CURIO(13), SEAL(14), EAGLE(15),
-        PLANT(16), MULTISTAGE_PLANT(17), PLANT_FALLOW(18),
-        MOB(32), WOLF(33), BEAR(34), LYNX(35), WILDGOAT(36), TROLL(38), WALRUS(39), BAT(40), CAVERAT(41),
-        WOODEN_SUPPORT(64), STONE_SUPPORT(65), METAL_SUPPORT(66), TROUGH(67), BEEHIVE(68), WAGON(600), WALL(602), DREAMCATCHER(603), HOUSE(604), TT(1024);
-
-        public final int value;
-
-        Type(int value) {
-            this.value = value;
-        }
-
-        boolean has(Type g) {
-            if (g == null)
-                return false;
-            return (value & g.value) != 0;
-        }
+    public enum Knocked {
+        UNKNOWN,
+        TRUE,
+        FALSE
     }
 
-    public static class Overlay implements Rendered {
-        public Indir<Resource> res;
+    public Knocked knocked = Knocked.UNKNOWN;
+
+    public Type type;
+
+    enum Type {
+        PLAYER,
+        OTHER
+    }
+
+    private static final HashMap<String, Type> types = new HashMap<String, Type>() {{
+        put("gfx/borka/body", Type.PLAYER);
+    }};
+
+    public static class Overlay implements RenderTree.Node {
+        public final int id;
+        public final Gob gob;
+        public final Indir<Resource> res;
         public MessageBuf sdt;
         public Sprite spr;
-        public int id;
         public boolean delign = false;
+        private Collection<RenderTree.Slot> slots = null;
+        private boolean added = false;
 
-        public Overlay(int id, Indir<Resource> res, Message sdt) {
+
+        public Overlay(Gob gob, int id, Indir<Resource> res, Message sdt) {
+            this.gob = gob;
             this.id = id;
             this.res = res;
             this.sdt = new MessageBuf(sdt);
-            spr = null;
+            this.spr = null;
         }
 
-        public Overlay(Sprite spr) {
-            this.id = -1;
+        public Overlay(Gob gob, Sprite spr) {
+            this.gob = gob;
+            this.id = (int) (Math.random() * Integer.MAX_VALUE);
             this.res = null;
             this.sdt = null;
             this.spr = spr;
         }
 
-        public Overlay(int id, Sprite spr) {
+        public Overlay(Gob gob, Sprite spr, int id) {
+            this.gob = gob;
             this.id = id;
             this.res = null;
             this.sdt = null;
             this.spr = spr;
         }
 
-        public static interface CDel {
-            public void delete();
+        private void init() {
+            if (spr == null) {
+                spr = Sprite.create(gob, res.get(), sdt);
+                if (added && (spr instanceof SetupMod))
+                    gob.setupmods.add((SetupMod) spr);
+            }
+            if (slots == null)
+                RUtils.multiadd(gob.slots, this);
         }
 
-        public static interface CUpd {
-            public void update(Message sdt);
+        private void add0() {
+            if (added)
+                throw (new IllegalStateException());
+            if (spr instanceof SetupMod)
+                gob.setupmods.add((SetupMod) spr);
+            added = true;
         }
 
-        public static interface SetupMod {
-            public void setupgob(GLState.Buffer buf);
-
-            public void setupmain(RenderList rl);
+        private void remove0() {
+            if (!added)
+                throw (new IllegalStateException());
+            if (slots != null) {
+                RUtils.multirem(new ArrayList<>(slots));
+                slots = null;
+            }
+            if (spr instanceof SetupMod)
+                gob.setupmods.remove(spr);
+            added = false;
         }
 
-        public void draw(GOut g) {
+        public void remove() {
+            remove0();
+            gob.ols.remove(this);
+            gob.updCustom();
         }
 
-        public boolean setup(RenderList rl) {
-            if (spr != null)
-                rl.add(spr, null);
-            return (false);
+        public void added(RenderTree.Slot slot) {
+            slot.add(spr);
+            if (slots == null)
+                slots = new ArrayList<>(1);
+            slots.add(slot);
         }
 
-        public Object staticp() {
-            return((spr == null)?null:spr.staticp());
+        public void removed(RenderTree.Slot slot) {
+            if (slots != null)
+                slots.remove(slot);
+        }
+    }
+
+    public static interface SetupMod {
+        public default Pipe.Op gobstate() {
+            return (null);
+        }
+
+        public default Pipe.Op placestate() {
+            return (null);
         }
     }
 
@@ -193,9 +217,9 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         }
 
         public static class FactMaker implements Resource.PublishedCode.Instancer {
-            public Factory make(Class<?> cl) throws InstantiationException, IllegalAccessException {
+            public Factory make(Class<?> cl, Resource ires, Object... argv) {
                 if (Factory.class.isAssignableFrom(cl))
-                    return (cl.asSubclass(Factory.class).newInstance());
+                    return (Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Factory.class), ires, argv));
                 if (ResAttr.class.isAssignableFrom(cl)) {
                     try {
                         final java.lang.reflect.Constructor<? extends ResAttr> cons = cl.asSubclass(ResAttr.class).getConstructor(Gob.class, Message.class);
@@ -212,51 +236,78 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         }
     }
 
-    public static class Static {}
-    public static class SemiStatic {}
-
-    public Gob(Glob glob, Coord2d c, long id, int frame) {
+    public Gob(Glob glob, Coord2d c, long id) {
         this.glob = glob;
         this.rc = c;
         this.id = id;
-        this.frame = frame;
-        loc.tick();
+        if (id < 0)
+            virtual = true;
+        updwait(this::updCustom, waiting -> {
+        });
     }
 
     public Gob(Glob glob, Coord2d c) {
-        this(glob, c, -1, 0);
+        this(glob, c, -1);
     }
 
-    public static interface ANotif<T extends GAttrib> {
-        public void ch(T n);
-    }
-
-    public void ctick(int dt) {
+    public void ctick(double dt) {
         for (GAttrib a : attr.values())
             a.ctick(dt);
+        loadrattr();
         for (Iterator<Overlay> i = ols.iterator(); i.hasNext(); ) {
             Overlay ol = i.next();
-            if (ol.spr == null) {
+            if (ol.slots == null) {
                 try {
-                    ol.spr = Sprite.create(this, ol.res.get(), ol.sdt.clone());
+                    ol.init();
                 } catch (Loading e) {
                 }
             } else {
                 boolean done = ol.spr.tick(dt);
-                if ((!ol.delign || (ol.spr instanceof Overlay.CDel)) && done)
+                if ((!ol.delign || (ol.spr instanceof Sprite.CDel)) && done) {
+                    ol.remove0();
                     i.remove();
+                }
             }
         }
-        if (virtual && ols.isEmpty())
-            glob.oc.remove(id);
+        updstate();
+        if (virtual && ols.isEmpty() && (getattr(Drawable.class) == null))
+            glob.oc.remove(this);
+        if (isPlayer() && this.glob.map.grids != null) {
+            MCache.Grid g = this.glob.map.grids.get(rc.floor().div(11 * 100));
+            if (g != null && glob.sess.ui.gui != null && glob.sess.ui.gui.charname != null) {
+                Mapper.players.putIfAbsent(glob.sess.ui.gui.charname, new Pair<>(glob.sess.ui.gui.hatname, new Pair(rc.div(11).floor().mod(new Coord(100, 100)), g.id)));
+            }
+        }
     }
 
-    /* Intended for local code. Server changes are handled via OCache. */
-    public void addol(Overlay ol) {
-        ols.add(ol);
+    public void gtick(Render g) {
+        Drawable d = getattr(Drawable.class);
+        if (d != null)
+            d.gtick(g);
+        for (Overlay ol : ols) {
+            if (ol.spr != null)
+                ol.spr.gtick(g);
+        }
     }
+
+    public void addol(Overlay ol, boolean async) {
+        if (!async)
+            ol.init();
+        ol.add0();
+        ols.add(ol);
+        updCustom();
+    }
+
+    public void addol(Overlay ol) {
+        addol(ol, true);
+    }
+
     public void addol(Sprite ol) {
-        addol(new Overlay(ol));
+        addol(new Overlay(this, ol));
+    }
+
+    public void addol(Indir<Resource> res, Message sdt) {
+        addol(new Overlay(this, -1, res, sdt));
     }
 
     public Overlay findol(int id) {
@@ -265,12 +316,6 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
                 return (ol);
         }
         return (null);
-    }
-
-    public void tick() {
-        for (GAttrib a : attr.values())
-            a.tick();
-        loadrattr();
     }
 
     public void dispose() {
@@ -287,17 +332,19 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         if (m != null)
             m.move(c);
         this.rc = c;
-        if (isplayer()) {
-            if(Config.pastaMapper && this.glob.map.grids != null) {
-            	MCache.Grid g = this.glob.map.grids.get(c.floor().div(11*100));
-            	if(g != null)
-					Mapper.setPlayerLoc(c, g.id);
-			}
-			if(Config.mapperEnabled)
-				Navigation.setPlayerCoordinates(c);
-            if(Config.vendanMapv4) MappingClient.getInstance().CheckGridCoord(c);
-        }
+        double olda = this.a;
         this.a = a;
+        if (isPlayer() && this.a != olda && glob.sess.ui != null && glob.sess.ui.gui != null && glob.sess.ui.gui.map != null && glob.sess.ui.gui.map.cp != null) {
+            if (Math.abs(a - (glob.sess.ui.gui.map.cp.rte[0].angle(this.rc) + Math.PI)) > Math.PI / 180) {
+                glob.sess.ui.gui.map.wrongdir = true;
+            } else {
+                glob.sess.ui.gui.map.wrongdir = false;
+            }
+        }
+    }
+
+    public boolean isPlayer() {
+        return (glob.sess.ui != null && glob.sess.ui.gui != null && this.id == glob.sess.ui.gui.plid);
     }
 
     public Coord3f getc() {
@@ -306,15 +353,24 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         DrawOffset df = getattr(DrawOffset.class);
         if (df != null)
             ret = ret.add(df.off);
+        if (knocked != Knocked.UNKNOWN)
+            try {
+                if (glob.map.tiler(glob.map.gettile(new Coord2d(ret).floor(MCache.tilesz))) instanceof WaterTile) {
+                    ret.z += 5;
+                }
+            } catch (Loading l) {
+            }
+
         return (ret);
     }
 
     public Coord3f getrc() {
-        return(glob.map.getzp(rc));
+        return (glob.map.getzp(rc));
     }
 
-    public double geta() {
-        return a;
+    protected Pipe.Op getmapstate(Coord3f pc) {
+        Tiler tile = glob.map.tiler(glob.map.gettile(new Coord2d(pc).floor(MCache.tilesz)));
+        return (tile.drawstate(glob, pc));
     }
 
     private Class<? extends GAttrib> attrclass(Class<? extends GAttrib> cl) {
@@ -326,23 +382,6 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         }
     }
 
-    public void setattr(GAttrib a) {
-        Class<? extends GAttrib> ac = attrclass(a.getClass());
-        attr.put(ac, a);
-
-        if (Config.showplayerpaths && gobpath == null && a instanceof LinMove) {
-            Gob pl = glob.oc.getgob(MapView.plgob);
-            if (pl != null) {
-                Following follow = pl.getattr(Following.class);
-                if (pl == this ||
-                        (follow != null && follow.tgt() == this)) {
-                    gobpath = new Overlay(new GobPath(this));
-                    ols.add(gobpath);
-                }
-            }
-        }
-    }
-
     public <C extends GAttrib> C getattr(Class<C> c) {
         GAttrib attr = this.attr.get(attrclass(c));
         if (!c.isInstance(attr))
@@ -350,13 +389,44 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         return (c.cast(attr));
     }
 
-    public void delattr(Class<? extends GAttrib> c) {
-        attr.remove(attrclass(c));
-        if (attrclass(c) == Moving.class && gobpath != null) {
-            ols.remove(gobpath);
-            gobpath = null;
-            MapView.pllastcc = null;
+    private void setattr(Class<? extends GAttrib> ac, GAttrib a) {
+        GAttrib prev = attr.remove(ac);
+        if (prev != null) {
+            if ((prev instanceof RenderTree.Node) && (prev.slots != null))
+                RUtils.multirem(new ArrayList<>(prev.slots));
+            if (prev instanceof SetupMod)
+                setupmods.remove(prev);
         }
+        if (a != null) {
+            if (a instanceof RenderTree.Node && !a.hide) {
+                try {
+                    RUtils.multiadd(this.slots, (RenderTree.Node) a);
+                } catch (Loading l) {
+                    if (prev instanceof RenderTree.Node && !prev.hide) {
+                        RUtils.multiadd(this.slots, (RenderTree.Node) prev);
+                        attr.put(ac, prev);
+                    }
+                    if (prev instanceof SetupMod)
+                        setupmods.add((SetupMod) prev);
+                    throw (l);
+                }
+            }
+            if (a instanceof SetupMod)
+                setupmods.add((SetupMod) a);
+            attr.put(ac, a);
+        }
+        if (prev != null)
+            prev.dispose();
+        if ((ac == Drawable.class && a != prev) || ac == KinInfo.class)
+            updCustom();
+    }
+
+    public void setattr(GAttrib a) {
+        setattr(attrclass(a.getClass()), a);
+    }
+
+    public void delattr(Class<? extends GAttrib> c) {
+        setattr(attrclass(c), null);
     }
 
     private Class<? extends ResAttr> rattrclass(Class<? extends ResAttr> cl) {
@@ -405,10 +475,6 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
             i.remove();
             upd = true;
         }
-        if(upd) {
-            if(glob.oc.getgob(id) != null)
-                glob.oc.changed(this);
-        }
     }
 
     public void setrattr(Indir<Resource> resid, Message dat) {
@@ -451,347 +517,372 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         }
     }
 
-    @Override
     public void draw(GOut g) {
     }
 
-    public void determineType(String name) {
-        if (name.startsWith("gfx/terobjs/trees") && !name.endsWith("log") && !name.endsWith("oldtrunk"))
-            type = Type.TREE;
-        else if (name.endsWith("oldtrunk"))
-            type = Type.OLDTRUNK;
-        else if (name.endsWith("terobjs/plants/carrot") || name.endsWith("terobjs/plants/hemp") || name.endsWith("terobjs/plants/turnip"))
-            type = Type.MULTISTAGE_PLANT;
-        else if (name.endsWith("/fallowplant"))
-            type = Type.PLANT_FALLOW;
-        else if (name.startsWith("gfx/terobjs/plants") && !name.endsWith("trellis"))
-            type = Type.PLANT;
-        else if (name.startsWith("gfx/terobjs/bushes"))
-            type = Type.BUSH;
-        else if (name.equals("gfx/borka/body"))
-            type = Type.PLAYER;
-        else if (name.startsWith("gfx/terobjs/bumlings"))
-            type = Type.BOULDER;
-        else  if (name.endsWith("vehicle/bram") || name.endsWith("vehicle/catapult"))
-            type = Type.SIEGE_MACHINE;
-        else if (name.endsWith("/bear"))
-            type = Type.BEAR;
-        else if (name.endsWith("/lynx"))
-            type = Type.LYNX;
-        else if (name.endsWith("/wolf"))
-            type = Type.WOLF;
-        else if (name.endsWith("/walrus"))
-            type = Type.WALRUS;
-        else if (name.endsWith("/greyseal"))
-            type = Type.SEAL;
-        else if (name.endsWith("/mammoth"))
-            type = Type.MAMMOTH;
-        else if (name.endsWith("/troll"))
-            type = Type.TROLL;
-        else if (name.endsWith("/bat"))
-            type = Type.BAT;
-        else if (name.endsWith("/caverat"))
-        	type = Type.CAVERAT;
-        else if (name.endsWith("/wolf"))
-            type = Type.WOLF;
-        else if (name.endsWith("/boar") ||
-                name.endsWith("/badger") ||
-                name.endsWith("/wolverine") ||
-                name.endsWith("/adder") ||
-                name.endsWith("/wolf") ||
-                name.endsWith("/wildgoat"))
-            type = Type.MOB;
-        else if (name.endsWith("/minesupport") || name.endsWith("/ladder"))
-            type = Type.WOODEN_SUPPORT;
-        else if (name.endsWith("/column"))
-            type = Type.STONE_SUPPORT;
-        else if (name.endsWith("/minebeam"))
-            type = Type.METAL_SUPPORT;
-        else if (name.endsWith("/trough"))
-            type = Type.TROUGH;
-        else if (name.endsWith("/beehive"))
-            type = Type.BEEHIVE;
-        else if (name.endsWith("/dframe"))
-            type = Type.DFRAME;
-        else if (name.endsWith("/gardenpot"))
-            type = Type.GARDENPOT;
-        else if (name.endsWith("/mussels"))
-            type = Type.MUSSEL;
-        else if (name.endsWith("/wagon"))
-        	type = Type.WAGON;
-        else if(name.endsWith("/stonemansion")||name.endsWith("/logcabin")||name.endsWith("/greathall")||name.endsWith("/stonestead")||name.endsWith("/timberhouse")||name.endsWith("stonetower"))
-        	type = Type.HOUSE;
-        else if(name.endsWith("dreca"))
-        	type = Type.DREAMCATCHER;
-        else if (name.startsWith("gfx/terobjs/arch/pali") && !name.equals("gfx/terobjs/arch/palisadegate") &&
-   			 !name.equals("gfx/terobjs/arch/palisadebiggate") || name.startsWith("gfx/terobjs/arch/brick")
-   			 && !name.equals("gfx/terobjs/arch/brickwallgate") &&!name.equals("gfx/terobjs/arch/brickwallbiggate")
-   			 || name.startsWith("gfx/terobjs/arch/pole") && !name.equals("gfx/terobjs/arch/polegate") && 
-!name.equals("gfx/terobjs/arch/polebiggate")) // Excludes gates
-        	type = Type.WALL;
-        else if (name.endsWith("/goldeneagle"))
-            type = Type.EAGLE;
-        else if (Config.alarmitems.containsKey(name) && Config.alarmitems.get(name).selected)
-            type = Type.FU_YE_CURIO;
-        else if (Config.locres.contains(name))
-            type = Type.LOC_RESOURCE;
-        else if(name.endsWith("/ttub"))
-        	type = Type.TT;
-        else
-            type = Type.OTHER;
+    public Type determineType(String name) {
+        return types.get(name);
     }
 
-    public boolean setup(RenderList rl) {
-        loc.tick();
-        for (Overlay ol : ols)
-            rl.add(ol, null);
-        for (Overlay ol : ols) {
-            if (ol.spr instanceof Overlay.SetupMod)
-                ((Overlay.SetupMod) ol.spr).setupmain(rl);
+    public static class GobClick extends Clickable {
+        public final Gob gob;
+
+        public GobClick(Gob gob) {
+            this.gob = gob;
         }
-        final GobHealth hlt = getattr(GobHealth.class);
-        if (hlt != null)
-            rl.prepc(hlt.getfx());
 
-        if (MapView.markedGobs.contains(id))
-            rl.prepc(MapView.markedFx);
+        public Object[] clickargs(ClickData cd) {
+            Object[] ret = {0, (int) gob.id, gob.rc.floor(OCache.posres), 0, -1};
+            for (Object node : cd.array()) {
+                if (node instanceof Gob.Overlay) {
+                    ret[0] = 1;
+                    ret[3] = ((Gob.Overlay) node).id;
+                }
+                if (node instanceof FastMesh.ResourceMesh)
+                    ret[4] = ((FastMesh.ResourceMesh) node).id;
+            }
+            return (ret);
+        }
 
-        if (Config.showdframestatus && type == Type.DFRAME) {
-            boolean done = true;
-            boolean empty = true;
-            for (Overlay ol : ols) {
+        public String toString() {
+            return (String.format("#<gob-click %d %s>", gob.id, gob.getres()));
+        }
+    }
+
+    private class GobState implements Pipe.Op {
+        final Pipe.Op mods;
+
+        private GobState() {
+            if (setupmods.isEmpty()) {
+                this.mods = null;
+            } else {
+                Pipe.Op[] mods = new Pipe.Op[setupmods.size()];
+                int n = 0;
+                for (SetupMod mod : setupmods) {
+                    if ((mods[n] = mod.gobstate()) != null)
+                        n++;
+                }
+                this.mods = (n > 0) ? Pipe.Op.compose(mods) : null;
+            }
+        }
+
+        public void apply(Pipe buf) {
+            if (!virtual)
+                buf.prep(new GobClick(Gob.this));
+            buf.prep(new TickList.Monitor(Gob.this));
+            if (mods != null)
+                buf.prep(mods);
+        }
+
+        public boolean equals(GobState that) {
+            return (Utils.eq(this.mods, that.mods));
+        }
+
+        public boolean equals(Object o) {
+            return ((o instanceof GobState) && equals((GobState) o));
+        }
+    }
+
+    private GobState curstate = null;
+
+    private GobState curstate() {
+        if (curstate == null)
+            curstate = new GobState();
+        return (curstate);
+    }
+
+    private void updstate() {
+        GobState nst;
+        try {
+            nst = new GobState();
+        } catch (Loading l) {
+            return;
+        }
+        if (!Utils.eq(nst, curstate)) {
+            for (RenderTree.Slot slot : slots)
+                slot.ostate(nst);
+            this.curstate = nst;
+        }
+    }
+
+    public void updCustom() {
+        if (updateseq == 0)
+            return;
+        new Runnable() {
+            @Override
+            public void run() {
+                boolean hide = false;
                 try {
-                    Indir<Resource> olires = ol.res;
-                    if (olires != null) {
-                        empty = false;
-                        Resource olres = olires.get();
-                        if (olres != null) {
-                            if (olres.name.endsWith("-blood") || olres.name.endsWith("-windweed") || olres.name.endsWith("-fishraw")) {
-                                done = false;
-                                break;
+                    Resource res = Gob.this.getres();
+                    if (res != null) {
+                        if (!alarmPlayed.contains(id)) {
+                            if (AlarmManager.play(res.name, Gob.this))
+                                alarmPlayed.add(id);
+                            if (type == Gob.Type.PLAYER && id != glob.sess.ui.gui.plid) {
+                                KinInfo kin = getattr(KinInfo.class);
+                                if (kin == null) {
+                                    Audio.play(Resource.local().loadwait("sfx/alarms/whitePlayer"));
+                                    alarmPlayed.add(id);
+                                } else if (kin.group == 2) {
+                                    alarmPlayed.add(id);
+                                    Audio.play(Resource.local().loadwait("sfx/alarms/redPlayer"));
+                                }
+                            }
+                        }
+                        if (res.name.startsWith("gfx/kritter")) {
+                            Overlay ol = findol(1341);
+                            if (!Config.animalRads.val.containsKey(res.name)) {
+                                Config.animalRads.val.put(res.name, true);
+                                Config.animalRads.setVal(Config.animalRads.val);
+                            }
+                            if (Config.animalRadiuses.val && Config.animalRads.val.getOrDefault(res.name, true) && knocked != Knocked.TRUE) {
+                                if (ol == null) {
+                                    addol(new Overlay(Gob.this, new AnimalRad(Gob.this, null, 5 * MCache.tilesz2.y), 1341));
+                                }
+                            } else if (ol != null) {
+                                ol.remove();
+                            }
+                        } else if (res.name.startsWith("gfx/borka/body")) {
+                            Overlay ol = findol(1342);
+                            if (Config.playerRadiuses.val && !isPlayer()) {
+                                if (ol == null) {
+                                    KinInfo kin = getattr(KinInfo.class);
+                                    if (kin == null)
+                                        addol(new Overlay(Gob.this, new PlayerRad(Gob.this, null, Color.WHITE), 1342));
+                                    else
+                                        addol(new Overlay(Gob.this, new PlayerRad(Gob.this, null, BuddyWnd.gc[kin.group]), 1342));
+                                    updstate();
+                                }
+                            } else if (ol != null) {
+                                ol.remove();
+                            }
+                        }
+                        String resname = res.name;
+                        if (Config.bbDisplayState.val > 0) {
+                            BoundingBox bb = BoundingBox.getBoundingBox(Gob.this);
+                            Overlay ol = findol(1339);
+                            if (ol != null && bb == null) {
+                                ol.remove();
+                            } else if (ol == null && bb != null) {
+                                addol(new Overlay(Gob.this, new GobBoundingBox(Gob.this, bb), 1339));
+                            }
+                        }
+                        Drawable d = getattr(Drawable.class);
+                        if (Config.hideToggle.val && d != null) {
+                            if (Config.hideTrees.val && res.name.startsWith("gfx/terobjs/trees") && !res.name.endsWith("log") && !res.name.endsWith("oldtrunk")) {
+                                hide = true;
+                            } else if (Config.hideHouses.val && (res.name.endsWith("/stonemansion") || res.name.endsWith("/logcabin") || res.name.endsWith("/greathall") || res.name.endsWith("/stonestead") || res.name.endsWith("/timberhouse") || res.name.endsWith("stonetower") || res.name.endsWith("windmill"))) {
+                                hide = true;
+                            } else if (Config.hideWalls.val && res.name.startsWith("gfx/terobjs/arch/pali") && !res.name.equals("gfx/terobjs/arch/palisadegate") && !res.name.equals("gfx/terobjs/arch/palisadebiggate") || res.name.startsWith("gfx/terobjs/arch/brick") && !res.name.equals("gfx/terobjs/arch/brickwallgate") && !res.name.equals("gfx/terobjs/arch/brickwallbiggate") || res.name.startsWith("gfx/terobjs/arch/pole") && !res.name.equals("gfx/terobjs/arch/polegate") && !res.name.equals("gfx/terobjs/arch/polebiggate")) {
+                                hide = true;
+                            } else if (Config.hideBushes.val && res.name.startsWith("gfx/terobjs/bushes")) {
+                                hide = true;
+                            } else if (Config.hideCrops.val && res.name.startsWith("gfx/terobjs/plants") && !res.name.endsWith("trellis")) {
+                                hide = true;
+                            }
+                        }
+                        if (d != null && d.hide != hide) {
+                            d.hide = hide;
+                            glob.loader.defer(() -> {
+                                synchronized (Gob.this) {
+                                    setattr(d);
+                                }
+                            }, null);
+                            Overlay ol = findol(1340);
+                            if (!hide && ol != null) {
+                                ol.remove();
+                            } else if (hide && ol == null) {
+                                BoundingBox bb = BoundingBox.getBoundingBox(Gob.this);
+                                addol(new Overlay(Gob.this, new GobHideBox(bb), 1340));
+                            }
+                        }
+                        ResDrawable rd = getattr(ResDrawable.class);
+                        if (Config.ttfHighlight.val) {
+                            if (res.name.equals("gfx/terobjs/dframe")) {
+                                boolean done = true;
+                                boolean empty = true;
+                                for (Overlay ol : ols) {
+                                    if (ol.res != null) {
+                                        Resource olres = ol.res.get();
+                                        if (olres.name.endsWith("-blood") || olres.name.endsWith("-windweed") || olres.name.endsWith("-fishraw")) {
+                                            done = false;
+                                        }
+                                        if (olres.name.startsWith("gfx/terobjs/dframe-")) {
+                                            empty = false;
+                                        }
+                                    }
+                                }
+                                synchronized (this) {
+                                    if (empty)
+                                        glob.loader.defer(() -> {
+                                            synchronized (Gob.this) {
+                                                setattr(new GobColor(Gob.this, dFrameEmpty));
+                                            }
+                                        }, null);
+                                    else if (done)
+                                        glob.loader.defer(() -> {
+                                            synchronized (Gob.this) {
+                                                setattr(new GobColor(Gob.this, dFrameDone));
+                                            }
+                                        }, null);
+                                    else
+                                        glob.loader.defer(() -> {
+                                            synchronized (Gob.this) {
+                                                delattr(GobColor.class);
+                                            }
+                                        }, null);
+                                }
+                            } else if (res.name.equals("gfx/terobjs/ttub")) {
+                                if (rd != null) {
+                                    int r = ((ResDrawable) rd).sdt.peekrbuf(0);
+                                    if ((r & (0x8)) == 0x8) {
+                                        glob.loader.defer(() -> {
+                                            synchronized (Gob.this) {
+                                                setattr(new GobColor(Gob.this, ttDone));
+                                            }
+                                        }, null);
+                                    } else if ((r & (0x4)) == 0 || r == 5) {
+                                        glob.loader.defer(() -> {
+                                            synchronized (Gob.this) {
+                                                setattr(new GobColor(Gob.this, ttEmpty));
+                                            }
+                                        }, null);
+                                    } else {
+                                        glob.loader.defer(() -> {
+                                            synchronized (Gob.this) {
+                                                delattr(GobColor.class);
+                                            }
+                                        }, null);
+                                    }
+                                }
+                            }
+                        } else {
+                            delattr(GobColor.class);
+                        }
+
+                        if (Config.growthStages.val) {
+                            if (resname.startsWith("gfx/terobjs/bushes") || (resname.startsWith("gfx/terobjs/trees") && !resname.endsWith("log") && !resname.endsWith("oldtrunk"))) {
+                                if (rd != null) {
+                                    int fscale = rd.sdt.peekrbuf(1);
+                                    if (fscale != -1) {
+                                        Gob.Overlay ovl = findol(1337);
+                                        synchronized (this) {
+                                            if (ovl == null) {
+                                                addol(new Gob.Overlay(Gob.this, new GobText(Gob.this, fscale + "%", Color.WHITE, 5), 1337));
+                                            } else if (!((GobText) ovl.spr).text.equals(fscale + "%")) {
+                                                ovl.remove();
+                                                addol(new Gob.Overlay(Gob.this, new GobText(Gob.this, fscale + "%", Color.WHITE, 5), 1337));
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (resname.startsWith("gfx/terobjs/plants") && !resname.endsWith("trellis") && rd != null) {
+                                int stage = rd.sdt.peekrbuf(0);
+                                if (cropstgmaxval == 0) {
+                                    for (FastMesh.MeshRes layer : getres().layers(FastMesh.MeshRes.class)) {
+                                        int stg = layer.id / 10;
+                                        if (stg > cropstgmaxval)
+                                            cropstgmaxval = stg;
+                                    }
+                                }
+                                Overlay ol = findol(1338);
+                                String text;
+                                Color col;
+                                if (resname.endsWith("/fallowplant")) {
+                                    col = Color.GRAY;
+                                    text = "-1";
+                                } else if (stage == cropstgmaxval) {
+                                    col = Color.GREEN;
+                                    text = stage + "/" + cropstgmaxval;
+                                } else if (stage == 0) {
+                                    col = Color.RED;
+                                    text = stage + "/" + cropstgmaxval;
+                                } else {
+                                    col = Color.YELLOW;
+                                    text = stage + "/" + cropstgmaxval;
+                                }
+                                synchronized (this) {
+                                    if (ol == null) {
+                                        addol(new Gob.Overlay(Gob.this, new GobText(Gob.this, text, col, -4), 1338));
+                                    } else if (!((GobText) ol.spr).text.equals(text)) {
+                                        ol.remove();
+                                        addol(new Gob.Overlay(Gob.this, new GobText(Gob.this, text, col, -4), 1338));
+                                    }
+                                }
                             }
                         }
                     }
                 } catch (Loading l) {
+                    l.waitfor(this, waiting -> {
+                    });
                 }
             }
-            if (done && !empty)
-                rl.prepc(dframeDone);
-            else if (empty)
-                rl.prepc(dframeEmpty);
-        }
-
-        if(Config.showdframestatus && type == Type.TT) {
-			GAttrib rd = getattr(ResDrawable.class);
-			if(rd != null) {
-				int r = ((ResDrawable) rd).sdt.peekrbuf(0);
-				if((r&(0x8)) == 0x8)
-					rl.prepc(ttDone);
-				else if((r&(0x4)) == 0)
-					rl.prepc(ttEmpty);
-			}
-		}
-
-        if (Config.highlightpots && type == Type.GARDENPOT && ols.size() == 2)
-            rl.prepc(potDone);
-
-        GobHighlight highlight = getattr(GobHighlight.class);
-        if (highlight != null) {
-            if (highlight.cycle <= 0)
-                delattr(GobHighlight.class);
-            else
-                rl.prepc(highlight.getfx());
-        }
-
-        Drawable d = getattr(Drawable.class);
-        if (d != null) {
-        	// Replace hide stuff with Purus Pasta hide
-        	if(Config.hidegobs) {
-        		if(Config.hideTrees && type == Type.TREE) {
-        			GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-        			if(bbox != null) {
-        				rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-        			}
-        		} else if(Config.hideCrops && (type == Type.PLANT || type == Type.MULTISTAGE_PLANT)) {
-        			// Crops don't have bounding boxes
-        			rl.add(new Overlay(new GobHitbox(this, new Coord(-5, -5), new Coord(5, 5), true)), null);
-        		} else if(Config.hideWalls && type == Type.WALL) {
-        			GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-        			if(bbox != null) {
-        				rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-        			}
-        		} else if(Config.hideBushes && type == Type.BUSH) {
-        			GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-        			if(bbox != null) {
-        				rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-        			}
-        		} else if(Config.hideDFrames && type == Type.DFRAME) {
-        			GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-        			if(bbox != null) {
-        				rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-        			}
-        		} else if(Config.hideWagons && type == Type.WAGON) {
-        			GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-        			if(bbox != null) {
-        				rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-        			}
-        		} else if(Config.hideHouses && type == Type.HOUSE) {
-        			GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-        			if(bbox != null) {
-        				rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-        			}
-        		} else 
-        			d.setup(rl);
-        	} else
-        		d.setup(rl);
-           /*if (Config.hidegobs && (type == Type.TREE || type == Type.BUSH)) {
-                GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-                if (bbox != null) {
-                    rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, true)), null);
-                }
-            } else {
-                d.setup(rl);
-            }*/
-
-            if (Config.showboundingboxes) {
-                GobHitbox.BBox bbox = GobHitbox.getBBox(this);
-                if (bbox != null)
-                    rl.add(new Overlay(new GobHitbox(this, bbox.a, bbox.b, false)), null);
-            }
-
-            if (Config.showplantgrowstage) {
-                if (Type.PLANT.has(type)) {
-                    int stage = getattr(ResDrawable.class).sdt.peekrbuf(0);
-                    if (cropstgmaxval == 0) {
-                        for (FastMesh.MeshRes layer : getres().layers(FastMesh.MeshRes.class)) {
-                            int stg = layer.id / 10;
-                            if (stg > cropstgmaxval)
-                                cropstgmaxval = stg;
-                        }
-                    }
-                    Overlay ol = findol(Sprite.GROWTH_STAGE_ID);
-                    if (type == Type.PLANT_FALLOW) {
-                        if (ol == null)
-                            addol(new Gob.Overlay(Sprite.GROWTH_STAGE_ID, new PlantStageSprite(stage, -1, false)));
-                    } else {
-                        if (ol == null && (stage == cropstgmaxval || stage > 0 && stage < 6)) {
-                            addol(new Gob.Overlay(Sprite.GROWTH_STAGE_ID, new PlantStageSprite(stage, cropstgmaxval, type == Type.MULTISTAGE_PLANT)));
-                        } else if (stage <= 0 || (stage != cropstgmaxval && stage >= 6)) {
-                            ols.remove(ol);
-                        } else if (((PlantStageSprite) ol.spr).stg != stage) {
-                            ((PlantStageSprite) ol.spr).update(stage, cropstgmaxval);
-                        }
-                    }
-                }
-
-                if (type == Type.TREE || type == Type.BUSH) {
-                    ResDrawable rd = getattr(ResDrawable.class);
-                    if (rd != null) {
-                        int fscale = rd.sdt.peekrbuf(1);
-                        if (fscale != -1) {
-                            Overlay ol = findol(Sprite.GROWTH_STAGE_ID);
-                            if (ol == null) {
-                                addol(new Gob.Overlay(Sprite.GROWTH_STAGE_ID, new TreeStageSprite(fscale)));
-                            } else if (((TreeStageSprite) ol.spr).val != fscale) {
-                                ((TreeStageSprite) ol.spr).update(fscale);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (Config.showanimalrad && (Type.MOB.has(type))) {
-                boolean hasradius = ols.contains(animalradius);
-                if ((knocked == null || knocked == Boolean.FALSE) && !hasradius)
-                    ols.add(animalradius);
-                else if (knocked == Boolean.TRUE && hasradius)
-                    ols.remove(animalradius);
-            }
-
-            if (Config.showarchvector && type == Type.PLAYER && d instanceof Composite) {
-                boolean targetting = false;
-
-                Gob followGob = null;
-                Moving moving = getattr(Moving.class);
-                if (moving != null && moving instanceof Following)
-                    followGob = ((Following)moving).tgt();
-
-                for (Composited.ED ed : ((Composite) d).comp.cequ) {
-                    try {
-                        Resource res = ed.res.res.get();
-                        if (res != null && res.name.endsWith("huntersbow") && ed.res.sdt.peekrbuf(0) == 5) {
-                            targetting = true;
-                            if (bowvector == null) {
-                                bowvector = new Overlay(new GobArcheryVector(this, followGob));
-                                ols.add(bowvector);
-                            }
-                            break;
-                        }
-                    } catch (Loading l) {
-                    }
-                }
-
-                if (!targetting && bowvector != null) {
-                    ols.remove(bowvector);
-                    bowvector = null;
-                }
-            }
-        }
-        Speaking sp = getattr(Speaking.class);
-        if (sp != null)
-            rl.add(sp.fx, null);
-        KinInfo ki = getattr(KinInfo.class);
-        if (ki != null) {
-            rl.add(ki.fx, null);
-			if(ploverlay == null) {
-            	Resource res = getres();
-            	if (res != null && res.name.contains("body") && !isplayer()) {
-            		ploverlay = new Gob.Overlay(new PartyMemberOutline(this, BuddyWnd.gc[ki.group]));
-		            ols.add(ploverlay);
-            	}
-            }
-        }
-        return (false);
+        }.run();
     }
 
-    private static final Object DYNAMIC = new Object();
-    private Object seq = null;
-    public Object staticp() {
-        if(seq == null) {
-            int rs = 0;
-            for(GAttrib attr : attr.values()) {
-                Object as = attr.staticp();
-                if(as == Rendered.CONSTANS) {
-                } else if(as instanceof Static) {
-                } else if(as == SemiStatic.class) {
-                    rs = Math.max(rs, 1);
-                } else {
-                    rs = 2;
-                    break;
-                }
+    public void added(RenderTree.Slot slot) {
+        synchronized (this) {
+            slot.ostate(curstate());
+            for (Overlay ol : ols) {
+                if (ol.slots != null)
+                    slot.add(ol);
             }
-            for(Overlay ol : ols) {
-                Object os = ol.staticp();
-                if(os == Rendered.CONSTANS) {
-                } else if(os instanceof Static) {
-                } else if(os == SemiStatic.class) {
-                    rs = Math.max(rs, 1);
-                } else {
-                    rs = 2;
-                    break;
-                }
+            for (GAttrib a : attr.values()) {
+                if (a instanceof RenderTree.Node && !a.hide)
+                    slot.add((RenderTree.Node) a);
             }
-            switch(rs) {
-                case 0: seq = new Static(); break;
-                case 1: seq = new SemiStatic(); break;
-                default: seq = null; break;
-            }
+            slots.add(slot);
         }
-        return((seq == DYNAMIC)?null:seq);
     }
 
-    void changed() {
-        seq = null;
+    public void removed(RenderTree.Slot slot) {
+        slots.remove(slot);
+    }
+
+    private Waitable.Queue updwait = null;
+    private int updateseq = 0;
+    int cropstgmaxval = 0;
+
+    void updated() {
+        synchronized (this) {
+            updateseq++;
+            if (updwait != null)
+                updwait.wnotify();
+        }
+    }
+
+    public void updwait(Runnable callback, Consumer<Waitable.Waiting> reg) {
+        /* Caller should probably synchronize on this already for a
+         * call like this to even be meaningful, but just in case. */
+        synchronized (this) {
+            if (updwait == null)
+                updwait = new Waitable.Queue();
+            reg.accept(updwait.add(callback));
+        }
+    }
+
+    public static class DataLoading extends Loading {
+        public final transient Gob gob;
+        public final int updseq;
+
+        /* It would be assumed that the caller has synchronized on gob
+         * while creating this exception. */
+        public DataLoading(Gob gob, String message) {
+            super(message);
+            this.gob = gob;
+            this.updseq = gob.updateseq;
+        }
+
+        public void waitfor(Runnable callback, Consumer<Waitable.Waiting> reg) {
+            synchronized (gob) {
+                if (gob.updateseq != this.updseq) {
+                    reg.accept(Waitable.Waiting.dummy);
+                    callback.run();
+                } else {
+                    gob.updwait(callback, reg);
+                }
+            }
+        }
     }
 
     public Random mkrandoom() {
@@ -805,13 +896,25 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         return (null);
     }
 
+    public Skeleton.Pose getpose() {
+        Drawable d = getattr(Drawable.class);
+        if (d != null)
+            return (d.getpose());
+        return (null);
+    }
+
     private static final ClassResolver<Gob> ctxr = new ClassResolver<Gob>()
             .add(Glob.class, g -> g.glob)
             .add(Session.class, g -> g.glob.sess);
-    public <T> T context(Class<T> cl) {return(ctxr.context(cl, this));}
+
+    public <T> T context(Class<T> cl) {
+        return (ctxr.context(cl, this));
+    }
 
     @Deprecated
-    public Glob glob() {return(context(Glob.class));}
+    public Glob glob() {
+        return (context(Glob.class));
+    }
 
     /* Because generic functions are too nice a thing for Java. */
     public double getv() {
@@ -821,90 +924,148 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         return (m.getv());
     }
 
-    public final GLState olmod = new GLState() {
-        public void apply(GOut g) {
+    public class Placed implements RenderTree.Node, TickList.Ticking, TickList.TickNode {
+        private final Collection<RenderTree.Slot> slots = new ArrayList<>(1);
+        private Placement cur;
+
+        private Placed() {
         }
 
-        public void unapply(GOut g) {
-        }
+        private class Placement implements Pipe.Op {
+            final Pipe.Op flw, tilestate, mods;
+            final Coord3f oc, rc;
+            final double a;
 
-        public void prep(Buffer buf) {
-            for (Overlay ol : ols) {
-                if (ol.spr instanceof Overlay.SetupMod) {
-                    ((Overlay.SetupMod) ol.spr).setupgob(buf);
+            Placement() {
+                try {
+                    Following flw = Gob.this.getattr(Following.class);
+                    Pipe.Op flwxf = (flw == null) ? null : flw.xf();
+                    Pipe.Op tilestate = null;
+                    if (flwxf == null) {
+                        Coord3f oc = Gob.this.getc();
+                        Coord3f rc = new Coord3f(oc);
+                        rc.y = -rc.y;
+                        this.flw = null;
+                        this.oc = oc;
+                        this.rc = rc;
+                        this.a = Gob.this.a;
+                        tilestate = Gob.this.getmapstate(oc);
+                    } else {
+                        this.flw = flwxf;
+                        this.oc = this.rc = null;
+                        this.a = Double.NaN;
+                    }
+                    this.tilestate = tilestate;
+                    if (setupmods.isEmpty()) {
+                        this.mods = null;
+                    } else {
+                        Pipe.Op[] mods = new Pipe.Op[setupmods.size()];
+                        int n = 0;
+                        for (SetupMod mod : setupmods) {
+                            if ((mods[n] = mod.placestate()) != null)
+                                n++;
+                        }
+                        this.mods = (n > 0) ? Pipe.Op.compose(mods) : null;
+                    }
+                } catch (Loading bl) {
+                    throw (new Loading(bl) {
+                        public String getMessage() {
+                            return (bl.getMessage());
+                        }
+
+                        public void waitfor(Runnable callback, Consumer<Waitable.Waiting> reg) {
+                            Waitable.or(callback, reg, bl, Gob.this::updwait);
+                        }
+                    });
                 }
             }
-        }
-    };
 
-    public class Save extends GLState.Abstract {
-        public Matrix4f cam = new Matrix4f(), wxf = new Matrix4f(),
-                mv = new Matrix4f();
-        public Projection proj = null;
-        boolean debug = false;
+            public boolean equals(Placement that) {
+                if (this.flw != null) {
+                    if (!Utils.eq(this.flw, that.flw))
+                        return (false);
+                } else {
+                    if (!(Utils.eq(this.oc, that.oc) && (this.a == that.a)))
+                        return (false);
+                }
+                if (!Utils.eq(this.tilestate, that.tilestate))
+                    return (false);
+                if (!Utils.eq(this.mods, that.mods))
+                    return (false);
+                return (true);
+            }
 
-        public void prep(Buffer buf) {
-            mv.load(cam.load(buf.get(PView.cam).fin(Matrix4f.id))).mul1(wxf.load(buf.get(PView.loc).fin(Matrix4f.id)));
-            Projection proj = buf.get(PView.proj);
-            PView.RenderState wnd = buf.get(PView.wnd);
-            Coord3f s = proj.toscreen(mv.mul4(Coord3f.o), wnd.sz());
-            Gob.this.sc = new Coord(s);
-            Gob.this.sczu = proj.toscreen(mv.mul4(Coord3f.zu), wnd.sz()).sub(s);
-            this.proj = proj;
-        }
-    }
+            public boolean equals(Object o) {
+                return ((o instanceof Placement) && equals((Placement) o));
+            }
 
-    public final Save save = new Save();
+            Pipe.Op gndst = null;
 
-    public class GobLocation extends GLState.Abstract {
-        private Coord3f c = null;
-        private double a = 0.0;
-        private Matrix4f update = null;
-        private final Location xl = new Location(Matrix4f.id, "gobx"), rot = new Location(Matrix4f.id, "gob");
-
-        public void tick() {
-            try {
-                Coord3f c = getc();
-                c.y = -c.y;
-                if (Config.disableelev)
-                    c.z = 0;
-				if(knocked != null && knocked) {
-					try {
-						if(glob.map.tiler(glob.map.gettile(rc.floor(MCache.tilesz))) instanceof WaterTile) {
-							c.z += 5;
-						}
-					} catch(Loading l) {}
-				}
-                if ((this.c == null) || !c.equals(this.c))
-                    xl.update(Transform.makexlate(new Matrix4f(), this.c = c));
-                if (this.a != Gob.this.a)
-                    rot.update(Transform.makerot(new Matrix4f(), Coord3f.zu, (float) -(this.a = Gob.this.a)));
-            } catch (Loading l) {
+            public void apply(Pipe buf) {
+                if (this.flw != null) {
+                    this.flw.apply(buf);
+                } else {
+                    if (gndst == null)
+                        gndst = Pipe.Op.compose(new Location(Transform.makexlate(new Matrix4f(), this.rc), "gobx"),
+                                new Location(Transform.makerot(new Matrix4f(), Coord3f.zu, (float) -this.a), "gob"));
+                    gndst.apply(buf);
+                }
+                if (tilestate != null)
+                    tilestate.apply(buf);
+                if (mods != null)
+                    mods.apply(buf);
             }
         }
 
-        public void prep(Buffer buf) {
-            xl.prep(buf);
-            rot.prep(buf);
+        public Pipe.Op placement() {
+            return (new Placement());
+        }
+
+        public void autotick(double dt) {
+            synchronized (Gob.this) {
+                Placement np;
+                try {
+                    np = new Placement();
+                } catch (Loading l) {
+                    return;
+                }
+                if (!Utils.eq(this.cur, np))
+                    update(np);
+            }
+        }
+
+        private void update(Placement np) {
+            for (RenderTree.Slot slot : slots)
+                slot.ostate(np);
+            this.cur = np;
+        }
+
+        public void added(RenderTree.Slot slot) {
+            slot.ostate(curplace());
+            slot.add(Gob.this);
+            slots.add(slot);
+        }
+
+        public void removed(RenderTree.Slot slot) {
+            slots.remove(slot);
+        }
+
+        public Pipe.Op curplace() {
+            if (cur == null)
+                cur = new Placement();
+            return (cur);
+        }
+
+        public Coord3f getc() {
+            return ((this.cur != null) ? this.cur.oc : null);
+        }
+
+        public TickList.Ticking ticker() {
+            return (this);
         }
     }
 
-    public final GobLocation loc = new GobLocation();
-
-    public boolean isplayer() {
-        return MapView.plgob == id;
-    }
-
-    public boolean isMoving() {
-        if (getattr(LinMove.class) != null)
-            return true;
-
-        Following follow = getattr(Following.class);
-        if (follow != null && follow.tgt().getattr(LinMove.class) != null)
-            return true;
-
-        return false;
-    }
+    public final Placed placed = new Placed();
 
     public LinMove getLinMove() {
         LinMove lm = getattr(LinMove.class);
@@ -918,32 +1079,4 @@ public class Gob implements Sprite.Owner, Skeleton.ModOwner, Rendered {
         return null;
     }
 
-    public boolean isFriend() {
-        synchronized (glob.party.memb) {
-            for (Party.Member m : glob.party.memb.values()) {
-                if (m.gobid == id)
-                    return true;
-            }
-        }
-
-        KinInfo kininfo = getattr(KinInfo.class);
-        if (kininfo == null || kininfo.group == 2 /*red*/)
-            return false;
-
-        return true;
-    }
-
-    public int getStage() {
-    	try {
-			Resource res = getres();
-			if(res != null && res.name.startsWith("gfx/terobjs/plants") && !res.name.endsWith("trellis")) {
-				GAttrib rd = getattr(ResDrawable.class);
-				final int stage = ((ResDrawable) rd).sdt.peekrbuf(0);
-				return stage;
-			} else
-				return -1;
-		} catch(Loading l) {
-    		return -1;
-		}
-    }
 }

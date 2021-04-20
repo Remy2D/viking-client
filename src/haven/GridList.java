@@ -27,14 +27,12 @@
 package haven;
 
 import java.awt.Color;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-import haven.PUtils.BlurFurn;
-import haven.PUtils.TexFurn;
+import static haven.PUtils.*;
 
 public abstract class GridList<T> extends Widget {
-    public static final Text.Furnace dcatf = new BlurFurn(new TexFurn(new Text.Foundry(Text.dfont, 18).aa(true), Window.ctex), 2, 1, new Color(96, 48, 0));
+    public static final Text.Furnace dcatf = new BlurFurn(new TexFurn(new Text.Foundry(Text.fraktur, 18).aa(true), Window.ctex), 2, 1, new Color(96, 48, 0));
     public final Text.Furnace catf;
     public final Scrollbar sb;
     public T sel = null;
@@ -107,7 +105,7 @@ public abstract class GridList<T> extends Widget {
 
     protected void drawsel(GOut g) {
         g.chcolor(255, 255, 0, 128);
-        g.frect(Coord.z, g.sz);
+        g.frect(Coord.z, g.sz());
         g.chcolor();
     }
 
@@ -146,7 +144,7 @@ public abstract class GridList<T> extends Widget {
                 try {
                     drawitem(ig, item);
                 } catch (Loading l) {
-                    ig.image(WItem.missing.layer(Resource.imgc).tex(), Coord.z, g.sz);
+                    ig.image(WItem.missing.layer(Resource.imgc).tex(), Coord.z, g.sz());
                 }
             }
         }

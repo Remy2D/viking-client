@@ -26,17 +26,10 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-
 import haven.Party.Member;
+
+import java.util.*;
+import java.util.Map.Entry;
 
 public class Partyview extends Widget {
     long ign;
@@ -54,7 +47,7 @@ public class Partyview extends Widget {
     }
 
     Partyview(long ign) {
-        super(new Coord(84, 140));
+        super(UI.scale(new Coord(84, 140)));
         this.ign = ign;
     }
 
@@ -71,34 +64,13 @@ public class Partyview extends Widget {
                     continue;
                 Avaview w = avs.get(m);
                 if (w == null) {
-                    w = add(new Avaview(new Coord(27, 27), m.gobid, "avacam") {
+                    w = add(new Avaview(UI.scale(new Coord(27, 27)), m.gobid, "avacam") {
                         private Tex tooltip = null;
 
                         public Object tooltip(Coord c, Widget prev) {
                             Gob gob = m.getgob();
-                            if (gob == null) {
-                                if (gameui().map == null || gameui().map.player() == null)
-                                    return tooltip;
-                                /*Coord a = gameui().map.player().rc;
-                                Coord b = m.getc();
-                                if (b == null)
-                                    return tooltip;
-
-                                double dx = (a.x - b.x) / 11.0d / 100.0d;
-                                double dy = (a.y - b.y) / 11.0d / 100.0d;
-                                double dist = Math.sqrt((dx * dx) + (dy * dy));
-
-                                double dxabs = Math.abs(dx);
-                                double dyabs = Math.abs(dy);
-
-                                String tooltipstr = String.format("  Distance: %s mg.  X: %s  Y: %s",
-                                        Utils.fmt1DecPlace(dist),
-                                        Utils.fmt1DecPlace(a.x > b.x ? -1 * dxabs: dxabs),
-                                        Utils.fmt1DecPlace(a.y > b.y ? dyabs : -1 * dyabs));
-                                tooltip = Text.render(tooltipstr).tex();*/
-
-                                return tooltip;
-                            }
+                            if (gob == null)
+                                return (tooltip);
                             KinInfo ki = gob.getattr(KinInfo.class);
                             if (ki == null)
                                 return (null);
@@ -128,7 +100,7 @@ public class Partyview extends Widget {
             });
             int i = 0;
             for (Map.Entry<Member, Avaview> e : wl) {
-                e.getValue().c = new Coord((i % 2) * 43, (i / 2) * 43 + 24);
+                e.getValue().c = UI.scale(new Coord((i % 2) * 43, (i / 2) * 43 + 27));
                 i++;
             }
         }
@@ -136,7 +108,7 @@ public class Partyview extends Widget {
             e.getValue().color = e.getKey().col;
         }
         if ((avs.size() > 0) && (leave == null)) {
-            leave = add(new Button(84, "Leave party"), Coord.z);
+            leave = add(new Button(UI.scale(84), "Leave party"), Coord.z);
         }
         if ((avs.size() == 0) && (leave != null)) {
             ui.destroy(leave);

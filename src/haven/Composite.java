@@ -26,64 +26,60 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
+import java.util.*;
+import java.lang.reflect.*;
 
-import haven.Composited.ED;
-import haven.Composited.MD;
+import haven.render.*;
 import haven.Skeleton.Pose;
 import haven.Skeleton.PoseMod;
+
+import static haven.Composited.ED;
+import static haven.Composited.MD;
 
 public class Composite extends Drawable {
     public final static float ipollen = 0.2f;
     public final Indir<Resource> base;
-    public Composited comp;
-    public Collection<ResData> nposes = null, tposes = null, prevposes;
-    public boolean nposesold, retainequ = false;
+    public final Composited comp;
+    public int pseq;
+    public List<MD> nmod;
+    public List<ED> nequ;
+    private Collection<ResData> nposes = null, tposes = null;
+    public Collection<ResData> prevposes;
+    private boolean nposesold, retainequ = false;
     private float tptime;
     private WrapMode tpmode;
-    public int pseq;
-    private List<MD> nmod;
-    private List<ED> nequ;
 
     public Composite(Gob gob, Indir<Resource> base) {
         super(gob);
         this.base = base;
+        comp = new Composited(base.get().layer(Skeleton.Res.class).s);
+        comp.eqowner = gob;
     }
 
-    private void init() {
-        if (comp != null)
-            return;
-        Resource res = base.get();
-        comp = new Composited(res.layer(Skeleton.Res.class).s);
-        comp.eqowner = gob;
+    public void added(RenderTree.Slot slot) {
+        slot.add(comp);
         if (gob.type == null) {
-            gob.determineType(res.name);
-            // prevent mannequins to be recognized as players
+            gob.type = gob.determineType(base.get().name);
             if (gob.type == Gob.Type.PLAYER && gob.attr.containsKey(GobHealth.class))
                 gob.type = Gob.Type.OTHER;
+            gob.updCustom();
         }
+        super.added(slot);
     }
 
-    public void setup(RenderList rl) {
-        try {
-            init();
-        } catch (Loading e) {
-            return;
-        }
-        rl.add(comp, null);
-    }
-
-    private List<PoseMod> loadposes(Collection<ResData> rl, Skeleton skel, boolean old) {
+    public static List<PoseMod> loadposes(Collection<ResData> rl, Skeleton.ModOwner owner, Skeleton skel, boolean old) {
         List<PoseMod> mods = new ArrayList<PoseMod>(rl.size());
         for (ResData dat : rl) {
-            PoseMod mod = skel.mkposemod(gob, dat.res.get(), dat.sdt.clone());
+            PoseMod mod = skel.mkposemod(owner, dat.res.get(), dat.sdt.clone());
             if (old)
                 mod.age();
             mods.add(mod);
         }
         return (mods);
+    }
+
+    private List<PoseMod> loadposes(Collection<ResData> rl, Skeleton skel, boolean old) {
+        return (loadposes(rl, gob, skel, old));
     }
 
     private List<PoseMod> loadposes(Collection<ResData> rl, Skeleton skel, WrapMode mode) {
@@ -98,36 +94,45 @@ public class Composite extends Drawable {
     private void updequ() {
         retainequ = false;
         if (nmod != null) {
-            comp.chmod(nmod);
-            nmod = null;
+            try {
+                comp.chmod(nmod);
+                nmod = null;
+            } catch (Loading l) {
+            }
         }
         if (nequ != null) {
-            comp.chequ(nequ);
-            nequ = null;
+            try {
+                comp.chequ(nequ);
+                nequ = null;
+            } catch (Loading l) {
+            }
         }
     }
 
-    public void ctick(int dt) {
-        if (comp == null)
-            return;
+    public void ctick(double dt) {
         if (nposes != null) {
             try {
                 Composited.Poses np = comp.new Poses(loadposes(nposes, comp.skel, nposesold));
                 np.set(nposesold ? 0 : ipollen);
-                updequ();
                 for (ResData resdata : nposes) {
                     Resource posres = resdata.res.get();
-                    // livestock:       */knock-*
-                    // other animals:   */knock
-                    if (posres != null && posres.name.contains("/knock")) {
-                        gob.knocked = Boolean.TRUE;
+                    if (posres != null && (posres.name.endsWith("/knock") || posres.name.endsWith("/dead"))) {
+                        gob.knocked = Gob.Knocked.TRUE;
+                        synchronized (gob.glob.oc) {
+                            gob.updCustom();
+                        }
                         break;
                     }
                 }
-                if (gob.knocked == null)
-                    gob.knocked = Boolean.FALSE;
+                if (gob.knocked == Gob.Knocked.UNKNOWN) {
+                    gob.knocked = Gob.Knocked.FALSE;
+                    synchronized (gob.glob.oc) {
+                        gob.updCustom();
+                    }
+                }
                 prevposes = nposes;
                 nposes = null;
+                updequ();
             } catch (Loading e) {
             }
         } else if (tposes != null) {
@@ -148,9 +153,11 @@ public class Composite extends Drawable {
         } else if (!retainequ) {
             updequ();
         }
-        if(Config.disableAllAnimations)
-        	return;
         comp.tick(dt);
+    }
+
+    public void gtick(Render g) {
+        comp.gtick(g);
     }
 
     public Resource getres() {
@@ -158,7 +165,6 @@ public class Composite extends Drawable {
     }
 
     public Pose getpose() {
-        init();
         return (comp.pose);
     }
 
@@ -194,6 +200,6 @@ public class Composite extends Drawable {
     }
 
     public Object staticp() {
-	return(null);
+        return (null);
     }
 }

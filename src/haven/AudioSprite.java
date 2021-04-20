@@ -26,30 +26,27 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
+import haven.purus.Config;
+import haven.purus.audiomanager.AudioManagerWindow;
+import haven.render.*;
 import haven.Audio.CS;
 
 public class AudioSprite {
-    public static List<Resource.Audio> clips(Resource res, String id)
-    {
+    public static List<Resource.Audio> clips(Resource res, String id) {
         List<Resource.Audio> cl = new ArrayList<Resource.Audio>();
         for (Resource.Audio clip : res.layers(Resource.audio)) {
             if (clip.id == id)
                 cl.add(clip);
         }
-        return(cl);
+        return (cl);
     }
 
     public static Resource.Audio randoom(Resource res, String id) {
         List<Resource.Audio> cl = clips(res, id);
-        if (!cl.isEmpty()) {
-            int rnd = (int) (Math.random() * cl.size());
-            if (rnd == 1 && "sfx/items/pickaxe".equals(res.name) )
-                rnd = 0;
-            return cl.get(rnd);
-        }
+        if (!cl.isEmpty())
+            return (cl.get((int) (Math.random() * cl.size())));
         return (null);
     }
 
@@ -73,24 +70,21 @@ public class AudioSprite {
         }
     };
 
+    public static final HashMap<String, Float> volumes = new HashMap<String, Float>();
+
     public static class ClipSprite extends Sprite {
         public final ActAudio.PosClip clip;
         private boolean done = false;
 
+
         public ClipSprite(Owner owner, Resource res, Resource.Audio clip) {
             super(owner, res);
-            haven.Audio.CS stream = clip.stream();
-
-            if (Config.sfxchipvol != 1.0 && "sfx/chip".equals(res.name))
-                stream = new Audio.VolAdjust(stream, Config.sfxchipvol);
-            else if ("sfx/squeak".equals(res.name))
-                stream = new Audio.VolAdjust(stream, 0.2);
-            else if (Config.sfxquernvol != 1.0 && "sfx/terobjs/quern".equals(res.name))
-                stream = new Audio.VolAdjust(stream, Config.sfxquernvol);
-            else if(Config.sfxclapvol != 1.0 && "sfx/borka/clap".equals(res.name))
-            	stream = new Audio.VolAdjust(stream, Config.sfxclapvol);
-
-            this.clip = new ActAudio.PosClip(new Audio.Monitor(stream) {
+            if (!Config.customVolumes.val.containsKey(res.name)) {
+                Config.customVolumes.val.put(res.name, 1.0f);
+                Config.customVolumes.setVal(Config.customVolumes.val);
+            }
+            AudioManagerWindow.recentClips.put(res.name, System.currentTimeMillis());
+            this.clip = new ActAudio.PosClip(new Audio.Monitor(new Audio.VolAdjust(clip.stream(), Config.customVolumes.val.get(res.name))) {
                 protected void eof() {
                     super.eof();
                     done = true;
@@ -98,29 +92,24 @@ public class AudioSprite {
             });
         }
 
-        public boolean setup(RenderList r) {
-            r.add(clip, null);
-            return (false);
+        public void added(RenderTree.Slot slot) {
+            slot.add(clip);
         }
 
-        public boolean tick(int dt) {
+        public boolean tick(double dt) {
             /* XXX: This is slightly bad, because virtual sprites that
              * are stuck as loading (by getting outside the map, for
              * instance), never play and therefore never get done,
              * effectively leaking. For now, this is seldom a problem
-             * because in practive most (all?) virtual audio-sprites
+             * because in practice most (all?) virtual audio-sprites
              * come from Skeleton.FxTrack which memoizes its origin
              * instead of asking the map for it, but also see comment
              * in glsl.MiscLib.maploc. Solve pl0x. */
             return (done);
         }
-
-        public Object staticp() {
-            return(CONSTANS);
-        }
     }
 
-    public static class RepeatSprite extends Sprite implements Gob.Overlay.CDel {
+    public static class RepeatSprite extends Sprite implements Sprite.CDel {
         private ActAudio.PosClip clip;
         private final Resource.Audio end;
 
@@ -131,70 +120,54 @@ public class AudioSprite {
                 private boolean f = true;
 
                 public CS cons() {
-                    if(f && (beg != null)) {
+                    if (f && (beg != null)) {
                         f = false;
-                        return(beg.stream());
+                        return (beg.stream());
                     }
-                    return(clips.get((int)(Math.random() * clips.size())).stream());
+                    return (clips.get((int) (Math.random() * clips.size())).stream());
                 }
             };
-
-            if (Config.sfxbeevol != 1.0 && "sfx/kritter/beeswarm".equals(res.name))
-                rep = new Audio.VolAdjust(rep, Config.sfxbeevol);
-
             this.clip = new ActAudio.PosClip(rep);
         }
 
-        public boolean setup(RenderList r) {
+        public void added(RenderTree.Slot slot) {
             if (clip != null)
-                r.add(clip, null);
-            return (false);
+                slot.add(clip);
         }
 
-        public boolean tick(int dt) {
+        public boolean tick(double dt) {
             return (clip == null);
         }
 
         public void delete() {
-            if (end != null)
+            if (end != null) {
                 clip = new ActAudio.PosClip(new Audio.Monitor(end.stream()) {
                     protected void eof() {
                         super.eof();
                         RepeatSprite.this.clip = null;
                     }
                 });
-            else
+            } else {
                 clip = null;
-        }
-
-        public Object staticp() {
-            return(CONSTANS);
+            }
         }
     }
 
     public static class Ambience extends Sprite {
-        public final Rendered amb;
+        public final RenderTree.Node amb;
 
         public Ambience(Owner owner, Resource res) {
             super(owner, res);
             ClipAmbiance.Desc clamb = res.layer(ClipAmbiance.Desc.class);
-            if (clamb != null) {
+            if (clamb != null)
                 this.amb = clamb.spr;
-            } else {
-                if (Config.sfxfirevol != 1.0 && "sfx/fire".equals(res.name))
-                    this.amb = new ActAudio.Ambience(res, Config.sfxfirevol);
-                else
-                    this.amb = new ActAudio.Ambience(res);
-            }
+            else
+                this.amb = new ActAudio.Ambience(res);
         }
 
-        public boolean setup(RenderList r) {
-            r.add(amb, null);
-            return (false);
-        }
-
-        public Object staticp() {
-            return(CONSTANS);
+        public void added(RenderTree.Slot slot) {
+            if (amb != null)
+                slot.add(amb);
         }
     }
 }

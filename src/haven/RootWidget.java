@@ -26,12 +26,15 @@
 
 package haven;
 
+import haven.purus.MultiSession;
+
 import java.awt.event.KeyEvent;
 
 public class RootWidget extends ConsoleHost {
     public static final Resource defcurs = Resource.local().loadwait("gfx/hud/curs/arw");
     Profile guprof, grprof, ggprof;
     boolean afk = false;
+    public MultiSession.MultiSessionWindow multiSessionWindow;
 
     public RootWidget(UI ui, Coord sz) {
         super(ui, new Coord(0, 0), sz);
@@ -45,13 +48,15 @@ public class RootWidget extends ConsoleHost {
             if (key == '`') {
                 GameUI gi = findchild(GameUI.class);
                 if (Config.profile) {
-                    add(new Profwnd(guprof, "UI profile"), new Coord(100, 100));
-                    add(new Profwnd(grprof, "GL profile"), new Coord(450, 100));
-                    if ((gi != null) && (gi.map != null))
-                        add(new Profwnd(gi.map.prof, "Map profile"), new Coord(100, 250));
+                    add(new Profwnd(guprof, "UI profile"), UI.scale(100, 100));
+                    add(new Profwnd(grprof, "GL profile"), UI.scale(500, 100));
+		    /* XXXRENDER
+		    if((gi != null) && (gi.map != null))
+			add(new Profwnd(gi.map.prof, "Map profile"), UI.scale(100, 250));
+		    */
                 }
                 if (Config.profilegpu) {
-                    add(new Profwnd(ggprof, "GPU profile"), new Coord(450, 250));
+                    add(new Profwnd(ggprof, "GPU profile"), UI.scale(500, 250));
                 }
             } else if (key == ':') {
                 entercmd();
@@ -59,12 +64,19 @@ public class RootWidget extends ConsoleHost {
                 wdgmsg("gk", (int) key);
             }
         }
+        if (MultiSession.kb_nextSession.key().match(ev)) {
+            MultiSession.nextSession(1);
+            return true;
+        } else if (MultiSession.kb_prevSession.key().match(ev)) {
+            MultiSession.nextSession(-1);
+            return true;
+        }
         return (true);
     }
 
     public void draw(GOut g) {
         super.draw(g);
-        drawcmd(g, new Coord(20, sz.y - 20));
+        drawcmd(g, new Coord(UI.scale(20), sz.y - UI.scale(20)));
     }
 
     public void error(String msg) {

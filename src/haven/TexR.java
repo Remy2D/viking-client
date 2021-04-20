@@ -26,17 +26,16 @@
 
 package haven;
 
+import java.util.*;
 import java.awt.Graphics;
-import java.awt.image.BufferedImage;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.security.AccessController;
-import java.security.PrivilegedAction;
+import java.awt.image.*;
+import java.io.*;
+import java.security.*;
 
-import javax.imageio.ImageIO;
-import javax.media.opengl.GL;
+import haven.Defer.Future;
+import haven.render.*;
+
+import static haven.render.Texture.Filter.*;
 
 @Resource.LayerName("tex")
 public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
@@ -51,7 +50,7 @@ public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
         this.off = new Coord(buf.uint16(), buf.uint16());
         this.sz = new Coord(buf.uint16(), buf.uint16());
         this.tex = new Real();
-        int minfilter = -1, magfilter = -1;
+        Texture.Filter minfilter = null, magfilter = null, mipfilter = null;
         while (!buf.eom()) {
             int t = buf.uint8();
             switch (t) {
@@ -70,30 +69,38 @@ public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
                     break;
                 case 2:
                     int magf = buf.uint8();
-                    magfilter = new int[]{GL.GL_NEAREST, GL.GL_LINEAR}[magf];
+                    magfilter = new Texture.Filter[]{NEAREST, LINEAR}[magf];
                     break;
                 case 3:
                     int minf = buf.uint8();
-                    minfilter = new int[]{GL.GL_NEAREST, GL.GL_LINEAR,
-                            GL.GL_NEAREST_MIPMAP_NEAREST, GL.GL_NEAREST_MIPMAP_LINEAR,
-                            GL.GL_LINEAR_MIPMAP_NEAREST, GL.GL_LINEAR_MIPMAP_LINEAR,
+                    minfilter = new Texture.Filter[]{NEAREST, LINEAR,
+                            NEAREST, NEAREST,
+                            LINEAR, LINEAR,
+                    }[minf];
+                    mipfilter = new Texture.Filter[]{null, null,
+                            NEAREST, LINEAR,
+                            NEAREST, LINEAR,
                     }[minf];
                     break;
                 case 4:
                     this.mask = buf.bytes(buf.int32());
                     break;
+                case 5:
+                    /* Linear color values, not relevant right now */
+                    break;
                 default:
                     throw (new Resource.LoadException("Unknown texture data part " + t + " in " + res.name, getres()));
             }
         }
-        if (magfilter == -1)
-            magfilter = GL.GL_LINEAR;
-        if (minfilter == -1)
-            minfilter = (tex.mipmap == null) ? GL.GL_LINEAR : GL.GL_LINEAR_MIPMAP_LINEAR;
-		if(res.name.startsWith("dyn/"))
-			tex.mipmap(new Mipmapper[]{Mipmapper.lanczos}[0]);
-        tex.magfilter(magfilter);
-        tex.minfilter(minfilter);
+        if (magfilter == null)
+            magfilter = LINEAR;
+        if (minfilter == null) {
+            minfilter = LINEAR;
+            mipfilter = (tex.mipmap == null) ? null : LINEAR;
+        }
+        if (res.name.startsWith("dyn/"))
+            tex.mipmap(Mipmapper.lanczos);
+        tex.img.magfilter(magfilter).minfilter(minfilter).mipfilter(mipfilter);
     }
 
     private class Real extends TexL {
@@ -102,22 +109,14 @@ public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
         }
 
         private BufferedImage rd(final byte[] data) {
-            return (AccessController.doPrivileged(new PrivilegedAction<BufferedImage>() {
-                /* This can crash if not privileged due to ImageIO
-                 * creating tempfiles without doing that
-                 * privileged itself. It can very much be argued
-                 * that this is a bug in ImageIO. */
-                public BufferedImage run() {
-                    try {
-                        return (ImageIO.read(new ByteArrayInputStream(data)));
-                    } catch (IOException e) {
-                        throw (new RuntimeException("Invalid image data in " + getres().name, e));
-                    }
-                }
-            }));
+            try {
+                return (Resource.readimage(new ByteArrayInputStream(data)));
+            } catch (IOException e) {
+                throw (new RuntimeException("Invalid image data in " + getres().name, e));
+            }
         }
 
-	public BufferedImage fill() {
+        public BufferedImage fill() {
             if (mask == null) {
                 return (rd(TexR.this.img));
             } else {
@@ -141,16 +140,8 @@ public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
             }
         }
 
-        protected void fill(GOut g) {
-            try {
-                super.fill(g);
-            } catch (Loading l) {
-                throw (new RenderList.RLoad(l));
-            }
-        }
-
         public String toString() {
-            return ("TexR(" + getres().name + ", " + id + ")");
+            return ("#<texr " + getres().name + "(" + id + ")>");
         }
 
         public String loadname() {
@@ -158,7 +149,7 @@ public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
         }
     }
 
-    public TexGL tex() {
+    public TexL tex() {
         return (tex);
     }
 

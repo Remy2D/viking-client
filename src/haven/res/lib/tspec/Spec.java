@@ -1,112 +1,88 @@
+/* Preprocessed source code */
 package haven.res.lib.tspec;
 
-import java.util.List;
-import java.util.Random;
+import haven.*;
 
-import haven.GSprite;
-import haven.GSprite.Owner;
-import haven.Glob;
-import haven.ItemInfo;
-import haven.ItemInfo.Name;
-import haven.ItemInfo.SpriteOwner;
-import haven.OwnerContext;
-import haven.ResData;
-import haven.Resource;
-import haven.Session;
-import haven.Tex;
-import haven.TexI;
-import haven.UI;
-import haven.res.ui.tt.defn.DefName;
+import java.util.*;
 
-public class Spec implements Owner, SpriteOwner {
-    private static final Object[] definfo = new Object[]{new Object[]{new DefName()}};
+public class Spec implements GSprite.Owner, ItemInfo.SpriteOwner {
+    public static final Object[] definfo = {new Object[]{Loading.waitfor(Resource.remote().load("ui/tt/defn", 5))}};
     public final Object[] info;
     public final ResData res;
     public final OwnerContext ctx;
+
+    public Spec(ResData res, OwnerContext ctx, Object[] info) {
+        this.res = res;
+        this.ctx = ctx;
+        this.info = (info == null) ? definfo : info;
+    }
+
     public static final ClassResolver<UI> uictx = new ClassResolver<UI>()
-            .add(Glob.class, var0 -> var0.sess.glob)
-            .add(Session.class, var0 -> var0.sess);
-    private Random rnd = null;
-    private GSprite spr = null;
-    private List<ItemInfo> cinfo = null;
+            .add(Glob.class, ui -> ui.sess.glob)
+            .add(Session.class, ui -> ui.sess);
 
-    public Spec(ResData var1, OwnerContext var2, Object[] var3) {
-        this.res = var1;
-        this.ctx = var2;
-        this.info = var3 == null ? definfo : var3;
+    public static OwnerContext uictx(UI ui) {
+        return (new OwnerContext() {
+            public <C> C context(Class<C> cl) {
+                return (uictx.context(cl, ui));
+            }
+        });
     }
 
-    public static OwnerContext uictx(UI var0) {
-        return new Spec$1(var0);
+    public <T> T context(Class<T> cl) {
+        return (ctx.context(cl));
     }
 
-    public <T> T context(Class<T> var1) {
-        return this.ctx.context(var1);
-    }
-
-    /**
-     * @deprecated
-     */
     @Deprecated
     public Glob glob() {
-        return (Glob) this.context(Glob.class);
+        return (context(Glob.class));
     }
 
     public Resource getres() {
-        return (Resource) this.res.res.get();
+        return (res.res.get());
     }
 
-    public Random mkrandoom() {
-        if (this.rnd == null) {
-            this.rnd = new Random();
-        }
+    private Random rnd = null;
 
-        return this.rnd;
+    public Random mkrandoom() {
+        if (rnd == null)
+            rnd = new Random();
+        return (rnd);
     }
 
     public GSprite sprite() {
-        return this.spr;
+        return (spr);
     }
 
     public Resource resource() {
-        return (Resource) this.res.res.get();
+        return (res.res.get());
     }
+
+    private GSprite spr = null;
 
     public GSprite spr() {
-        if (this.spr == null) {
-            this.spr = GSprite.create(this, (Resource) this.res.res.get(), this.res.sdt.clone());
-        }
-
-        return this.spr;
+        if (spr == null)
+            spr = GSprite.create(this, res.res.get(), res.sdt.clone());
+        return (spr);
     }
 
-    public List<ItemInfo> info() {
-        if (this.cinfo == null) {
-            this.cinfo = ItemInfo.buildinfo(this, this.info);
-        }
+    private List<ItemInfo> cinfo = null;
 
-        return this.cinfo;
+    public List<ItemInfo> info() {
+        if (cinfo == null)
+            cinfo = ItemInfo.buildinfo(this, info);
+        return (cinfo);
     }
 
     public Tex longtip() {
-        return new TexI(ItemInfo.longtip(this.info()));
+        return (new TexI(ItemInfo.longtip(info())));
     }
 
     public String name() {
-        GSprite var1 = this.spr();
-        Name var2 = (Name) ItemInfo.find(Name.class, this.info());
-        return var2 == null ? null : var2.str.text;
-    }
-
-    final static class Spec$1 implements OwnerContext {
-        private UI ui;
-
-        Spec$1(UI var1) {
-            this.ui = var1;
-        }
-
-        public <C> C context(Class<C> var1) {
-            return Spec.uictx.context(var1, this.ui);
-        }
+        GSprite spr = spr();
+        ItemInfo.Name nm = ItemInfo.find(ItemInfo.Name.class, info());
+        if (nm == null)
+            return (null);
+        return (nm.str.text);
     }
 }

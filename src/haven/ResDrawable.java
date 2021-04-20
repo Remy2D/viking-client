@@ -26,19 +26,23 @@
 
 package haven;
 
+import java.util.*;
+
+import haven.render.*;
+
 public class ResDrawable extends Drawable {
     public final Indir<Resource> res;
-    public Sprite spr = null;
+    public final Sprite spr;
     public MessageBuf sdt;
-    private int delay = 0;
+    // private double delay = 0; XXXRENDER
 
     public ResDrawable(Gob gob, Indir<Resource> res, Message sdt) {
         super(gob);
         this.res = res;
         this.sdt = new MessageBuf(sdt);
-        try {
-            init();
-        } catch (Loading e) {
+        spr = Sprite.create(gob, res.get(), this.sdt.clone());
+        if (gob.type == null) {
+            gob.type = gob.determineType(res.get().name);
         }
     }
 
@@ -46,47 +50,17 @@ public class ResDrawable extends Drawable {
         this(gob, res.indir(), MessageBuf.nil);
     }
 
-    public void init() {
-        if (spr != null)
-            return;
-        Resource res = this.res.get();
-        if (gob.type == null)
-            gob.determineType(res.name);
-
-        MessageBuf stdCopy = sdt.clone();
-        if (Config.bonsai && (gob.type == Gob.Type.TREE || gob.type == Gob.Type.BUSH) && !stdCopy.eom()) {
-            byte[] args = new byte[2];
-            args[0] = (byte)stdCopy.uint8();
-            int fscale = 25;
-            if (!stdCopy.eom()) {
-                fscale = stdCopy.uint8();
-                if (fscale > 25)
-                    fscale = 25;
-
-            }
-            args[1] = (byte)fscale;
-            stdCopy = new MessageBuf(args);
-        }
-
-        spr = Sprite.create(gob, res, stdCopy);
+    public void ctick(double dt) {
+        spr.tick(dt);
     }
 
-    public void setup(RenderList rl) {
-        try {
-            init();
-        } catch (Loading e) {
-            return;
-        }
-        rl.add(spr, null);
+    public void gtick(Render g) {
+        spr.gtick(g);
     }
 
-    public void ctick(int dt) {
-        if (spr == null) {
-            delay += dt;
-        } else {
-            spr.tick(delay + dt);
-            delay = 0;
-        }
+    public void added(RenderTree.Slot slot) {
+        slot.add(spr);
+        super.added(slot);
     }
 
     public void dispose() {
@@ -99,11 +73,6 @@ public class ResDrawable extends Drawable {
     }
 
     public Skeleton.Pose getpose() {
-        init();
         return (Skeleton.getpose(spr));
-    }
-
-    public Object staticp() {
-        return((spr != null)?spr.staticp():null);
     }
 }

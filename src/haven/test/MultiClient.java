@@ -26,8 +26,7 @@
 
 package haven.test;
 
-import java.util.Collection;
-import java.util.HashSet;
+import java.util.*;
 
 public class MultiClient extends BaseTest {
     public Collection<TestClient> clients = new HashSet<TestClient>();

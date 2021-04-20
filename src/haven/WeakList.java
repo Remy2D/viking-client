@@ -26,12 +26,8 @@
 
 package haven;
 
-import java.lang.ref.Reference;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
-import java.util.AbstractCollection;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.*;
+import java.lang.ref.*;
 
 public class WeakList<T> extends AbstractCollection<T> {
     private final ReferenceQueue<T> cleanq = new ReferenceQueue<T>();
@@ -41,8 +37,8 @@ public class WeakList<T> extends AbstractCollection<T> {
         Reference<? extends T> ref;
         while ((ref = cleanq.poll()) != null) {
             Entry e = (Entry) ref;
-	    if (e.l != null)
-	        e.unlink();
+            if (e.l != null)
+                e.unlink();
         }
     }
 

@@ -26,50 +26,49 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.Collection;
+import java.util.*;
+import java.awt.Color;
 
 public class Bufflist extends Widget {
-    public static final int margin = 2;
+    public static final int margin = UI.scale(2);
     public static final int num = 5;
-    public final static Resource buffswim = Resource.local().loadwait("gfx/hud/buffs/toggles/swim");
-    public final static Resource bufftrack = Resource.local().loadwait("gfx/hud/buffs/toggles/tracking");
-    public final static Resource buffcrime = Resource.local().loadwait("gfx/hud/buffs/toggles/crime");
-    public final static Resource partyperm = Resource.local().loadwait("gfx/hud/buffs/toggles/partyperm");
-    public final static Resource buffbrain = Resource.local().loadwait("gfx/hud/buffs/brain");
 
     public interface Managed {
         public void move(Coord c, double off);
+    }
+
+    public Bufflist() {
+        super(Buff.cframe.sz());
     }
 
     private void arrange(Widget imm) {
         int i = 0, rn = 0, x = 0, y = 0, maxh = 0;
         Coord br = new Coord();
         Collection<Pair<Managed, Coord>> mv = new ArrayList<>();
-        for(Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if(!(wdg instanceof Managed))
+        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
+            if (!(wdg instanceof Managed))
                 continue;
-            Managed ch = (Managed)wdg;
+            Managed ch = (Managed) wdg;
             Coord c = new Coord(x, y);
-            if(ch == imm)
+            if (ch == imm)
                 wdg.c = c;
             else
                 mv.add(new Pair<>(ch, c));
             i++;
             x += wdg.sz.x + margin;
             maxh = Math.max(maxh, wdg.sz.y);
-            if(++rn >= num) {
+            if (++rn >= num) {
                 x = 0;
                 y += maxh + margin;
                 maxh = 0;
                 rn = 0;
             }
-            if(c.x + wdg.sz.x > br.x) br.x = c.x + wdg.sz.x;
-            if(c.y + wdg.sz.y > br.y) br.y = c.y + wdg.sz.y;
+            if (c.x + wdg.sz.x > br.x) br.x = c.x + wdg.sz.x;
+            if (c.y + wdg.sz.y > br.y) br.y = c.y + wdg.sz.y;
         }
         resize(br);
         double off = 1.0 / mv.size(), coff = 0.0;
-        for(Pair<Managed, Coord> p : mv) {
+        for (Pair<Managed, Coord> p : mv) {
             p.a.move(p.b, coff);
             coff += off;
         }
@@ -85,26 +84,11 @@ public class Bufflist extends Widget {
     }
 
     public void draw(GOut g) {
-        for(Widget wdg = child, next; wdg != null; wdg = next) {
+        for (Widget wdg = child, next; wdg != null; wdg = next) {
             next = wdg.next;
-            if(!wdg.visible || !(wdg instanceof Managed))
+            if (!wdg.visible || !(wdg instanceof Managed))
                 continue;
             wdg.draw(g.reclipl(xlate(wdg.c, true), wdg.sz));
         }
-    }
-
-    public Buff gettoggle(String name) {
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (wdg instanceof Buff) {
-                Buff buff = (Buff) wdg;
-                try {
-                    Resource res = buff.res.get();
-                    if (res.basename().equals(name))
-                        return buff;
-                } catch (Loading l) {
-                }
-            }
-        }
-        return null;
     }
 }

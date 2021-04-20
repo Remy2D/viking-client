@@ -26,33 +26,27 @@
 
 package haven;
 
-public class TexSI extends Tex {
+public class TexSI implements Tex {
     public final Tex parent;
-    private final Coord ul;
+    public final Coord ul, br;
 
-    public TexSI(Tex parent, Coord ul, Coord sz) {
-        super(sz);
+    public TexSI(Tex parent, Coord ul, Coord br) {
         this.parent = parent;
         this.ul = ul;
+        this.br = br;
     }
 
-    public float tcx(int x) {
-        return (parent.tcx(x + ul.x));
+    public Coord sz() {
+        return (br.sub(ul));
     }
 
-    public float tcy(int y) {
-        return (parent.tcy(y + ul.y));
-    }
-
-    public void render(GOut g, Coord c, Coord ul, Coord br, Coord sz) {
-        parent.render(g, c, this.ul.add(ul), this.ul.add(br), sz);
-    }
-
-    public GLState draw() {
-        return (parent.draw());
-    }
-
-    public GLState clip() {
-        return (parent.clip());
+    public void render(GOut g, float[] gc, float[] tc) {
+        float[] ptc = {
+                tc[0] + ul.x, tc[1] + ul.y,
+                tc[2] + ul.x, tc[3] + ul.y,
+                tc[4] + ul.x, tc[5] + ul.y,
+                tc[6] + ul.x, tc[7] + ul.y,
+        };
+        parent.render(g, gc, ptc);
     }
 }

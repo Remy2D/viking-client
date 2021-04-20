@@ -26,31 +26,17 @@
 
 package haven.error;
 
-import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.Toolkit;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.StringSelection;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.awt.*;
+import java.awt.event.*;
 
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JDialog;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
-import javax.swing.SwingUtilities;
-
-import haven.Config;
+import javax.swing.*;
+import javax.swing.event.*;
 
 public abstract class ErrorGui extends JDialog implements ErrorStatus {
+    private JLabel status;
+    private JEditorPane info;
     private JPanel details;
-    private JButton closebtn, cbbtn;
+    private JButton closebtn, detbtn;
     private JTextArea exbox;
     private JScrollPane infoc, exboxc;
     private Thread reporter;
@@ -62,21 +48,32 @@ public abstract class ErrorGui extends JDialog implements ErrorStatus {
         setResizable(false);
         add(new JPanel() {{
             setLayout(new BoxLayout(this, BoxLayout.PAGE_AXIS));
-            add(new JLabel(" An error has occurred! Please notify the client developer."));
-
+            add(new JLabel("An error has occurred!"));
+            add(status = new JLabel("Please wait..."));
+            add(infoc = new JScrollPane(info = new JEditorPane() {{
+                setEditable(false);
+                addHyperlinkListener(new HyperlinkListener() {
+                    public void hyperlinkUpdate(HyperlinkEvent ev) {
+                        if (ev.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+                            try {
+                                Desktop.getDesktop().browse(ev.getURL().toURI());
+                            } catch (Exception e) {
+                                throw (new RuntimeException(e));
+                            }
+                        } else if (ev.getEventType() == HyperlinkEvent.EventType.ENTERED) {
+                            setCursor(new Cursor(Cursor.HAND_CURSOR));
+                        } else if (ev.getEventType() == HyperlinkEvent.EventType.EXITED) {
+                            setCursor(null);
+                        }
+                    }
+                });
+            }}) {{
+                setPreferredSize(new Dimension(300, 100));
+                setVisible(false);
+            }});
             add(new JPanel() {{
                 setLayout(new FlowLayout());
                 setAlignmentX(0);
-                add(cbbtn = new JButton("Copy to Clipboard") {{
-                    addActionListener(new ActionListener() {
-                        public void actionPerformed(ActionEvent ev) {
-                            StringSelection exc = new StringSelection(exbox.getText());
-                            Clipboard cb = Toolkit.getDefaultToolkit().getSystemClipboard();
-                            cb.setContents(exc, null);
-                            ErrorGui.this.pack();
-                        }
-                    });
-                }});
                 add(closebtn = new JButton("Close") {{
                     addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent ev) {
@@ -85,7 +82,20 @@ public abstract class ErrorGui extends JDialog implements ErrorStatus {
                                 done = true;
                                 ErrorGui.this.notifyAll();
                             }
-                            System.exit(1);
+                        }
+                    });
+                }});
+                add(detbtn = new JButton("Details >>>") {{
+                    addActionListener(new ActionListener() {
+                        public void actionPerformed(ActionEvent ev) {
+                            if (details.isVisible()) {
+                                details.setVisible(false);
+                                detbtn.setText("Details >>>");
+                            } else {
+                                details.setVisible(true);
+                                detbtn.setText("<<< Details");
+                            }
+                            ErrorGui.this.pack();
                         }
                     });
                 }});
@@ -93,7 +103,7 @@ public abstract class ErrorGui extends JDialog implements ErrorStatus {
             add(details = new JPanel() {{
                 setLayout(new BorderLayout());
                 setAlignmentX(0);
-                setVisible(true);
+                setVisible(false);
                 add(exboxc = new JScrollPane(exbox = new JTextArea(15, 80) {{
                     setEditable(false);
                 }}) {{
@@ -109,41 +119,118 @@ public abstract class ErrorGui extends JDialog implements ErrorStatus {
                     ErrorGui.this.notifyAll();
                 }
                 reporter.interrupt();
-                System.exit(1);
             }
         });
         pack();
-        setLocationRelativeTo(parent);
     }
 
-    public boolean goterror(Report r) {
+    public boolean goterror(Throwable t) {
         reporter = Thread.currentThread();
         java.io.StringWriter w = new java.io.StringWriter();
-        r.t.printStackTrace(new java.io.PrintWriter(w));
+        t.printStackTrace(new java.io.PrintWriter(w));
         final String tr = w.toString();
-        SwingUtilities.invokeLater(() -> {
-            String details = String.format("%s.%s\n%s, %s\n%s\n\n%s",
-                    Config.version, Config.gitrev.substring(0, 8),
-                    r.props.get("os"), r.props.get("java"),
-                    r.props.get("gpu"),
-                    tr);
-            exbox.setText(details);
-            pack();
-            exbox.setCaretPosition(0);
-            setVisible(true);
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                closebtn.setEnabled(false);
+                status.setText("Please wait...");
+                exbox.setText(tr);
+                pack();
+                setVisible(true);
+            }
         });
         return (true);
     }
 
+    public void connecting() {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                status.setText("Connecting to server...");
+                pack();
+            }
+        });
+    }
+
+    public void sending() {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                status.setText("Sending error...");
+                pack();
+            }
+        });
+    }
+
     public void done(final String ctype, final String info) {
         done = false;
-
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                closebtn.setEnabled(true);
+                if ((ctype != null) && ctype.equals("text/x-report-info")) {
+                    status.setText("There is information available about this error:");
+                    ErrorGui.this.info.setContentType("text/html");
+                    ErrorGui.this.info.setText(info);
+                    infoc.setVisible(true);
+                    SwingUtilities.invokeLater(new Runnable() {
+                        public void run() {
+                            infoc.getVerticalScrollBar().setValue(0);
+                        }
+                    });
+                } else {
+                    status.setText("The error has been reported.");
+                }
+                pack();
+            }
+        });
         synchronized (this) {
             try {
                 while (!done)
                     wait();
             } catch (InterruptedException e) {
                 throw (new Error(e));
+            }
+        }
+        errorsent();
+    }
+
+    public void senderror(Exception e) {
+        final String errstr;
+        if (e instanceof ReportException) {
+            /* C¦ */
+            StringBuilder buf = new StringBuilder();
+            buf.append("<html>");
+            String msg = e.getMessage();
+            for (int i = 0; i < msg.length(); i++) {
+                char c = msg.charAt(i);
+                if (c == '\n')
+                    buf.append("<br>");
+                else if (c == '<')
+                    buf.append("&lt;");
+                else if (c == '>')
+                    buf.append("&gt;");
+                else if (c == '&')
+                    buf.append("&amp;");
+                else
+                    buf.append(c);
+            }
+            buf.append("</html>");
+            errstr = buf.toString();
+        } else {
+            e.printStackTrace();
+            errstr = "An error occurred while sending!";
+        }
+        done = false;
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                closebtn.setEnabled(true);
+                status.setText(errstr);
+                pack();
+            }
+        });
+        synchronized (this) {
+            try {
+                while (!done)
+                    wait();
+            } catch (InterruptedException e2) {
+                throw (new Error(e2));
             }
         }
         errorsent();

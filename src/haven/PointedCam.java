@@ -26,9 +26,11 @@
 
 package haven;
 
+import haven.render.*;
+
 public class PointedCam extends Camera {
-    Coord3f base = Coord3f.o;
-    float dist = 5.0f, e, a;
+    public Coord3f base = Coord3f.o;
+    public float dist = 5.0f, e, a;
 
     public PointedCam() {
         super(Matrix4f.identity());

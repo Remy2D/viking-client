@@ -26,16 +26,14 @@
 
 package haven;
 
-import integrations.map.Navigation;
-
-import java.io.IOException;
-import java.lang.ref.Reference;
-import java.lang.ref.WeakReference;
 import java.net.*;
 import java.util.*;
+import java.util.function.*;
+import java.io.*;
+import java.lang.ref.*;
 
 public class Session implements Resource.Resolver {
-    public static final int PVER = 23;
+    public static final int PVER = 24;
 
     public static final int MSG_SESS = 0;
     public static final int MSG_REL = 1;
@@ -51,14 +49,16 @@ public class Session implements Resource.Resolver {
     public static final int SESSERR_CONN = 3;
     public static final int SESSERR_PVER = 4;
     public static final int SESSERR_EXPR = 5;
+    public static final int SESSERR_MESG = 6;
 
     static final int ackthresh = 30;
 
     DatagramSocket sk;
     SocketAddress server;
-    Thread rworker, sworker, ticker;
+    Thread rworker, sworker;
     Object[] args;
     public int connfailed = 0;
+    public String connerror = null;
     public String state = "conn";
     int tseq = 0, rseq = 0;
     int ackseq;
@@ -67,11 +67,12 @@ public class Session implements Resource.Resolver {
     Map<Integer, PMessage> waiting = new TreeMap<Integer, PMessage>();
     LinkedList<RMessage> pending = new LinkedList<RMessage>();
     Map<Long, ObjAck> objacks = new TreeMap<Long, ObjAck>();
-    String username;
+    public String username;
     byte[] cookie;
     final Map<Integer, CachedRes> rescache = new TreeMap<Integer, CachedRes>();
     public final Glob glob;
     public byte[] sesskey;
+    public UI ui;
 
     @SuppressWarnings("serial")
     public static class MessageException extends RuntimeException {
@@ -93,19 +94,20 @@ public class Session implements Resource.Resolver {
             this.resid = res.resid;
         }
 
-        public void waitfor() throws InterruptedException {
+        public void waitfor(Runnable callback, Consumer<Waitable.Waiting> reg) {
             synchronized (res) {
-                while (res.resnm == null)
-                    res.wait();
+                if (res.resnm != null) {
+                    reg.accept(Waitable.Waiting.dummy);
+                    callback.run();
+                } else {
+                    reg.accept(res.wq.add(callback));
+                }
             }
-        }
-
-        public boolean canwait() {
-            return (true);
         }
     }
 
     private static class CachedRes {
+        private final Waitable.Queue wq = new Waitable.Queue();
         private final int resid;
         private String resnm = null;
         private int resver;
@@ -152,7 +154,7 @@ public class Session implements Resource.Resolver {
                 this.resnm = nm;
                 this.resver = ver;
                 get().reset();
-                notifyAll();
+                wq.wnotify();
             }
         }
     }
@@ -186,27 +188,6 @@ public class Session implements Resource.Resolver {
         }
     }
 
-    private class Ticker extends HackThread {
-        public Ticker() {
-            super("Server time ticker");
-            setDaemon(true);
-        }
-
-        public void run() {
-            try {
-                while (true) {
-                    long now, then;
-                    then = System.currentTimeMillis();
-                    glob.oc.tick();
-                    now = System.currentTimeMillis();
-                    if (now - then < 70)
-                        Thread.sleep(70 - (now - then));
-                }
-            } catch (InterruptedException e) {
-            }
-        }
-    }
-
     private class RWorker extends HackThread {
         boolean alive;
         int fragtype = -1;
@@ -233,29 +214,12 @@ public class Session implements Resource.Resolver {
                 int fl = msg.uint8();
                 long id = msg.uint32();
                 int frame = msg.int32();
-                synchronized (oc) {
-                    if ((fl & 1) != 0)
-                        oc.remove(id, frame - 1);
-                    Gob gob = oc.getgob(id, frame);
-                    if (gob != null) {
-                        gob.frame = frame;
-                        gob.virtual = ((fl & 2) != 0);
-                    }
-                    while (true) {
-                        int type = msg.uint8();
-                        if (type == OCache.OD_REM) {
-                            oc.remove(id, frame);
-                        } else if (type == OCache.OD_END) {
-                            break;
-                        } else {
-                            oc.receive(gob, type, msg);
-                        }
-                    }
-                }
+                oc.receive(fl, id, frame, msg);
                 synchronized (objacks) {
                     if (objacks.containsKey(id)) {
                         ObjAck a = objacks.get(id);
-                        a.frame = frame;
+                        if (frame > a.frame)
+                            a.frame = frame;
                         a.recv = System.currentTimeMillis();
                     } else {
                         objacks.put(id, new ObjAck(id, frame, System.currentTimeMillis()));
@@ -268,7 +232,7 @@ public class Session implements Resource.Resolver {
         }
 
         private void handlerel(PMessage msg) {
-            if(msg.type == RMessage.RMSG_FRAGMENT) {
+            if (msg.type == RMessage.RMSG_FRAGMENT) {
                 int head = msg.uint8();
                 if ((head & 0x80) == 0) {
                     if (fragbuf != null)
@@ -292,8 +256,9 @@ public class Session implements Resource.Resolver {
                         throw (new MessageException("Got invalid fragment type: " + head, msg));
                     }
                 }
-            } else if((msg.type == RMessage.RMSG_NEWWDG) || (msg.type == RMessage.RMSG_WDGMSG) ||
-                    (msg.type == RMessage.RMSG_DSTWDG) || (msg.type == RMessage.RMSG_ADDWDG)) {
+            } else if ((msg.type == RMessage.RMSG_NEWWDG) || (msg.type == RMessage.RMSG_WDGMSG) ||
+                    (msg.type == RMessage.RMSG_DSTWDG) || (msg.type == RMessage.RMSG_ADDWDG) ||
+                    (msg.type == RMessage.RMSG_WDGBAR)) {
                 synchronized (uimsgs) {
                     uimsgs.add(msg);
                 }
@@ -309,10 +274,17 @@ public class Session implements Resource.Resolver {
             } else if (msg.type == RMessage.RMSG_PARTY) {
                 glob.party.msg(msg);
             } else if (msg.type == RMessage.RMSG_SFX) {
-                Indir<Resource> res = getres(msg.uint16());
+                Indir<Resource> resid = getres(msg.uint16());
                 double vol = ((double) msg.uint16()) / 256.0;
                 double spd = ((double) msg.uint16()) / 256.0;
-                Audio.play(res);
+                glob.loader.defer(() -> {
+                    Audio.CS clip = Audio.fromres(resid.get());
+                    if (spd != 1.0)
+                        clip = new Audio.Resampler(clip).sp(spd);
+                    if (vol != 1.0)
+                        clip = new Audio.VolAdjust(clip, vol);
+                    Audio.play(clip);
+                }, null);
             } else if (msg.type == RMessage.RMSG_CATTR) {
                 glob.cattr(msg);
             } else if (msg.type == RMessage.RMSG_MUSIC) {
@@ -367,7 +339,7 @@ public class Session implements Resource.Resolver {
                     try {
                         sk.receive(p);
                     } catch (java.nio.channels.ClosedByInterruptException e) {
-            /* Except apparently Sun's J2SE doesn't throw this when interrupted :P*/
+                        /* Except apparently Sun's J2SE doesn't throw this when interrupted :P*/
                         break;
                     } catch (SocketTimeoutException e) {
                         continue;
@@ -385,6 +357,28 @@ public class Session implements Resource.Resolver {
                                     state = "";
                                 } else {
                                     connfailed = error;
+                                    switch (connfailed) {
+                                        case SESSERR_AUTH:
+                                            connerror = "Invalid authentication token";
+                                            break;
+                                        case SESSERR_BUSY:
+                                            connerror = "Already logged in";
+                                            break;
+                                        case SESSERR_CONN:
+                                            connerror = "Could not connect to server";
+                                            break;
+                                        case SESSERR_PVER:
+                                            connerror = "This client is too old";
+                                            break;
+                                        case SESSERR_EXPR:
+                                            connerror = "Authentication token expired";
+                                            break;
+                                        case SESSERR_MESG:
+                                            connerror = msg.string();
+                                            break;
+                                        default:
+                                            connerror = "Connection failed";
+                                    }
                                     Session.this.close();
                                 }
                                 Session.this.notifyAll();
@@ -459,9 +453,12 @@ public class Session implements Resource.Resolver {
                                     return;
                                 }
                             }
+                            String protocol = "Hafen";
+                            if (!Config.confid.equals(""))
+                                protocol += "/" + Config.confid;
                             PMessage msg = new PMessage(MSG_SESS);
                             msg.adduint16(2);
-                            msg.addstring("Hafen/Purus-Pasta2");
+                            msg.addstring(protocol);
                             msg.adduint16(PVER);
                             msg.addstring(username);
                             msg.adduint16(cookie.length);
@@ -489,8 +486,8 @@ public class Session implements Resource.Resolver {
                         }
                         now = System.currentTimeMillis();
                         boolean beat = true;
-            /*
-              if((closing != -1) && (now - closing > 500)) {
+			/*
+			  if((closing != -1) && (now - closing > 500)) {
 			  Message cm = new Message(MSG_CLOSE);
 			  sendmsg(cm);
 			  closing = now;
@@ -591,7 +588,6 @@ public class Session implements Resource.Resolver {
                     }
                 }
             } finally {
-                ticker.interrupt();
                 rworker.interrupt();
             }
         }
@@ -612,9 +608,6 @@ public class Session implements Resource.Resolver {
         rworker.start();
         sworker = new SWorker();
         sworker.start();
-        ticker = new Ticker();
-        ticker.start();
-        Navigation.reset();
     }
 
     private void sendack(int seq) {

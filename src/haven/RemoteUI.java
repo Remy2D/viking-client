@@ -27,8 +27,8 @@
 package haven;
 
 public class RemoteUI implements UI.Receiver, UI.Runner {
-    Session sess, ret;
-    UI ui;
+    public final Session sess;
+    private Session ret;
 
     public RemoteUI(Session sess) {
         this.sess = sess;
@@ -50,12 +50,11 @@ public class RemoteUI implements UI.Receiver, UI.Runner {
         }
     }
 
-    public Session run(UI ui) throws InterruptedException {
-        this.ui = ui;
-        ui.setreceiver(this);
-        while (true) {
-            PMessage msg;
-            synchronized (ui) {
+    public UI.Runner run(UI ui) throws InterruptedException {
+        try {
+            ui.setreceiver(this);
+            while (true) {
+                PMessage msg;
                 while ((msg = sess.getuimsg()) != null) {
                     if (msg.type == RMessage.RMSG_NEWWDG) {
                         int id = msg.uint16();
@@ -71,23 +70,39 @@ public class RemoteUI implements UI.Receiver, UI.Runner {
                     } else if (msg.type == RMessage.RMSG_DSTWDG) {
                         int id = msg.uint16();
                         ui.destroy(id);
-                    } else if(msg.type == RMessage.RMSG_ADDWDG) {
+                    } else if (msg.type == RMessage.RMSG_ADDWDG) {
                         int id = msg.uint16();
                         int parent = msg.uint16();
                         Object[] pargs = msg.list();
                         ui.addwidget(id, parent, pargs);
+                    } else if (msg.type == RMessage.RMSG_WDGBAR) {
+                        /* Ignore for now. */
                     }
                 }
-            }
-            synchronized (sess) {
-                if (ret != null) {
-                    sess.close();
-                    return (ret);
+                synchronized (sess) {
+                    if (ret != null) {
+                        sess.close();
+                        return (new RemoteUI(ret));
+                    }
+                    if (!sess.alive())
+                        return (null);
+                    sess.wait();
                 }
-                if (!sess.alive())
-                    return (null);
-                sess.wait();
+            }
+        } finally {
+            sess.close();
+            synchronized (sess) {
+                while (sess.alive())
+                    sess.wait();
             }
         }
+    }
+
+    public void init(UI ui) {
+        ui.sess = sess;
+    }
+
+    public String title() {
+        return (sess.username);
     }
 }

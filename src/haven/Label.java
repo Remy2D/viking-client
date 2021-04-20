@@ -30,15 +30,15 @@ import java.awt.Color;
 
 public class Label extends Widget {
     Text.Foundry f;
-    Text text;
-    public String texts;
+    public Text text;
+    String texts;
     public Color col = Color.WHITE;
 
     @RName("lbl")
     public static class $_ implements Factory {
         public Widget create(UI ui, Object[] args) {
             if (args.length > 1)
-                return (new Label((String) args[0], (Integer) args[1]));
+                return (new Label((String) args[0], UI.scale((Integer) args[1])));
             else
                 return (new Label((String) args[0]));
         }
@@ -51,46 +51,27 @@ public class Label extends Widget {
     public Label(String text, int w, Text.Foundry f) {
         super(Coord.z);
         this.f = f;
-        this.text = f.renderwrap(texts = Resource.getLocString(Resource.BUNDLE_LABEL, text), this.col, w);
+        this.text = f.renderwrap(texts = text, this.col, w);
         sz = this.text.sz();
     }
 
     public Label(String text, Text.Foundry f) {
         super(Coord.z);
         this.f = f;
-        this.text = f.render(texts = Resource.getLocString(Resource.BUNDLE_LABEL, text), this.col);
-        sz = this.text.sz();
-    }
-
-    public Label(String text, Text.Foundry f, Color col) {
-        super(Coord.z);
-        this.col = col;
-        this.f = f;
-        this.text = f.render(texts = text, this.col); // used only for numbers and symbols. hence no localization.
+        this.text = f.render(texts = text, this.col);
         sz = this.text.sz();
     }
 
     public Label(String text, int w) {
-        this(text, w, Text.labelFnd);
+        this(text, w, Text.std);
     }
 
     public Label(String text) {
-        this(text, Text.labelFnd);
+        this(text, Text.std);
     }
 
     public void settext(String text) {
-        String t = text;
-        if (!Resource.language.equals("en") || Resource.L10N_DEBUG) {
-            // barrel content
-            final String contStr = "Contents: ";
-            if (text.startsWith(contStr) && !text.endsWith("Empty.")) {
-                String cont = text.substring(contStr.length(), text.length() - 1);
-                t = Resource.getLocString(Resource.BUNDLE_LABEL, contStr) + Resource.getLocContent(cont);
-            } else {
-                t = Resource.getLocString(Resource.BUNDLE_LABEL, text);
-            }
-        }
-        this.text = f.render(texts = t, col);
+        this.text = f.render(texts = text, col);
         sz = this.text.sz();
     }
 

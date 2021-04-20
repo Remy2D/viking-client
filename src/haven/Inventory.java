@@ -26,24 +26,54 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import haven.res.ui.tt.q.qbuff.QBuff;
+import java.util.*;
+import java.awt.image.WritableRaster;
 
 public class Inventory extends Widget implements DTarget {
-    public static final Tex invsq = Resource.loadtex("gfx/hud/invsq");
-    public static final Coord sqsz = new Coord(33, 33);
+    public static final Coord sqsz = UI.scale(new Coord(33, 33));
+    public static final Tex invsq;
     public boolean dropul = true;
     public Coord isz;
-    public Map<GItem, WItem> wmap = new HashMap<GItem, WItem>();
+    Map<GItem, WItem> wmap = new HashMap<GItem, WItem>();
+
+    static {
+        Coord sz = sqsz.add(1, 1);
+        WritableRaster buf = PUtils.imgraster(sz);
+        for (int i = 1, y = sz.y - 1; i < sz.x - 1; i++) {
+            buf.setSample(i, 0, 0, 20);
+            buf.setSample(i, 0, 1, 28);
+            buf.setSample(i, 0, 2, 21);
+            buf.setSample(i, 0, 3, 167);
+            buf.setSample(i, y, 0, 20);
+            buf.setSample(i, y, 1, 28);
+            buf.setSample(i, y, 2, 21);
+            buf.setSample(i, y, 3, 167);
+        }
+        for (int i = 1, x = sz.x - 1; i < sz.y - 1; i++) {
+            buf.setSample(0, i, 0, 20);
+            buf.setSample(0, i, 1, 28);
+            buf.setSample(0, i, 2, 21);
+            buf.setSample(0, i, 3, 167);
+            buf.setSample(x, i, 0, 20);
+            buf.setSample(x, i, 1, 28);
+            buf.setSample(x, i, 2, 21);
+            buf.setSample(x, i, 3, 167);
+        }
+        for (int y = 1; y < sz.y - 1; y++) {
+            for (int x = 1; x < sz.x - 1; x++) {
+                buf.setSample(x, y, 0, 36);
+                buf.setSample(x, y, 1, 52);
+                buf.setSample(x, y, 2, 38);
+                buf.setSample(x, y, 3, 125);
+            }
+        }
+        invsq = new TexI(PUtils.rasterimg(buf));
+    }
+
     @RName("inv")
     public static class $_ implements Factory {
         public Widget create(UI ui, Object[] args) {
-            return new Inventory((Coord) args[0]);
+            return (new Inventory((Coord) args[0]));
         }
     }
 
@@ -58,7 +88,7 @@ public class Inventory extends Widget implements DTarget {
     }
 
     public Inventory(Coord sz) {
-        super(invsq.sz().add(new Coord(-1, -1)).mul(sz).add(new Coord(1, 1)));
+        super(sqsz.mul(sz).add(1, 1));
         isz = sz;
     }
 
@@ -93,9 +123,13 @@ public class Inventory extends Widget implements DTarget {
     }
 
     public boolean drop(Coord cc, Coord ul) {
-        Coord dc = dropul ? ul.add(sqsz.div(2)).div(sqsz) : cc.div(sqsz);
+        Coord dc;
+        if (dropul)
+            dc = ul.add(sqsz.div(2)).div(sqsz);
+        else
+            dc = cc.div(sqsz);
         wdgmsg("drop", dc);
-        return(true);
+        return (true);
     }
 
     public boolean iteminteract(Coord cc, Coord ul) {
@@ -105,9 +139,9 @@ public class Inventory extends Widget implements DTarget {
     public void uimsg(String msg, Object... args) {
         if (msg == "sz") {
             isz = (Coord) args[0];
-            resize(invsq.sz().add(new Coord(-1, -1)).mul(isz).add(new Coord(1, 1)));
-        } else if(msg == "mode") {
-            dropul = (((Integer)args[0]) == 0);
+            resize(invsq.sz().add(UI.scale(new Coord(-1, -1))).mul(isz).add(UI.scale(new Coord(1, 1))));
+        } else if (msg == "mode") {
+            dropul = (((Integer) args[0]) == 0);
         } else {
             super.uimsg(msg, args);
         }
@@ -115,178 +149,12 @@ public class Inventory extends Widget implements DTarget {
 
     @Override
     public void wdgmsg(Widget sender, String msg, Object... args) {
-        if(msg.equals("drop-identical")) {
-            for (WItem item : getIdenticalItems((GItem) args[0], false))
-                item.item.wdgmsg("drop", Coord.z);
-        } else if(msg.startsWith("transfer-identical")) {
-            boolean eq = msg.endsWith("eq");
-            List<WItem> items = getIdenticalItems((GItem) args[0], eq);
-            if (!eq) {
-                int asc = msg.endsWith("asc") ? 1 : -1;
-                Collections.sort(items, (a, b) -> {
-                    QBuff aq = a.item.quality();
-                    QBuff bq = b.item.quality();
-                    if (aq == null || bq == null)
-                        return 0;
-                    else if (aq.q == bq.q)
-                        return 0;
-                    else if (aq.q > bq.q)
-                        return asc;
-                    else
-                        return -asc;
-                });
-            }
-            Window stockpile = gameui().getwnd("Stockpile");
-            Window smelter = gameui().getwnd("Ore Smelter");
-            Window kiln = gameui().getwnd("Kiln");
-            if (stockpile == null || smelter != null || kiln != null) {
-                for (WItem item : items)
-                    item.item.wdgmsg("transfer", Coord.z);
-            } else {
-                for (Widget w = stockpile.lchild; w != null; w = w.prev) {
-                    if (w instanceof ISBox) {
-                        ISBox isb = (ISBox) w;
-                        int freespace = isb.getfreespace();
-                        for (WItem item : items) {
-                            if (freespace-- <= 0)
-                                break;
-                            item.item.wdgmsg("take", new Coord(item.sz.x / 2, item.sz.y / 2));
-                            isb.drop(null, null);
-                        }
-                        break;
-                    }
-                }
-            }
-        } else {
-            super.wdgmsg(sender, msg, args);
+        if (msg.equals("transfer-identical")) {
+            children().stream().filter((w) -> w instanceof WItem && ((WItem) w).item.getname().equals((String) args[0]))
+                    .sorted(Comparator.comparingDouble(a -> ((WItem) a).quality()))
+                    .forEach(item -> ((WItem) item).item.wdgmsg("transfer", Coord.z));
+            return;
         }
-    }
-
-    public List<WItem> getIdenticalItems(GItem item, boolean quality) {
-        List<WItem> items = new ArrayList<WItem>();
-        double q0 = 0;
-        if (quality) {
-            QBuff aq = item.quality();
-            if (aq != null)
-                q0 = aq.q;
-        }
-        GSprite sprite = item.spr();
-        if (sprite != null) {
-            String name = sprite.getname();
-            String resname = item.resource().name;
-            for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-                if (wdg instanceof WItem) {
-                    GItem it = ((WItem) wdg).item;
-                    sprite = it.spr();
-                    if (sprite != null) {
-                        Resource res = it.resource();
-                        if (res != null && res.name.equals(resname) && (name == null || name.equals(sprite.getname()))) {
-                            if (quality) {
-                                QBuff bq = it.quality();
-                                if (bq != null) {
-                                    double q1 = bq.q - q0;
-                                    if (q1 < 0.1 && q1 > -0.1)
-                                        items.add((WItem) wdg);
-                                }
-                            } else {
-                                items.add((WItem) wdg);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return items;
-    }
-
-    /* Following getItem* methods do partial matching of the name *on purpose*.
-       Because when localization is turned on, original English name will be in the brackets
-       next to the translation
-    */
-    public List<WItem> getItemsPartial(String... names) {
-        List<WItem> items = new ArrayList<WItem>();
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (wdg instanceof WItem) {
-                String wdgname = ((WItem)wdg).item.getname();
-                for (String name : names) {
-                    if (wdgname.contains(name)) {
-                        items.add((WItem) wdg);
-                        break;
-                    }
-                }
-            }
-        }
-        return items;
-    }
-
-    public WItem getItemPartial(String name) {
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (wdg instanceof WItem) {
-                String wdgname = ((WItem)wdg).item.getname();
-                if (wdgname.contains(name))
-                    return (WItem) wdg;
-            }
-        }
-        return null;
-    }
-
-    public int getItemPartialCount(String name) {
-        int count = 0;
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (wdg instanceof WItem) {
-                String wdgname = ((WItem)wdg).item.getname();
-                if (wdgname.contains(name))
-                    count++;
-            }
-        }
-        return count;
-    }
-
-    public int getFreeSpace() {
-        int feespace = isz.x * isz.y;
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (wdg instanceof WItem)
-                feespace -= (wdg.sz.x * wdg.sz.y) / (sqsz.x * sqsz.y);
-        }
-        return feespace;
-    }
-    
-    // Null if no free slots found
-    public Coord getFreeSlot() {
-    	int[][] invTable = new int[isz.x][isz.y];
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (wdg instanceof WItem) {
-            	WItem item = (WItem) wdg;
-            	for(int i=0; i<item.sz.div(sqsz).y; i++)
-            		for(int j=0; j<item.sz.div(sqsz).x; j++)
-            			invTable[item.c.div(sqsz).x+j][item.c.div(sqsz).y+i] = 1;
-            }
-        }
-        for(int i=0; i<isz.y; i++) {
-        	for(int j=0; j<isz.x; j++) {
-        		if(invTable[j][i] == 0)
-        			return new Coord(j, i);
-        	}
-        }
-        return null;
-    }
-
-    public boolean drink(int threshold) {
-        IMeter.Meter stam = gameui().getmeter("stam", 0);
-        if (stam == null || stam.a > threshold)
-            return false;
-
-        List<WItem> containers = getItemsPartial("Waterskin", "Waterflask", "Kuksa");
-        for (WItem wi : containers) {
-            ItemInfo.Contents cont = wi.item.getcontents();
-            if (cont != null) {
-                FlowerMenu.setNextSelection("Drink");
-                ui.lcc = wi.rootpos();
-                wi.item.wdgmsg("iact", wi.c, 0);
-                return true;
-            }
-        }
-
-        return false;
+        super.wdgmsg(sender, msg, args);
     }
 }

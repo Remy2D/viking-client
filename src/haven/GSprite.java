@@ -26,12 +26,9 @@
 
 package haven;
 
+import java.util.*;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
 
 public abstract class GSprite implements Drawn {
     public final Owner owner;
@@ -76,9 +73,9 @@ public abstract class GSprite implements Drawn {
             throw (new RuntimeException("Could not find any suitable constructor for dynamic sprite"));
         }
 
-        public Factory make(Class<?> cl) throws InstantiationException, IllegalAccessException {
+        public Factory make(Class<?> cl, Resource ires, Object... argv) {
             if (Factory.class.isAssignableFrom(cl))
-                return (cl.asSubclass(Factory.class).newInstance());
+                return (Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Factory.class), ires, argv));
             if (GSprite.class.isAssignableFrom(cl))
                 return (dynfact(cl.asSubclass(GSprite.class)));
             throw (new RuntimeException("Could not find construct sprite factory for dynamic sprite class " + cl));
@@ -109,17 +106,5 @@ public abstract class GSprite implements Drawn {
     public abstract Coord sz();
 
     public void tick(double dt) {
-    }
-
-    public String getname() {
-        Class cl = this.getClass();
-        try {
-            Field name = cl.getDeclaredField("name");
-            return (String)name.get(this);
-        } catch (NoSuchFieldException nsfe) {
-        } catch (ClassCastException cce) {
-        } catch (IllegalAccessException iae) {
-        }
-        return null;
     }
 }

@@ -26,44 +26,31 @@
 
 package haven;
 
+import haven.purus.Config;
+import haven.purus.GobHighlight;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.awt.Color;
 import java.awt.Font;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.ClipboardOwner;
-import java.awt.datatransfer.StringSelection;
-import java.awt.datatransfer.Transferable;
 import java.awt.event.KeyEvent;
 import java.awt.font.TextAttribute;
 import java.awt.font.TextHitInfo;
 import java.awt.image.BufferedImage;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.net.URL;
-import java.nio.charset.Charset;
-import java.text.AttributedCharacterIterator;
+import java.text.*;
 import java.text.AttributedCharacterIterator.Attribute;
-import java.text.CharacterIterator;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.net.URL;
+import java.util.regex.*;
+import java.io.IOException;
+import java.awt.datatransfer.*;
 
 public class ChatUI extends Widget {
-    private static final Resource alarmsfx = Resource.local().loadwait("sfx/chatalarm");
-    public static final RichText.Foundry fnd = new RichText.Foundry(new ChatParser(TextAttribute.FONT, Text.dfont.deriveFont((float)Config.fontsizechat)));
+    public static final RichText.Foundry fnd = new RichText.Foundry(new ChatParser(TextAttribute.FONT, Text.dfont.deriveFont(UI.scale(10f)), TextAttribute.FOREGROUND, Color.BLACK));
     public static final Text.Foundry qfnd = new Text.Foundry(Text.dfont, 12, new java.awt.Color(192, 255, 192));
-    public static final int selw = 130;
-    private static final int brpw = 142, beltw = 410;
-    public static final Coord marg = new Coord(9, 9);
+    public static final int selw = UI.scale(130);
+    public static final Coord marg = UI.scale(new Coord(9, 9));
+    public static final int offset = UI.scale(28);
     public static final Color[] urgcols = new Color[]{
             null,
             new Color(0, 128, 255),
@@ -77,7 +64,6 @@ public class ChatUI extends Widget {
     private QuickLine qline = null;
     private final LinkedList<Notification> notifs = new LinkedList<Notification>();
     private UI.Grab qgrab;
-    public static final String CMD_PREFIX_HLIGHT = "@";
 
     public ChatUI(int w, int h) {
         super(new Coord(w, h));
@@ -99,7 +85,8 @@ public class ChatUI extends Widget {
         }
 
         public static final Attribute HYPERLINK = new ChatAttribute("hyperlink");
-        public static final Attribute HEARTH_SECRET = new ChatAttribute("hearth-secret");
+        public static final Attribute HEARTHSECRET = new ChatAttribute("hearthsecret");
+
     }
 
     public static class FuckMeGentlyWithAChainsaw {
@@ -119,7 +106,7 @@ public class ChatUI extends Widget {
         public static final Pattern urlpat = Pattern.compile("\\b((https?://)|(www\\.[a-z0-9_.-]+\\.[a-z0-9_.-]+))[a-z0-9/_.~#%+?&:*=-]*", Pattern.CASE_INSENSITIVE);
         public static final Map<? extends Attribute, ?> urlstyle = RichText.fillattrs(TextAttribute.FOREGROUND, new Color(64, 64, 255),
                 TextAttribute.UNDERLINE, TextAttribute.UNDERLINE_ON);
-        private static final Pattern hspat = Pattern.compile("\\bhs: ?([^ ]+)", Pattern.CASE_INSENSITIVE);
+        public static final Pattern hspat = Pattern.compile("hs:\\S+");
 
         public ChatParser(Object... args) {
             super(args);
@@ -128,52 +115,54 @@ public class ChatUI extends Widget {
         protected RichText.Part text(PState s, String text, Map<? extends Attribute, ?> attrs) throws IOException {
             RichText.Part ret = null;
             int p = 0;
+            Matcher m = urlpat.matcher(text);
+            Matcher m2 = hspat.matcher(text);
             while (true) {
-            	Map<Attribute, Object> na = null;
-                Matcher m = hspat.matcher(text);
-                if (m.find(p)) {
-                    String hs = m.group(1);
-                    na = new HashMap<Attribute, Object>(attrs);
+                if (!m.find(p) || (m2.find(p) && m2.start() < m.start())) {
+                    if (!m2.find(p))
+                        break;
+                    String hs = text.substring(m2.start() + 3, m2.end());
+                    RichText.Part lead = new RichText.TextPart(text.substring(p, m2.start()), attrs);
+                    if (ret == null) ret = lead;
+                    else ret.append(lead);
+                    Map<Attribute, Object> na = new HashMap<Attribute, Object>(attrs);
                     na.putAll(urlstyle);
-na.put(ChatAttribute.HEARTH_SECRET, hs);
-                p = m.end();
-                } else {
-	                m = urlpat.matcher(text);
-	                if (m.find(p)) {
-	                    URL url;
-	                    try {
-	                        String su = text.substring(m.start(), m.end());
-	                        if(su.indexOf(':') < 0)
-	                            su = "http://" + su;
-	                        url = new URL(su);
-	                    } catch(java.net.MalformedURLException e) {
-	                        p = m.end();
-	                        continue;
-	                    }
-	                    na = new HashMap<Attribute, Object>(attrs);
-	                    na.putAll(urlstyle);
-	                    na.put(ChatAttribute.HYPERLINK, new FuckMeGentlyWithAChainsaw(url));
-	                    p = m.end();
-	                }
+                    na.put(ChatAttribute.HEARTHSECRET, hs);
+                    ret.append(new RichText.TextPart(text.substring(m2.start(), m2.end()), na));
+                    p = m2.end();
+                    continue;
                 }
-                if (na == null)
-                    break;
-        		RichText.Part lead = new RichText.TextPart(text.substring(0, m.start()), attrs);
-        		if(ret == null) ret = lead; else ret.append(lead);
-        		ret.append(new RichText.TextPart(text.substring(m.start(), m.end()), na));
-        	    }
-        	    if(ret == null)
-        		ret = new RichText.TextPart(text, attrs);
-        	    else
-        		ret.append(new RichText.TextPart(text.substring(p), attrs));
-        	    return(ret);
-        	}
+                URL url;
+                try {
+                    String su = text.substring(m.start(), m.end());
+                    if (su.indexOf(':') < 0)
+                        su = "http://" + su;
+                    url = new URL(su);
+                } catch (java.net.MalformedURLException e) {
+                    p = m.end();
+                    continue;
+                }
+                RichText.Part lead = new RichText.TextPart(text.substring(p, m.start()), attrs);
+                if (ret == null) ret = lead;
+                else ret.append(lead);
+                Map<Attribute, Object> na = new HashMap<Attribute, Object>(attrs);
+                na.putAll(urlstyle);
+                na.put(ChatAttribute.HYPERLINK, new FuckMeGentlyWithAChainsaw(url));
+                ret.append(new RichText.TextPart(text.substring(m.start(), m.end()), na));
+                p = m.end();
+            }
+            if (ret == null)
+                ret = new RichText.TextPart(text, attrs);
+            else
+                ret.append(new RichText.TextPart(text.substring(p), attrs));
+            return (ret);
+        }
     }
 
     public static abstract class Channel extends Widget {
         public final List<Message> msgs = new LinkedList<Message>();
         private final Scrollbar sb;
-        public final IButton cb;
+        private final IButton cb;
         public int urgency = 0;
 
         public static abstract class Message {
@@ -190,7 +179,6 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
             private final Text t;
 
             public SimpleMessage(String text, Color col, int w) {
-                text = timestamp(text);
                 if (col == null)
                     this.t = fnd.render(RichText.Parser.quote(text), w);
                 else
@@ -289,7 +277,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
         public void resize(Coord sz) {
             super.resize(sz);
             if (sb != null) {
-                sb.move(new Coord(sz.x - (12 - marg.x), 34 - marg.y));
+                sb.move(new Coord(sz.x - (UI.scale(12) - marg.x), UI.scale(34) - marg.y));
                 sb.resize(ih() - sb.c.y);
                 int y = 0;
                 for (Message m : msgs)
@@ -530,10 +518,10 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                     getparent(GameUI.class).error("Could not launch web browser.");
                 }
             }
-            String hs = (String)inf.getAttribute(ChatAttribute.HEARTH_SECRET);
-            if (hs != null && gameui() != null && gameui().buddies != null) {
-            	gameui().buddies.show();
-            	gameui().buddies.wdgmsg("bypwd", hs);
+            String hs = (String) inf.getAttribute(ChatAttribute.HEARTHSECRET);
+            if (hs != null) {
+                ui.gui.buddies.show();
+                ui.gui.buddies.wdgmsg("bypwd", hs);
             }
         }
 
@@ -709,7 +697,6 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                 append(cmsg);
                 if (urgency > 0)
                     notify(cmsg, urgency);
-                save(name, cmsg.text().text);
             } else {
                 super.uimsg(msg, args);
             }
@@ -722,7 +709,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
 
     public static class MultiChat extends EntryChannel {
         public final int urgency;
-        protected final String name;
+        private final String name;
         private final Map<Integer, Color> pc = new HashMap<Integer, Color>();
 
         public class NamedMessage extends Message {
@@ -744,8 +731,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                 BuddyWnd.Buddy b = getparent(GameUI.class).buddies.find(from);
                 String nm = (b == null) ? "???" : (b.name);
                 if ((r == null) || !nm.equals(cn)) {
-                    String tf = String.format("%s: %s", nm, text);
-                    r = fnd.render(RichText.Parser.quote(timestamp(tf)), w, TextAttribute.FOREGROUND, col);
+                    r = fnd.render(RichText.Parser.quote(String.format("[%s] %s: %s", LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), nm, text)), w, TextAttribute.FOREGROUND, col);
                     cn = nm;
                 }
                 return (r);
@@ -765,7 +751,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
 
         public class MyMessage extends SimpleMessage {
             public MyMessage(String text, int w) {
-                super(text, new Color(192, 192, 255), w);
+                super(String.format("[%s] %s", LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")), text), new Color(192, 192, 255), w);
             }
         }
 
@@ -794,32 +780,23 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
             if (msg == "msg") {
                 Integer from = (Integer) args[0];
                 String line = (String) args[1];
-
-                if (name.equals(Resource.getLocString(Resource.BUNDLE_LABEL, "Area Chat")) && line.startsWith(CMD_PREFIX_HLIGHT)) {
+                if (name.equals("Area Chat") && line.startsWith("@")) {
                     try {
                         long gobid = Long.parseLong(line.substring(1));
-                        OCache oc = gameui().map.glob.oc;
-                        Gob gob = oc.getgob(gobid);
-                        if (gob != null) {
-                            gob.delattr(GobHighlight.class);
-                            gob.setattr(new GobHighlight(gob));
-                            oc.changed(gob);
-                            return;
-                        }
-                    } catch (NumberFormatException nfe) {
+                        Gob gob = ui.sess.glob.oc.getgob(gobid);
+                        gob.setattr(new GobHighlight(gob));
+                        gob.updated();
+                        return;
+                    } catch (NumberFormatException | NullPointerException e) {
                     }
                 }
-
                 if (from == null) {
-                    MyMessage my = new MyMessage(line, iw());
-                    append(my);
-                    save(name, my.text().text, super.getparent(GameUI.class).buddies.getCharName());
+                    append(new MyMessage(line, iw()));
                 } else {
                     Message cmsg = new NamedMessage(from, line, fromcolor(from), iw());
                     append(cmsg);
                     if (urgency > 0)
                         notify(cmsg, urgency);
-                    save(name, cmsg.text().text);
                 }
             } else {
                 super.uimsg(msg, args);
@@ -832,40 +809,28 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
     }
 
     public static class PartyChat extends MultiChat {
-        private long lastmsg = 0;
-
         public PartyChat() {
-            super(false, Resource.getLocString(Resource.BUNDLE_LABEL, "Party"), 2);
+            super(false, "Party", 2);
         }
 
         public void uimsg(String msg, Object... args) {
             if (msg == "msg") {
                 Integer from = (Integer) args[0];
-                int gobid = (Integer) args[1];
+                long gobid = Utils.uint32((Integer) args[1]);
                 String line = (String) args[2];
                 Color col = Color.WHITE;
-
                 synchronized (ui.sess.glob.party.memb) {
-                    Party.Member pm = ui.sess.glob.party.memb.get((long) gobid);
+                    Party.Member pm = ui.sess.glob.party.memb.get(gobid);
                     if (pm != null)
                         col = pm.col;
                 }
                 if (from == null) {
-                    MyMessage my = new MyMessage(line, iw());
-                    append(my);
-                    save(name, my.text().text, super.getparent(GameUI.class).buddies.getCharName());
+                    append(new MyMessage(line, iw()));
                 } else {
                     Message cmsg = new NamedMessage(from, line, Utils.blendcol(col, Color.WHITE, 0.5), iw());
                     append(cmsg);
-                    save(name, cmsg.text().text);
                     if (urgency > 0)
                         notify(cmsg, urgency);
-
-                    long time = System.currentTimeMillis();
-                    if (Config.chatalarm && (lastmsg == 0 || (time - lastmsg) / 1000 > 50)) {
-                        Audio.play(alarmsfx, Config.chatalarmvol);
-                        lastmsg = time;
-                    }
                 }
             } else {
                 super.uimsg(msg, args);
@@ -875,7 +840,6 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
 
     public static class PrivChat extends EntryChannel {
         private final int other;
-        private long lastmsg = 0;
 
         public class InMessage extends SimpleMessage {
             public InMessage(String text, int w) {
@@ -902,19 +866,8 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                     Message cmsg = new InMessage(line, iw());
                     append(cmsg);
                     notify(cmsg, 3);
-                    
-                    BuddyWnd.Buddy buddy = getparent(GameUI.class).buddies.find(other);
-                    save("Private Chat", cmsg.text().text, buddy != null ? buddy.name : "???");
-
-                    long time = System.currentTimeMillis();
-                    if (lastmsg == 0 || (time - lastmsg) / 1000 > 50) {
-                        Audio.play(alarmsfx, Config.chatalarmvol);
-                        lastmsg = time;
-                    }
                 } else if (t.equals("out")) {
-                    OutMessage om = new OutMessage(line, iw());
-                    append(om);
-                    save("Private Chat", om.text().text, super.getparent(GameUI.class).buddies.getCharName());
+                    append(new OutMessage(line, iw()));
                 }
             } else if (msg == "err") {
                 String err = (String) args[0];
@@ -948,7 +901,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
         public Widget create(UI ui, Object[] args) {
             String name = (String) args[0];
             int urgency = (Integer) args[1];
-            return (new MultiChat(false, Resource.getLocString(Resource.BUNDLE_LABEL, name), urgency));
+            return (new MultiChat(false, name, urgency));
         }
     }
 
@@ -999,7 +952,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
 
     private class Selector extends Widget {
         public final BufferedImage ctex = Resource.loadimg("gfx/hud/chantex");
-        public final Text.Foundry tf = new Text.Foundry(Text.serif.deriveFont(Font.BOLD, Text.cfg.chatName)).aa(true);
+        public final Text.Foundry tf = new Text.Foundry(Text.serif.deriveFont(Font.BOLD, UI.scale(12))).aa(true);
         public final Text.Furnace[] nf = {
                 new PUtils.BlurFurn(new PUtils.TexFurn(tf, ctex), 1, 1, new Color(80, 40, 0)),
                 new PUtils.BlurFurn(new PUtils.TexFurn(tf, ctex), 1, 1, new Color(0, 128, 255)),
@@ -1050,9 +1003,9 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                     g.chcolor(255, 255, 255, 255);
                     if ((ch.rname == null) || !ch.rname.text.equals(ch.chan.name()) || (ch.urgency != ch.chan.urgency))
                         ch.rname = nf[ch.urgency = ch.chan.urgency].render(ch.chan.name());
-                    g.aimage(ch.rname.tex(), new Coord(sz.x / 2, y + 8), 0.5, 0.5);
-                    g.image(chandiv, new Coord(0, y + 18));
-                    y += 28;
+                    g.aimage(ch.rname.tex(), new Coord(sz.x / 2, y + UI.scale(8)), 0.5, 0.5);
+                    g.image(chandiv, new Coord(0, y + UI.scale(18)));
+                    y += offset;
                     if (y >= sz.y)
                         break;
                     i++;
@@ -1093,7 +1046,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
         }
 
         private Channel bypos(Coord c) {
-            int i = (c.y / 28) + s;
+            int i = (c.y / offset) + s;
             if ((i >= 0) && (i < chls.size()))
                 return (chls.get(i).chan);
             return (null);
@@ -1111,8 +1064,8 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
         public boolean mousewheel(Coord c, int amount) {
             if (!ui.modshift) {
                 s += amount;
-                if (s >= chls.size() - (sz.y / 28))
-                    s = chls.size() - (sz.y / 28);
+                if (s >= chls.size() - (sz.y / offset))
+                    s = chls.size() - (sz.y / offset);
                 if (s < 0)
                     s = 0;
             } else {
@@ -1164,12 +1117,12 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                 rqline = qfnd.render(pre + qline.line);
                 rqpre = pre.length();
             }
-            c = br.sub(0, 20);
+            c = br.sub(UI.scale(0, 20));
             g.image(rqline.tex(), c);
-            int lx = rqline.advance(qline.point + rqpre);
-            g.line(new Coord(br.x + lx + 1, br.y - 18), new Coord(br.x + lx + 1, br.y - 6), 1);
+            int lx = rqline.advance(qline.point + rqpre) + UI.scale(1);
+            g.line(new Coord(br.x + lx, br.y - UI.scale(18)), new Coord(br.x + lx, br.y - UI.scale(6)), 1);
         } else {
-            c = br.sub(0, 5);
+            c = br.sub(UI.scale(0, 5));
         }
         double now = Utils.ntime();
         synchronized (notifs) {
@@ -1181,7 +1134,7 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
                 }
                 if ((c.y -= n.msg.sz().y) < br.y - h)
                     break;
-                g.image(n.chnm.tex(), c, br.sub(0, h), br.add(selw - 10, 0));
+                g.image(n.chnm.tex(), c, br.sub(0, h), br.add(selw - UI.scale(10), 0));
                 g.image(n.msg.tex(), c.add(selw, 0));
             }
         }
@@ -1208,10 +1161,15 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
             g.aimage(bcbd, new Coord(sz.x, 0), 1, 0);
     }
 
+    private static final Resource notifsfx = Resource.local().loadwait("sfx/hud/chat");
+
     public void notify(Channel chan, Channel.Message msg) {
         synchronized (notifs) {
             notifs.addFirst(new Notification(chan, msg));
         }
+        if (Config.disableMultichatNotification.val && chan instanceof MultiChat)
+            return;
+        ui.sfx(notifsfx);
     }
 
     private class Spring extends NormAnim {
@@ -1235,7 +1193,6 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
     public void resize(Coord sz) {
         super.resize(sz);
         this.c = base.add(0, -this.sz.y);
-
         chansel.resize(new Coord(selw, this.sz.y - marg.y));
         if (sel != null)
             sel.resize(new Coord(this.sz.x - marg.x - sel.c.x, this.sz.y - sel.c.y));
@@ -1251,6 +1208,10 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
     public void hresize(int h) {
         clearanims(Spring.class);
         resize(sz.x, targeth = h);
+    }
+
+    public void resize(int w) {
+        resize(new Coord(Math.max(w, selw + marg.x + UI.scale(10) + marg.x), sz.y));
     }
 
     public void move(Coord base) {
@@ -1290,23 +1251,22 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
         }
     }
 
-    private UI.Grab dm = null;
+    private UI.Grab dm = null, dm2 = null;
     private Coord doff;
-    public int savedh = Math.max(111, Config.chatsz.y);
-
-    private boolean resizehoriz = false;
+    private static final int minh = 111, minw = 420;
+    public int savedh = UI.scale(Math.max(minh, Utils.getprefi("chatsize", minh)));
+    public int savedw = UI.scale(Math.max(minw, Utils.getprefi("chatsizew", minw)));
 
     public boolean mousedown(Coord c, int button) {
         int bmfx = (sz.x - bmf.sz().x) / 2;
-        if (button == 1 && c.x > sz.x - 9) {
-            dm = ui.grabmouse(this);
-            doff = c;
-            resizehoriz = true;
-            return (true);
-        } else if ((button == 1) && (c.y < bmf.sz().y) && (c.x >= bmfx) && (c.x <= (bmfx + bmf.sz().x))) {
+        if ((button == 1) && (c.y < bmf.sz().y) && (c.x >= bmfx) && (c.x <= (bmfx + bmf.sz().x))) {
             dm = ui.grabmouse(this);
             doff = c;
             return (true);
+        } else if ((button == 1) && c.x > sz.x - UI.scale(10)) {
+            dm2 = ui.grabmouse(this);
+            doff = c;
+            return true;
         } else {
             return (super.mousedown(c, button));
         }
@@ -1314,26 +1274,27 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
 
     public void mousemove(Coord c) {
         if (dm != null) {
-            if (resizehoriz) {
-                resize(Math.max(beltw, Math.min(parent.sz.x - brpw, sz.x + c.x - doff.x)), savedh);
-                doff = c;
-            } else {
-                resize(sz.x, savedh = Math.max(111, sz.y + doff.y - c.y));
-                GameUI gui = gameui();
-                if (gui.questpanel != null)
-                    gui.questpanel.c = new Coord(10, gui.sz.y - gui.chat.sz.y - gui.beltwdg.sz.y - gui.questpanel.sz.y - 10);
-            }
+            resize(sz.x, savedh = Math.max(UI.scale(minh), sz.y + doff.y - c.y));
+        } else if (dm2 != null) {
+            resize(savedw = Math.max(UI.scale(minw), sz.x + (c.x - doff.x)), sz.y);
+            chansel.chls.forEach(ch -> ch.chan.resize(sz.x - marg.x - ch.chan.c.x, sz.y - ch.chan.c.y));
+            doff = c;
         } else {
             super.mousemove(c);
         }
     }
 
     public boolean mouseup(Coord c, int button) {
+        if (dm2 != null) {
+            dm2.remove();
+            dm2 = null;
+            Utils.setprefi("chatsizew", UI.unscale(savedw));
+            return (true);
+        }
         if (dm != null) {
             dm.remove();
             dm = null;
-            Utils.setprefc("chatsz", sz);
-            resizehoriz = false;
+            Utils.setprefi("chatsize", UI.unscale(savedh));
             return (true);
         } else {
             return (super.mouseup(c, button));
@@ -1383,8 +1344,9 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
     }
 
     public static final KeyBinding kb_quick = KeyBinding.get("chat-quick", KeyMatch.forcode(KeyEvent.VK_ENTER, 0));
+
     public boolean globtype(char key, KeyEvent ev) {
-        if(kb_quick.key().match(ev)) {
+        if (kb_quick.key().match(ev)) {
             if (!visible && (sel instanceof EntryChannel)) {
                 qgrab = ui.grabkeys(this);
                 qline = new QuickLine((EntryChannel) sel);
@@ -1392,30 +1354,5 @@ na.put(ChatAttribute.HEARTH_SECRET, hs);
             }
         }
         return (super.globtype(key, ev));
-    }
-
-    private static String timestamp(String text) {
-        return "[" + new SimpleDateFormat("HH:mm").format(new Date()) + "] " + text;
-    }
-
-    private static void save(String chatName, String text, String name) {
-        if (Config.chatsave)
-            save(chatName, text.substring(0, 7) + " " + name + ":" + text.substring(7));
-    }
-
-    private synchronized static void save(String chatName, String text) {
-        if (Config.chatsave) {
-            try {
-                if (Config.chatlog == null) {
-                    OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(Config.chatfile, true),
-                            Charset.forName("UTF-8").newEncoder());
-                    Config.chatlog = new PrintWriter(osw, true);
-                }
-                String date = new SimpleDateFormat("[yyyy-MM-dd HH:mm:ss] ").format(new Date());
-                Config.chatlog.println("[" + chatName + "]" + date + text.substring(8));
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
     }
 }

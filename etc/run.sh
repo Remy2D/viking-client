@@ -1,2 +1,2 @@
 #!/bin/bash
-java -Djogl.disable.opengles=true -Xss1024k -Xms512m -Xmx1024m -jar hafen.jar -U https://game.havenandhearth.com/hres/ game.havenandhearth.com
+java -Djogl.disable.opengles=true -Xms2G -Xmx4G -XX:MaxGCPauseMillis=16 -Dsun.java2d.uiScale.enabled=false -Dhaven.errorurl=http://game.havenandhearth.com/java/error -Dhaven.defserv=game.havenandhearth.com -Dhaven.resurl=https://game.havenandhearth.com/res/ -Dhaven.screenurl=http://game.havenandhearth.com/mt/ss -Dhaven.cachebase=http://game.havenandhearth.com/render/ -Dhaven.mapbase=http://game.havenandhearth.com/java/ -Dhaven.fullscreen=off -jar hafen.jar

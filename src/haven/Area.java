@@ -26,7 +26,7 @@
 
 package haven;
 
-import java.util.Iterator;
+import java.util.*;
 
 public class Area implements Iterable<Coord>, java.io.Serializable {
     public Coord ul, br;
@@ -37,7 +37,7 @@ public class Area implements Iterable<Coord>, java.io.Serializable {
     }
 
     public int hashCode() {
-	return((ul.hashCode() * 31) + br.hashCode());
+        return ((ul.hashCode() * 31) + br.hashCode());
     }
 
     public boolean equals(Object o) {
@@ -51,8 +51,16 @@ public class Area implements Iterable<Coord>, java.io.Serializable {
         return (new Area(ul, ul.add(sz)));
     }
 
+    public static Area sized(Coord sz) {
+        return (new Area(Coord.z, sz));
+    }
+
     public Coord sz() {
         return (br.sub(ul));
+    }
+
+    public boolean positive() {
+        return ((br.x > ul.x) && (br.y > ul.y));
     }
 
     public boolean contains(Coord c) {
@@ -68,21 +76,21 @@ public class Area implements Iterable<Coord>, java.io.Serializable {
     }
 
     public Area overlap(Area o) {
-	if(!isects(o))
-	    return(null);
-	return(new Area(new Coord(Math.max(ul.x, o.ul.x), Math.max(ul.y, o.ul.y)),
-			new Coord(Math.min(br.x, o.br.x), Math.min(br.y, o.br.y))));
+        if (!isects(o))
+            return (null);
+        return (new Area(new Coord(Math.max(ul.x, o.ul.x), Math.max(ul.y, o.ul.y)),
+                new Coord(Math.min(br.x, o.br.x), Math.min(br.y, o.br.y))));
     }
 
     public Coord closest(Coord p) {
-	if(contains(p))
-	    return(p);
-	return(new Coord(Utils.clip(p.x, ul.x, br.x),
-			 Utils.clip(p.y, ul.y, br.y)));
+        if (contains(p))
+            return (p);
+        return (new Coord(Utils.clip(p.x, ul.x, br.x),
+                Utils.clip(p.y, ul.y, br.y)));
     }
 
     public int area() {
-	return((br.x - ul.x) * (br.y - ul.y));
+        return ((br.x - ul.x) * (br.y - ul.y));
     }
 
     public Area xl(Coord off) {
@@ -95,6 +103,20 @@ public class Area implements Iterable<Coord>, java.io.Serializable {
 
     public Area margin(int m) {
         return (margin(new Coord(m, m)));
+    }
+
+    public Area mul(Coord d) {
+        return (new Area(ul.mul(d), br.mul(d)));
+    }
+
+    public Area div(Coord d) {
+        return (new Area(ul.div(d), br.sub(1, 1).div(d).add(1, 1)));
+    }
+
+    public int ridx(Coord c) {
+        if (!contains(c))
+            return (-1);
+        return ((c.x - ul.x) + ((c.y - ul.y) * (br.x - ul.x)));
     }
 
     public Iterator<Coord> iterator() {

@@ -1,10 +1,6 @@
 package haven.resutil;
 
-import haven.Config;
-import haven.Indir;
-import haven.Loading;
-import haven.Resource;
-import haven.Utils;
+import haven.*;
 
 public class CompilerClassLoader extends ClassLoader {
     private Indir<Resource>[] useres;
@@ -24,8 +20,9 @@ public class CompilerClassLoader extends ClassLoader {
 
     public Class<?> findClass(String name) throws ClassNotFoundException {
         for (Indir<Resource> res : useres) {
+            ClassLoader loader = Loading.waitfor(() -> res.get().layer(Resource.CodeEntry.class).loader());
             try {
-                return (Loading.waitfor(res).layer(Resource.CodeEntry.class).loader(true).loadClass(name));
+                return (loader.loadClass(name));
             } catch (ClassNotFoundException e) {
             }
         }

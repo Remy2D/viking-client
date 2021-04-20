@@ -33,7 +33,7 @@ public class ISBox extends Widget implements DTarget {
     private Text label;
 
     static {
-        lf = new Text.Foundry(Text.sans, 22, java.awt.Color.WHITE);
+        lf = new Text.Foundry(Text.fraktur, 22, java.awt.Color.WHITE);
         lf.aa = true;
     }
 
@@ -66,11 +66,11 @@ public class ISBox extends Widget implements DTarget {
         g.image(bg, Coord.z);
         try {
             Tex t = res.get().layer(Resource.imgc).tex();
-            Coord dc = new Coord(6, (bg.sz().y / 2) - (t.sz().y / 2));
+            Coord dc = new Coord(UI.scale(6), (bg.sz().y / 2) - (t.sz().y / 2));
             g.image(t, dc);
         } catch (Loading e) {
         }
-        g.image(label.tex(), new Coord(40, (bg.sz().y / 2) - (label.tex().sz().y / 2)));
+        g.image(label.tex(), new Coord(UI.scale(40), (bg.sz().y / 2) - (label.tex().sz().y / 2)));
     }
 
     public Object tooltip(Coord c, Widget prev) {
@@ -86,21 +86,9 @@ public class ISBox extends Widget implements DTarget {
         if (button == 1) {
             if (ui.modshift)
                 wdgmsg("xfer");
-            else if (ui.modmeta) {
-                // max inventory size is 9 * 8
-                for (int i = 0; i < 9 * 8; i++)
-                    wdgmsg("xfer");
-                return true;
-            } else
+            else
                 wdgmsg("click");
             return (true);
-        } else if (button == 3) {
-            if (ui.modmeta) {
-                // max inventory size is 9 * 8
-                for (int i = 0; i < 9 * 8; i++)
-                    wdgmsg("xfer");
-                return true;
-            }
         }
         return (false);
     }
@@ -173,4 +161,5 @@ public class ISBox extends Widget implements DTarget {
         }
         return Integer.MAX_VALUE;
     }
+
 }

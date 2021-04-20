@@ -26,286 +26,67 @@
 
 package haven;
 
-import java.nio.ShortBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.nio.*;
 
-import javax.media.opengl.GL;
-import javax.media.opengl.GL2;
+import haven.render.*;
+import haven.render.VertexArray.Layout;
+import haven.render.Model.Indices;
+import haven.render.Rendered;
 
-import haven.glsl.ShaderMacro.Program;
-
-public class FastMesh implements FRendered, Rendered.Instanced, Disposable {
-    public static final GLState.Slot<GLState> vstate = new GLState.Slot<GLState>(GLState.Slot.Type.SYS, GLState.class);
+public class FastMesh implements Rendered.Instancable, RenderTree.Node, Disposable {
     public final VertexBuf vert;
     public final ShortBuffer indb;
-    public final int num, lo, hi;
-    public FastMesh from;
-    private Compiler compiler;
+    public final int num;
+    public final Model model;
     private Coord3f nb, pb;
 
     public FastMesh(VertexBuf vert, ShortBuffer ind) {
         this.vert = vert;
         num = ind.capacity() / 3;
-        if(ind.capacity() != num * 3)
-            throw(new RuntimeException("Invalid index array length"));
+        if (ind.capacity() != num * 3)
+            throw (new RuntimeException("Invalid index array length"));
         this.indb = ind;
-        int lo = 65536, hi = 0;
-        for(int i = 0; i < ind.capacity(); i++) {
-            int idx = ((int)ind.get(i)) & 0xffff;
-            lo = Math.min(lo, idx);
-            hi = Math.max(hi, idx);
-        }
-        this.lo = (lo == 65536)?0:lo; this.hi = hi;
+        this.model = new Model(Model.Mode.TRIANGLES, vert.data(),
+                new Indices(num * 3, NumberFormat.UINT16, DataBuffer.Usage.STATIC, this::indfill).shared(),
+                0, num * 3);
     }
 
     public FastMesh(VertexBuf vert, short[] ind) {
-        this(vert, Utils.bufcp(ind));
+        this(vert, ShortBuffer.wrap(ind));
     }
 
-    public FastMesh(FastMesh from, VertexBuf vert) {
-        this.from = from;
-        if(from.vert.num != vert.num)
-            throw(new RuntimeException("V-buf sizes must match"));
-        this.vert = vert;
-        this.indb = from.indb;
-        this.num = from.num;
-        this.lo = from.lo;
-        this.hi = from.hi;
-    }
-
-    public static abstract class Compiled {
-        public abstract void draw(GOut g);
-        public abstract void dispose();
-        public void prepare(GOut g) {}
-    }
-
-    public abstract class Compiler {
-        private Entry[] cache = new Entry[0];
-
-        private class Entry {
-            GLProgram prog;
-            Compiled mesh;
-            Object id;
-
-            Entry(GLProgram prog, Compiled mesh, Object id) {this.prog = prog; this.mesh = mesh; this.id = id;}
-        }
-
-        private Object[] getid(GOut g) {
-            ArrayList<Object> id = new ArrayList<Object>();
-            for(int i = 0; i < vert.bufs.length; i++) {
-                if(vert.bufs[i] instanceof VertexBuf.GLArray)
-                    id.add(((VertexBuf.GLArray)vert.bufs[i]).progid(g));
-                else
-                    id.add(null);
-            }
-	    /* XXX: Probably, each auto-inst should have to be ID'd in
-	     * some meaningful way, but I'm not currently sure what
-	     * would consitute a proper ID. */
-            id.add(g.st.prog.autoinst.length > 0);
-            return(ArrayIdentity.intern(id.toArray(new Object[0])));
-        }
-
-        private Compiled last = null;
-        public Compiled get(GOut g) {
-            if(last != null)
-                last.prepare(g);
-            g.apply();
-            GLProgram prog = g.st.prog;
-            {
-                Entry[] lc = cache;
-                for(int i = 0; i < lc.length; i++) {
-                    if(lc[i].prog == prog)
-                        return(last = lc[i].mesh);
-                }
-            }
-            Object[] id = getid(g);
-            Compiled ret;
-            synchronized(this) {
-                Entry[] lc = cache;
-                create: {
-                    for(int i = 0; i < lc.length; i++) {
-                        if(lc[i].id == id) {
-                            ret = cache[i].mesh;
-                            break create;
-                        }
-                    }
-                    ret = create(g);
-                }
-                int i = lc.length;
-                lc = Utils.extend(lc, i + 1);
-                lc[i] = new Entry(prog, ret, id);
-                cache = lc;
-                return(last = ret);
-            }
-        }
-
-        public abstract Compiled create(GOut g);
-
-        public void dispose() {
-            for(Entry ent : cache)
-                ent.mesh.dispose();
-            cache = new Entry[0];
-        }
-    }
-
-    public class DLCompiler extends Compiler {
-        public class DLCompiled extends Compiled {
-            private DisplayList list;
-
-            public void draw(GOut g) {
-                BGL gl = g.gl;
-                if((list != null) && (list.cur != g.curgl)) {
-                    list.dispose();
-                    list = null;
-                }
-                if(list == null) {
-                    list = new DisplayList(g);
-                    gl.glNewList(list, GL2.GL_COMPILE);
-                    cdraw(g);
-                    gl.glEndList();
-                }
-                gl.glCallList(list);
-            }
-
-            public void dispose() {
-                if(list != null) {
-                    list.dispose();
-                    list = null;
-                }
-            }
-        }
-
-        public DLCompiled create(GOut g) {return(new DLCompiled());}
-    }
-
-    public class VAOState extends GLState {
-        private GLBuffer ind;
-        private GLVertexArray vao;
-
-        private void bindindbo(GOut g) {
-            BGL gl = g.gl;
-            if((ind != null) && (ind.cur != g.curgl)) {
-                ind.dispose();
-                ind = null;
-            }
-            if(ind == null) {
-                ind = new GLBuffer(g);
-                gl.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ind);
-                indb.rewind();
-                gl.glBufferData(GL.GL_ELEMENT_ARRAY_BUFFER, indb.remaining() * 2, indb, GL.GL_STATIC_DRAW);
-                GOut.checkerr(gl);
-            } else {
-                gl.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, ind);
-            }
-        }
-
-        public void apply(GOut g) {
-            BGL gl = g.gl;
-            if((vao != null) && (vao.cur != g.curgl)) {
-                vao.dispose();
-                vao = null;
-            }
-            if(vao == null) {
-                vao = new GLVertexArray(g);
-                gl.glBindVertexArray(vao);
-                for(VertexBuf.AttribArray buf : vert.bufs) {
-                    if(buf instanceof VertexBuf.GLArray)
-                        ((VertexBuf.GLArray)buf).bind(g, true);
-                }
-                bindindbo(g);
-            } else {
-                gl.glBindVertexArray(vao);
-            }
-        }
-
-        public void unapply(GOut g) {
-            BGL gl = g.gl;
-            gl.glBindVertexArray(null);
-            gl.glBindBuffer(GL.GL_ELEMENT_ARRAY_BUFFER, null);
-        }
-
-        public int capplyfrom(GLState o) {
-            if(o instanceof VAOState)
-                return(1);
-            return(-1);
-        }
-
-        public void applyfrom(GOut g, GLState from) {
-            apply(g);
-        }
-
-        public void dispose() {
-            if(vao != null) {
-                vao.dispose();
-                vao = null;
-            }
-            if(ind != null) {
-                ind.dispose();
-                ind = null;
-            }
-        }
-
-        public void prep(Buffer buf) {
-            buf.put(vstate, this);
-        }
-    }
-
-    public class VAOCompiler extends Compiler {
-        public class VAOCompiled extends Compiled {
-            private VAOState st = new VAOState();
-
-            public void prepare(GOut g) {
-                GLState cur = g.st.cur(vstate);
-                if(cur != null)
-                    g.state(cur);
-            }
-
-            public void draw(GOut g) {
-                BGL gl = g.gl;
-                g.st.apply(g, vstate, st);
-                gl.glDrawRangeElements(GL.GL_TRIANGLES, lo, hi, num * 3, GL.GL_UNSIGNED_SHORT, 0);
-            }
-
-            public boolean drawinst(GOut g, List<GLState.Buffer> inst) {
-                BGL gl = g.gl;
-                g.st.apply(g, vstate, st);
-                g.st.bindiarr(g, inst);
-                gl.glDrawElementsInstanced(GL.GL_TRIANGLES, num * 3, GL.GL_UNSIGNED_SHORT, 0, inst.size());
-                g.st.unbindiarr(g);
-                return(true);
-            }
-
-            public void dispose() {
-                st.dispose();
-            }
-        }
-
-        public VAOCompiled create(GOut g) {return(new VAOCompiled());}
+    private FillBuffer indfill(Indices ibuf, Environment env) {
+        FillBuffer dst = env.fillbuf(ibuf);
+        ShortBuffer buf = dst.push().asShortBuffer();
+        ShortBuffer tx = indb.duplicate();
+        tx.rewind();
+        buf.put(tx);
+        return (dst);
     }
 
     private void cbounds() {
         Coord3f nb = null, pb = null;
-        VertexBuf.VertexArray vbuf = null;
-        for(VertexBuf.AttribArray buf : vert.bufs) {
-            if(buf instanceof VertexBuf.VertexArray) {
-                vbuf = (VertexBuf.VertexArray)buf;
+        VertexBuf.VertexData vbuf = null;
+        for (VertexBuf.AttribData buf : vert.bufs) {
+            if (buf instanceof VertexBuf.VertexData) {
+                vbuf = (VertexBuf.VertexData) buf;
                 break;
             }
         }
-        for(int i = 0; i < indb.capacity(); i++) {
+        for (int i = 0; i < indb.capacity(); i++) {
             int vi = indb.get(i) * 3;
             float x = vbuf.data.get(vi), y = vbuf.data.get(vi + 1), z = vbuf.data.get(vi + 2);
-            if(nb == null) {
+            if (nb == null) {
                 nb = new Coord3f(x, y, z);
                 pb = new Coord3f(x, y, z);
             } else {
-                nb.x = Math.min(nb.x, x); pb.x = Math.max(pb.x, x);
-                nb.y = Math.min(nb.y, y); pb.y = Math.max(pb.y, y);
-                nb.z = Math.min(nb.z, z); pb.z = Math.max(pb.z, z);
+                nb.x = Math.min(nb.x, x);
+                pb.x = Math.max(pb.x, x);
+                nb.y = Math.min(nb.y, y);
+                pb.y = Math.max(pb.y, y);
+                nb.z = Math.min(nb.z, z);
+                pb.z = Math.max(pb.z, z);
             }
         }
         this.nb = nb;
@@ -313,170 +94,115 @@ public class FastMesh implements FRendered, Rendered.Instanced, Disposable {
     }
 
     public Coord3f nbounds() {
-        if(nb == null) cbounds();
-        return(nb);
+        if (nb == null) cbounds();
+        return (nb);
     }
+
     public Coord3f pbounds() {
-        if(pb == null) cbounds();
-        return(pb);
+        if (pb == null) cbounds();
+        return (pb);
     }
 
-    public void cdraw(GOut g) {
-        g.apply();
-        indb.rewind();
-        for(int i = 0; i < vert.bufs.length; i++) {
-            if(vert.bufs[i] instanceof VertexBuf.GLArray)
-                ((VertexBuf.GLArray)vert.bufs[i]).bind(g, false);
-        }
-        g.gl.glDrawRangeElements(GL.GL_TRIANGLES, lo, hi, num * 3, GL.GL_UNSIGNED_SHORT, indb);
-        for(int i = 0; i < vert.bufs.length; i++) {
-            if(vert.bufs[i] instanceof VertexBuf.GLArray)
-                ((VertexBuf.GLArray)vert.bufs[i]).unbind(g);
-        }
-    }
-
-    private GLSettings.MeshMode curmode = null;
-    private Compiler compiler(GLConfig gc) {
-        if(compile()) {
-            if(curmode != gc.pref.meshmode.val) {
-                if(compiler != null) {
-                    compiler.dispose();
-                    compiler = null;
-                }
-                switch(gc.pref.meshmode.val) {
-                    case VAO:
-                        compiler = new VAOCompiler();
-                        break;
-                    case DLIST:
-                        compiler = new DLCompiler();
-                        break;
-                }
-                curmode = gc.pref.meshmode.val;
-            }
-        } else if(compiler != null) {
-            compiler.dispose();
-            compiler = null;
-            curmode = null;
-        }
-        return(compiler);
-    }
-
-    public void draw(GOut g) {
-        BGL gl = g.gl;
-        Compiler compiler = compiler(g.gc);
-        if(compiler != null) {
-            compiler.get(g).draw(g);
-        } else {
-            cdraw(g);
-        }
-        GOut.checkerr(gl);
-    }
-
-    protected boolean compile() {
-        return(true);
-    }
-
-    public boolean drawinst(GOut g, List<GLState.Buffer> st) {
-        Compiler compiler = compiler(g.gc);
-        if(!(compiler instanceof VAOCompiler))
-            return(false);
-        if(!g.st.inststate(st))
-            return(false);
-        return(((VAOCompiler.VAOCompiled)compiler.get(g)).drawinst(g, st));
-    }
-
-    /* XXX: One might start to question if it isn't about time to
-     * dispose of display-list drawing. */
-    private class Instanced implements Rendered, FRendered, Disposable {
-        final List<GLState.Buffer> instances;
-        final VAOCompiler compiler;
-        final Map<Program, Arrays> arrays = new HashMap<Program, Arrays>();
-
-        class Arrays {
-            final Program prog;
-            final GLBuffer[] data;
-
-            Arrays(GOut g, Program prog) {
-                this.prog = prog;
-                this.data = new GLBuffer[prog.autoinst.length];
-                for(int i = 0; i < data.length; i++) {
-                    data[i] = new GLBuffer(g);
-                    prog.autoinst[i].filliarr(g, instances, data[i]);
-                }
-            }
-
-            void bind(GOut g) {
-                for(int i = 0; i < data.length; i++)
-                    prog.autoinst[i].bindiarr(g, data[i]);
-            }
-
-            void unbind(GOut g) {
-                for(int i = 0; i < data.length; i++)
-                    prog.autoinst[i].unbindiarr(g, data[i]);
-            }
-
-            void dispose() {
-                for(GLBuffer buf : data)
-                    buf.dispose();
-            }
-        }
-
-        Instanced(VAOCompiler compiler, List<GLState.Buffer> instances) {
-            this.compiler = compiler;
-            this.instances = instances;
-        }
-
-        public void draw(GOut g) {
-            BGL gl = g.gl;
-            g.st.apply(g, vstate, ((VAOCompiler.VAOCompiled)compiler.get(g)).st);
-            Arrays ar = arrays.get(g.st.prog);
-            if(ar == null) {
-                arrays.put(g.st.prog, ar = new Arrays(g, g.st.prog));
-                if(arrays.size() > 10)
-                    System.err.println("warning: creating very many instance arrays for " + FastMesh.this);
-            }
-            ar.bind(g);
-            gl.glDrawElementsInstanced(GL.GL_TRIANGLES, num * 3, GL.GL_UNSIGNED_SHORT, 0, instances.size());
-            ar.unbind(g);
-        }
-
-        public void drawflat(GOut g) {
-            draw(g);
-        }
-
-        public boolean setup(RenderList r) {
-            throw(new RuntimeException("Instanced meshes are transformed into, not set up"));
-        }
-
-        public void dispose() {
-            for(Arrays ar : arrays.values())
-                ar.dispose();
-        }
-    }
-
-    public Rendered instanced(GLConfig gc, List<GLState.Buffer> st) {
-        Compiler compiler = compiler(gc);
-        if(!(compiler instanceof VAOCompiler))
-            return(null);
-        VAOCompiler vc = (VAOCompiler)compiler;
-        return(new Instanced((VAOCompiler)compiler, new ArrayList<GLState.Buffer>(st)));
+    public void draw(Pipe context, Render out) {
+        out.draw(context, model);
     }
 
     public void dispose() {
-        if(compiler != null) {
-            compiler.dispose();
-            compiler = null;
-        }
+        model.ind.dispose();
+        model.dispose();
         vert.dispose();
     }
 
-    public void drawflat(GOut g) {
-        draw(g);
-        GOut.checkerr(g.gl);
+    public class Instanced implements Rendered.Instanced {
+        public final InstanceBatch bat;
+        private final InstanceBatch.AttributeData attr;
+        private final Layout fmt;
+        private VertexArray data;
+        private Model model;
+        private int ninst;
+
+        private Layout mkfmt(Layout.Input[] ifmt) {
+            VertexArray sdat = vert.data();
+            Layout.Input[] inputs = new Layout.Input[sdat.fmt.inputs.length + ifmt.length];
+            for (int i = 0; i < sdat.fmt.inputs.length; i++)
+                inputs[i] = sdat.fmt.inputs[i];
+            for (int i = 0; i < ifmt.length; i++) {
+                Layout.Input si = ifmt[i];
+                inputs[i + sdat.fmt.inputs.length] = new Layout.Input(si.tgt, si.el, sdat.fmt.nbufs, si.offset, si.stride, true);
+            }
+            return (new Layout(inputs));
+        }
+
+        private VertexArray mkdata(Layout.Input[] ifmt, VertexArray.Buffer ibuf) {
+            if (ibuf == null)
+                return (null);
+            VertexArray sdat = vert.data();
+            VertexArray.Buffer[] bufs = new VertexArray.Buffer[sdat.bufs.length + 1];
+            for (int i = 0; i < sdat.bufs.length; i++)
+                bufs[i] = sdat.bufs[i];
+            bufs[sdat.bufs.length] = ibuf;
+            return (new VertexArray(this.fmt, bufs).shared());
+        }
+
+        private Instanced(InstanceBatch bat) {
+            this.bat = bat;
+            this.attr = new InstanceBatch.AttributeData(bat);
+            this.fmt = mkfmt(attr.fmt);
+            vertupdate();
+            modupdate(false);
+        }
+
+        public void draw(Pipe context, Render out) {
+            out.draw(context, model);
+        }
+
+        private void modupdate(boolean batupd) {
+            if (model != null)
+                model.dispose();
+            Model smod = FastMesh.this.model;
+            model = new Model(smod.mode, (data != null) ? data : vert.data(),
+                    smod.ind, smod.f, smod.n,
+                    ninst);
+            if (batupd)
+                bat.instupdate();
+        }
+
+        private void vertupdate() {
+            if (data != null)
+                data.dispose();
+            data = mkdata(this.attr.fmt, attr.buf());
+        }
+
+        public void iupdate(int idx) {
+            boolean vu = attr.iupdate(idx);
+            ninst = Math.max(ninst, idx + 1);
+            if (vu)
+                vertupdate();
+            if (vu || ((model != null) && (model.ninst != ninst)))
+                modupdate(true);
+        }
+
+        public void itrim(int idx) {
+            boolean vu = attr.itrim(idx);
+            ninst = Math.min(ninst, idx);
+            if (vu)
+                vertupdate();
+            if (vu || ((model != null) && (model.ninst != ninst)))
+                modupdate(true);
+        }
+
+        public void commit(Render g) {
+            attr.commit(g);
+        }
+
+        public void dispose() {
+            if (model != null)
+                model.dispose();
+        }
     }
 
-    public boolean setup(RenderList r) {
-        return(true);
+    public Rendered.Instanced instancify(InstanceBatch bat) {
+        return (new Instanced(bat));
     }
 
     public static class ResourceMesh extends FastMesh {
@@ -492,7 +218,7 @@ public class FastMesh implements FRendered, Rendered.Instanced, Disposable {
         }
 
         public String toString() {
-            return("FastMesh(" + res.name + ", " + id + ")");
+            return ("FastMesh(" + res.name + ", " + id + ")");
         }
     }
 
@@ -503,57 +229,61 @@ public class FastMesh implements FRendered, Rendered.Instanced, Disposable {
         public final Map<String, String> rdat;
         private transient short[] tmp;
         public final int id, ref;
-        private int matid;
+        private int vbufid, matid;
 
         public MeshRes(Resource res, Message buf) {
             res.super();
             int fl = buf.uint8();
             int num = buf.uint16();
             matid = buf.int16();
-            if((fl & 2) != 0) {
+            if ((fl & 2) != 0) {
                 id = buf.int16();
             } else {
                 id = -1;
             }
-            if((fl & 4) != 0) {
+            if ((fl & 4) != 0) {
                 ref = buf.int16();
             } else {
                 ref = -1;
             }
             Map<String, String> rdat = new HashMap<String, String>();
-            if((fl & 8) != 0) {
-                while(true) {
+            if ((fl & 8) != 0) {
+                while (true) {
                     String k = buf.string();
-                    if(k.equals(""))
+                    if (k.equals(""))
                         break;
                     rdat.put(k, buf.string());
                 }
             }
             this.rdat = Collections.unmodifiableMap(rdat);
-            if((fl & ~15) != 0)
-                throw(new Resource.LoadException("Unsupported flags in fastmesh: " + fl, getres()));
+            if ((fl & 16) != 0)
+                vbufid = buf.int16();
+            else
+                vbufid = 0;
+            if ((fl & ~31) != 0)
+                throw (new Resource.LoadException("Unsupported flags in fastmesh: " + fl, getres()));
             short[] ind = new short[num * 3];
-            for(int i = 0; i < num * 3; i++)
-                ind[i] = (short)buf.uint16();
+            for (int i = 0; i < num * 3; i++)
+                ind[i] = (short) buf.uint16();
             this.tmp = ind;
         }
 
         public void init() {
-            VertexBuf v = getres().layer(VertexBuf.VertexRes.class).b;
+            VertexBuf v = getres().layer(VertexBuf.VertexRes.class, vbufid).b;
             this.m = new ResourceMesh(v, this.tmp, this);
             this.tmp = null;
-            if(matid >= 0) {
-                for(Material.Res mr : getres().layers(Material.Res.class)) {
-                    if(mr.id == matid)
+            if (matid >= 0) {
+                for (Material.Res mr : getres().layers(Material.Res.class)) {
+                    if (mr.id == matid)
                         this.mat = mr;
                 }
-                if(this.mat == null)
-                    throw(new Resource.LoadException("Could not find specified material: " + matid, getres()));
+                if (this.mat == null)
+                    throw (new Resource.LoadException("Could not find specified material: " + matid, getres()));
             }
         }
 
         public Integer layerid() {
-            return(id);
+            return (id);
         }
     }
 }

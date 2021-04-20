@@ -26,8 +26,8 @@
 
 package haven;
 
+import java.util.*;
 import java.awt.Color;
-import java.util.ArrayList;
 
 public abstract class Message {
     public static final int T_END = 0;
@@ -90,9 +90,10 @@ public abstract class Message {
         public FormatError(String message) {
             super(message);
         }
-	public FormatError(String message, Throwable cause) {
-	    super(message, cause);
-	}
+
+        public FormatError(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     public abstract boolean underflow(int hint);
@@ -218,19 +219,22 @@ public abstract class Message {
     }
 
     public Color color() {
-        return(new Color(uint8(), uint8(), uint8(), uint8()));
+        return (new Color(uint8(), uint8(), uint8(), uint8()));
     }
 
     public float float8() {
-        return(Utils.mfdec((byte)int8()));
+        return (Utils.mfdec((byte) int8()));
     }
+
     public float float16() {
-        return(Utils.hfdec((short)int16()));
+        return (Utils.hfdec((short) int16()));
     }
+
     public float float32() {
         int off = rget(4);
         return (Utils.float32d(rbuf, off));
     }
+
     public double float64() {
         int off = rget(8);
         return (Utils.float64d(rbuf, off));
@@ -242,22 +246,27 @@ public abstract class Message {
     }
 
     public float snorm8() {
-	return(Utils.clip(int8(), -0x7f, 0x7f) / 0x7fp0f);
+        return (Utils.clip(int8(), -0x7f, 0x7f) / 0x7fp0f);
     }
+
     public float unorm8() {
-	return(uint8() / 0xffp0f);
+        return (uint8() / 0xffp0f);
     }
+
     public float snorm16() {
-	return(Utils.clip(int16(), -0x7fff, 0x7fff) / 0x7fffp0f);
+        return (Utils.clip(int16(), -0x7fff, 0x7fff) / 0x7fffp0f);
     }
+
     public float unorm16() {
-	return(uint16() / 0xffffp0f);
+        return (uint16() / 0xffffp0f);
     }
+
     public double snorm32() {
-	return(Utils.clip(int32(), -0x7fffffff, 0x7fffffff) / 0x7fffffffp0);
+        return (Utils.clip(int32(), -0x7fffffff, 0x7fffffff) / 0x7fffffffp0);
     }
+
     public double unorm32() {
-	return(uint32() / 0xffffffffp0);
+        return (uint32() / 0xffffffffp0);
     }
 
     public Object[] list() {
@@ -353,21 +362,25 @@ public abstract class Message {
         addbytes(src, 0, src.length);
         return (this);
     }
+
     public Message addint8(byte num) {
         wensure(1);
         wbuf[wh++] = num;
-        return(this);
+        return (this);
     }
+
     public Message adduint8(int num) {
         wensure(1);
         wbuf[wh++] = (byte) num;
         return (this);
     }
+
     public Message addint16(short num) {
         int off = wget(2);
         Utils.int16e(num, wbuf, off);
-        return(this);
+        return (this);
     }
+
     public Message adduint16(int num) {
         int off = wget(2);
         Utils.uint16e(num, wbuf, off);
@@ -410,16 +423,21 @@ public abstract class Message {
     }
 
     public Message addcolor(Color color) {
-        adduint8(color.getRed()); adduint8(color.getGreen());
-        adduint8(color.getBlue()); adduint8(color.getAlpha());
-        return(this);
+        adduint8(color.getRed());
+        adduint8(color.getGreen());
+        adduint8(color.getBlue());
+        adduint8(color.getAlpha());
+        return (this);
     }
+
     public Message addfloat8(float num) {
-        return(addint8(Utils.mfenc(num)));
+        return (addint8(Utils.mfenc(num)));
     }
+
     public Message addfloat16(float num) {
-        return(addint16(Utils.hfenc(num)));
+        return (addint16(Utils.hfenc(num)));
     }
+
     public Message addfloat32(float num) {
         int off = wget(4);
         Utils.float32e(num, wbuf, off);
@@ -433,42 +451,50 @@ public abstract class Message {
     }
 
     public Message addlist(Object... args) {
-        for(Object o : args) {
-            if(o == null) {
+        for (Object o : args) {
+            if (o == null) {
                 adduint8(T_NIL);
-            } else if(o instanceof Integer) {
+            } else if (o instanceof Integer) {
                 adduint8(T_INT);
-                addint32(((Integer)o).intValue());
-            } else if(o instanceof String) {
+                addint32(((Integer) o).intValue());
+            } else if (o instanceof String) {
                 adduint8(T_STR);
-                addstring((String)o);
-            } else if(o instanceof Coord) {
+                addstring((String) o);
+            } else if (o instanceof Coord) {
                 adduint8(T_COORD);
-                addcoord((Coord)o);
-            } else if(o instanceof byte[]) {
-                byte[] b = (byte[])o;
+                addcoord((Coord) o);
+            } else if (o instanceof byte[]) {
+                byte[] b = (byte[]) o;
                 adduint8(T_BYTES);
-                if(b.length < 128) {
+                if (b.length < 128) {
                     adduint8(b.length);
                 } else {
                     adduint8(0x80);
                     addint32(b.length);
                 }
                 addbytes(b);
-            } else if(o instanceof Color) {
+            } else if (o instanceof Color) {
                 adduint8(T_COLOR);
-                addcolor((Color)o);
-            } else if(o instanceof Float) {
+                addcolor((Color) o);
+            } else if (o instanceof Float) {
                 adduint8(T_FLOAT32);
-                addfloat32(((Float)o).floatValue());
-            } else if(o instanceof Double) {
+                addfloat32(((Float) o).floatValue());
+            } else if (o instanceof Double) {
                 adduint8(T_FLOAT64);
-                addfloat64(((Double)o).floatValue());
+                addfloat64(((Double) o).floatValue());
+            } else if (o instanceof Coord2d) {
+                adduint8(T_FCOORD64);
+                addfloat64(((Coord2d) o).x);
+                addfloat64(((Coord2d) o).y);
+            } else if (o instanceof Object[]) {
+                adduint8(T_TTOL);
+                addlist((Object[]) o);
+                adduint8(T_END);
             } else {
-                throw(new RuntimeException("Cannot encode a " + o.getClass() + " as TTO"));
+                throw (new RuntimeException("Cannot encode a " + o.getClass() + " as TTO"));
             }
         }
-        return(this);
+        return (this);
     }
 
     public int peekrbuf(int i) {
@@ -476,4 +502,5 @@ public abstract class Message {
             return -1;
         return rbuf[i];
     }
+
 }

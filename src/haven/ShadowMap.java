@@ -26,174 +26,265 @@
 
 package haven;
 
-import static haven.glsl.Cons.aadd;
-import static haven.glsl.Cons.add;
-import static haven.glsl.Cons.amul;
-import static haven.glsl.Cons.ass;
-import static haven.glsl.Cons.div;
-import static haven.glsl.Cons.eq;
-import static haven.glsl.Cons.gt;
-import static haven.glsl.Cons.l;
-import static haven.glsl.Cons.lt;
-import static haven.glsl.Cons.mul;
-import static haven.glsl.Cons.pick;
-import static haven.glsl.Cons.stmt;
-import static haven.glsl.Cons.texture2D;
-import static haven.glsl.Cons.vec2;
-import static haven.glsl.Type.FLOAT;
-import static haven.glsl.Type.INT;
-import static haven.glsl.Type.MAT4;
-import static haven.glsl.Type.SAMPLER2D;
-import static haven.glsl.Type.VEC3;
-import static haven.glsl.Type.VEC4;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import haven.render.*;
+import haven.render.sl.*;
 
-import javax.media.opengl.GL;
-import javax.media.opengl.GL2;
+import java.awt.image.*;
 
-import haven.GLProgram.VarID;
-import haven.glsl.AutoVarying;
-import haven.glsl.Expression;
-import haven.glsl.For;
-import haven.glsl.Function;
-import haven.glsl.If;
-import haven.glsl.LValue;
-import haven.glsl.Phong;
-import haven.glsl.ProgramContext;
-import haven.glsl.Return;
-import haven.glsl.ShaderMacro;
-import haven.glsl.Uniform;
-import haven.glsl.VertexContext;
+import haven.render.DataBuffer;
 
-public class ShadowMap extends GLState implements GLState.GlobalState, GLState.Global {
-    public final static Slot<ShadowMap> smap = new Slot<ShadowMap>(Slot.Type.DRAW, ShadowMap.class, Light.lighting);
-    public DirLight light;
-    public final TexE lbuf;
+import static haven.render.sl.Cons.*;
+import static haven.render.sl.Function.PDir.*;
+import static haven.render.sl.Type.*;
+
+public class ShadowMap extends State {
+    public final static Slot<ShadowMap> smap = new Slot<ShadowMap>(Slot.Type.DRAW, ShadowMap.class);
+    public final Texture2D lbuf;
+    public final Texture2D.Sampler2D lsamp;
     private final Projection lproj;
-    private final DirCam lcam;
-    private final FBView tgt;
+    private final Pipe.Op basic;
+    private DirLight light;
+    private Camera lcam;
+    private Pipe.Op curbasic;
     private final static Matrix4f texbias = new Matrix4f(0.5f, 0.0f, 0.0f, 0.5f,
             0.0f, 0.5f, 0.0f, 0.5f,
             0.0f, 0.0f, 0.5f, 0.5f,
             0.0f, 0.0f, 0.0f, 1.0f);
-    private final List<RenderList.Slot> parts = new ArrayList<RenderList.Slot>();
-    private int slidx;
-    private Matrix4f txf;
 
     public ShadowMap(Coord res, float size, float depth, float dthr) {
-        lbuf = new TexE(res, GL2.GL_DEPTH_COMPONENT, GL2.GL_DEPTH_COMPONENT, GL.GL_UNSIGNED_INT);
-        lbuf.magfilter = GL.GL_LINEAR;
-        lbuf.wrapmode = GL2.GL_CLAMP;
-        shader = new Shader(1.0 / res.x, 1.0 / res.y, 4, dthr / depth);
+        lbuf = new Texture2D(res, DataBuffer.Usage.STATIC, Texture.DEPTH, new VectorFormat(1, NumberFormat.FLOAT32), null);
+        (lsamp = new Texture2D.Sampler2D(lbuf)).magfilter(Texture.Filter.LINEAR).wrapmode(Texture.Wrapping.CLAMP);
+        /* XXX: It would arguably be nice to intern the shader. */
+        shader = Shader.get(1.0 / res.x, 1.0 / res.y, 4, dthr / depth);
         lproj = Projection.ortho(-size, size, -size, size, 1, depth);
-        lcam = new DirCam();
-        tgt = new FBView(new GLFrameBuffer((TexGL) null, lbuf), GLState.compose(lproj, lcam));
+        basic = Pipe.Op.compose(new DepthBuffer<>(lbuf.image(0)),
+                new States.Viewport(Area.sized(Coord.z, res)),
+                lproj);
     }
 
-    private final Rendered scene = new Rendered() {
-        public void draw(GOut g) {
-        }
-
-        public boolean setup(RenderList rl) {
-            GLState.Buffer buf = new GLState.Buffer(rl.cfg);
-            for (RenderList.Slot s : parts) {
-                rl.state().copy(buf);
-                s.os.copy(buf, GLState.Slot.Type.GEOM);
-                rl.add2(s.r, buf);
-            }
-            return (false);
-        }
-    };
-
-    public void setpos(Coord3f base, Coord3f dir) {
-        lcam.update(base, dir);
+    private ShadowMap(ShadowMap that) {
+        this.lbuf = that.lbuf;
+        this.lsamp = that.lsamp;
+        this.shader = that.shader;
+        this.lproj = that.lproj;
+        this.basic = that.basic;
+        this.light = that.light;
+        this.lcam = that.lcam;
+        this.curbasic = that.curbasic;
     }
 
     public void dispose() {
         lbuf.dispose();
-        tgt.dispose();
     }
 
-    public void prerender(RenderList rl, GOut g) {
-        parts.clear();
-        Light.LightList ll = null;
-        Camera cam = null;
-        for (RenderList.Slot s : rl.slots()) {
-            if (!s.d)
-                continue;
-            if ((s.os.get(smap) != this) || (s.os.get(Light.lighting) == null))
-                continue;
-            if (ll == null) {
-                PView.RenderState rs = s.os.get(PView.wnd);
-                cam = s.os.get(PView.cam);
-                ll = s.os.get(Light.lights);
-            }
-            parts.add(s);
+    public static class ShadowList implements RenderList<Rendered>, RenderList.Adapter, Disposable {
+        public static final Pipe.Op shadowbasic = Pipe.Op.compose(new States.Depthtest(States.Depthtest.Test.LE),
+                new States.Facecull(),
+                Homo3D.state);
+        private final RenderList.Adapter master;
+        private final ProxyPipe basic = new ProxyPipe();
+        private final Map<Slot<? extends Rendered>, Shadowslot> slots = new HashMap<>();
+        private DrawList back = null;
+        private DefPipe curbasic = null;
+
+        public ShadowList(RenderList.Adapter master) {
+            asyncadd(this.master = master, Rendered.class);
         }
 
-        slidx = -1;
-        if ((ll != null) && (cam != null)) {
-            for (int i = 0; i < ll.ll.size(); i++) {
-                if (ll.ll.get(i) == light) {
-                    slidx = i;
-                    break;
+        public class Shadowslot implements Slot<Rendered>, GroupPipe {
+            static final int idx_bas = 0, idx_back = 1;
+            public final Slot<? extends Rendered> bk;
+
+            public Shadowslot(Slot<? extends Rendered> bk) {
+                this.bk = bk;
+            }
+
+            public Rendered obj() {
+                return (bk.obj());
+            }
+
+            public GroupPipe state() {
+                return (this);
+            }
+
+            public Pipe group(int idx) {
+                switch (idx) {
+                    case idx_bas:
+                        return (basic);
+                    default:
+                        return (bk.state().group(idx - idx_back));
                 }
             }
-            Matrix4f cm = Transform.rxinvert(cam.fin(Matrix4f.id));
-        /*
-	      txf = cm;
-	      barda(txf);
-	      txf = lcam.fin(Matrix4f.id).mul(txf);
-	      barda(txf);
-	      txf = lproj.fin(Matrix4f.id).mul(txf);
-	      barda(txf);
-	      txf = texbias.mul(txf);
-	      barda(txf);
-	    */
-            txf = texbias
-                    .mul(lproj.fin(Matrix4f.id))
-                    .mul(lcam.fin(Matrix4f.id))
-                    .mul(cm);
-            tgt.render(scene, g);
+
+            public int gstate(int id) {
+                if (State.Slot.byid(id).type == State.Slot.Type.GEOM) {
+                    int ret = bk.state().gstate(id);
+                    if (ret >= 0)
+                        return (ret + idx_back);
+                }
+                if ((id < curbasic.mask.length) && curbasic.mask[id])
+                    return (idx_bas);
+                return (-1);
+            }
+
+            public int nstates() {
+                return (Math.max(bk.state().nstates(), curbasic.mask.length));
+            }
+        }
+
+        public void add(Slot<? extends Rendered> slot) {
+            if (slot.state().get(Light.lighting) == null)
+                return;
+            Shadowslot ns = new Shadowslot(slot);
+            if (back != null)
+                back.add(ns);
+            if ((slots.put(slot, ns)) != null)
+                throw (new AssertionError());
+        }
+
+        public void remove(Slot<? extends Rendered> slot) {
+            Shadowslot cs = slots.remove(slot);
+            if (cs != null) {
+                if (back != null)
+                    back.remove(cs);
+            }
+        }
+
+        public void update(Slot<? extends Rendered> slot) {
+            if (back != null) {
+                Shadowslot cs = slots.get(slot);
+                if (cs != null) {
+                    back.update(cs);
+                }
+            }
+        }
+
+        public void update(Pipe group, int[] statemask) {
+            if (back != null)
+                back.update(group, statemask);
+        }
+
+        public Locked lock() {
+            return (master.lock());
+        }
+
+        public Iterable<? extends Slot<?>> slots() {
+            return (slots.values());
+        }
+
+        /* Shouldn't have to care. */
+        public <R> void add(RenderList<R> list, Class<? extends R> type) {
+        }
+
+        public void remove(RenderList<?> list) {
+        }
+
+        public void basic(Pipe.Op st) {
+            try (Locked lk = lock()) {
+                DefPipe buf = new DefPipe();
+                buf.prep(st);
+                if (curbasic != null) {
+                    int[] mask = curbasic.maskdiff(buf);
+                    if (mask.length != 0) {
+                        for (int id : mask)
+                            System.err.println(State.Slot.byid(id));
+                        throw (new RuntimeException("changing shadowlist basic definition mask is not supported"));
+                    }
+                }
+                int[] mask = basic.dupdate(buf);
+                curbasic = buf;
+                if (back != null)
+                    back.update(basic, mask);
+            }
+        }
+
+        public void draw(Render out) {
+            if ((back == null) || !back.compatible(out.env())) {
+                if (back != null)
+                    back.dispose();
+                back = out.env().drawlist();
+                back.asyncadd(this, Rendered.class);
+            }
+            back.draw(out);
+        }
+
+        public void dispose() {
+            if (back != null)
+                back.dispose();
         }
     }
 
-    /*
-      static void barda(Matrix4f m) {
-      float[] a = m.mul4(new float[] {0, 0, 0, 1});
-      System.err.println(String.format("(%f, %f, %f, %f)", a[0], a[1], a[2], a[3]));
-      }
-    */
-
-    public Global global(RenderList rl, Buffer ctx) {
-        return (this);
+    public ShadowMap light(DirLight light) {
+        if (light == this.light)
+            return (this);
+        ShadowMap ret = new ShadowMap(this);
+        ret.light = light;
+        return (ret);
     }
 
-    public void postsetup(RenderList rl) {
+    public boolean haspos() {
+        return (lcam != null);
     }
 
-    public void postrender(RenderList rl, GOut g) {
-	/* g.image(lbuf, Coord.z, g.sz); */
+    public ShadowMap setpos(Coord3f base, Coord3f dir) {
+        DirCam lcam = new DirCam();
+        lcam.update(base, dir);
+        if (Utils.eq(this.lcam, lcam))
+            return (this);
+        ShadowMap ret = new ShadowMap(this);
+        ret.lcam = lcam;
+        ret.curbasic = Pipe.Op.compose(ShadowList.shadowbasic, ret.basic, lcam);
+        return (ret);
     }
 
-    public void prep(Buffer buf) {
+    public void update(Render out, ShadowList data) {
+        /* XXX: FrameInfo, and potentially others, should quite
+         * arguably be inherited from some parent context instead. */
+        Pipe.Op basic = Pipe.Op.compose(curbasic, new FrameInfo());
+        Pipe bstate = new BufPipe().prep(basic);
+        out.clear(bstate, 1.0);
+        data.basic(basic);
+        data.draw(out);
+        if (false)
+            GOut.getimage(out, lbuf.image(0), Debug::dumpimage);
+    }
+
+    public void apply(Pipe buf) {
         buf.put(smap, this);
     }
 
     public static class Shader implements ShaderMacro {
-        public static final Uniform txf = new Uniform(MAT4), sl = new Uniform(INT), map = new Uniform(SAMPLER2D);
+        public static final Uniform txf = new Uniform(MAT4, p -> {
+            ShadowMap sm = p.get(smap);
+            Matrix4f cm = Transform.rxinvert(p.get(Homo3D.cam).fin(Matrix4f.id));
+            Matrix4f proj = sm.lproj.fin(Matrix4f.id);
+            Matrix4f lcam = sm.lcam.fin(Matrix4f.id);
+            Matrix4f txf = texbias.mul(proj).mul(lcam).mul(cm);
+            return (txf);
+        }, smap, Homo3D.cam);
+        public static final Uniform sl = new Uniform(INT, p -> {
+            DirLight light = p.get(smap).light;
+            Light.LightList lights = p.get(Light.lights);
+            int idx = -1;
+            if (light != null)
+                idx = lights.index(light);
+            return (idx);
+        }, smap, Light.lights);
+        public static final Uniform map = new Uniform(SAMPLER2D, p -> p.get(smap).lsamp, smap);
         public static final AutoVarying stc = new AutoVarying(VEC4) {
             public Expression root(VertexContext vctx) {
-                return (mul(txf.ref(), vctx.eyev.depref()));
+                return (mul(txf.ref(), Homo3D.get(vctx.prog).eyev.depref()));
             }
         };
 
         public final Function.Def shcalc;
+        private final Object id;
 
-        public Shader(final double xd, final double yd, final int res, final double thr) {
-            shcalc = new Function.Def(FLOAT) {
+        private Shader(double xd, double yd, int res, double thr) {
+            this.id = Arrays.asList(xd, yd, res, thr);
+            this.shcalc = new Function.Def(FLOAT) {
                 {
                     LValue sdw = code.local(FLOAT, l(0.0)).ref();
                     Expression mapc = code.local(VEC3, div(pick(stc.ref(), "xyz"), pick(stc.ref(), "w"))).ref();
@@ -204,12 +295,12 @@ public class ShadowMap extends GLState implements GLState.GlobalState, GLState.G
                         LValue yo = code.local(FLOAT, null).ref();
                         code.add(new For(ass(yo, l(-yr / 2)), lt(yo, l((yr / 2) + (yd / 2))), aadd(yo, l(yd)),
                                 new For(ass(xo, l(-xr / 2)), lt(xo, l((xr / 2) + (xd / 2))), aadd(xo, l(xd)),
-                                        new If(gt(add(pick(texture2D(map.ref(), add(pick(mapc, "xy"), vec2(xo, yo))), "z"), l(thr)), pick(mapc, "z")),
+                                        new If(gt(add(pick(texture2D(map.ref(), add(pick(mapc, "xy"), vec2(xo, yo))), "r"), l(thr)), pick(mapc, "z")),
                                                 stmt(aadd(sdw, l(1.0 / (res * res))))))));
                     } else {
                         for (double yo = -yr / 2; yo < (yr / 2) + (yd / 2); yo += yd) {
                             for (double xo = -xr / 2; xo < (xr / 2) + (xd / 2); xo += xd) {
-                                code.add(new If(gt(add(pick(texture2D(map.ref(), add(pick(mapc, "xy"), vec2(l(xo), l(yo)))), "z"), l(thr)), pick(mapc, "z")),
+                                code.add(new If(gt(add(pick(texture2D(map.ref(), add(pick(mapc, "xy"), vec2(l(xo), l(yo)))), "r"), l(thr)), pick(mapc, "z")),
                                         stmt(aadd(sdw, l(1.0 / (res * res))))));
                             }
                         }
@@ -232,39 +323,25 @@ public class ShadowMap extends GLState implements GLState.GlobalState, GLState.G
                 }
             }, 0);
         }
+
+        public int hashCode() {
+            return (id.hashCode());
+        }
+
+        public boolean equals(Object that) {
+            return ((that instanceof Shader) && Utils.eq(this.id, ((Shader) that).id));
+        }
+
+        private static final WeakHashedSet<Shader> interned = new WeakHashedSet<>(Hash.eq);
+
+        public static Shader get(double xd, double yd, int res, double thr) {
+            return (interned.intern(new Shader(xd, yd, res, thr)));
+        }
     }
 
     public final Shader shader;
 
     public ShaderMacro shader() {
         return (shader);
-    }
-
-    private TexUnit sampler;
-
-    public void apply(GOut g) {
-        sampler = g.st.texalloc();
-        BGL gl = g.gl;
-        sampler.act(g);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, lbuf.glid(g));
-        reapply(g);
-    }
-
-    public void reapply(GOut g) {
-        BGL gl = g.gl;
-        VarID mapu = g.st.prog.cuniform(Shader.map);
-        if (mapu != null) {
-            gl.glUniform1i(mapu, sampler.id);
-            gl.glUniformMatrix4fv(g.st.prog.uniform(Shader.txf), 1, false, txf.m, 0);
-            gl.glUniform1i(g.st.prog.uniform(Shader.sl), slidx);
-        }
-    }
-
-    public void unapply(GOut g) {
-        BGL gl = g.gl;
-        sampler.act(g);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, null);
-        sampler.free();
-        sampler = null;
     }
 }
