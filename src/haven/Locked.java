@@ -33,22 +33,25 @@ public class Locked implements AutoCloseable {
     private boolean held;
 
     public Locked(Lock lk) {
-	(this.lk = lk).lock();
-	held = true;
+        (this.lk = lk).lock();
+        held = true;
     }
 
     public void unlock() {
-	if(!held)
-	    throw(new IllegalStateException());
-	lk.unlock();
-	held = false;
+        if (!held)
+            throw (new IllegalStateException());
+        lk.unlock();
+        held = false;
     }
-    public void close() {unlock();}
+
+    public void close() {
+        unlock();
+    }
 
     protected void finalize() {
-	if(held) {
-	    System.err.println("warning: held lock finalized");
-	    lk.unlock();
-	}
+        if (held) {
+            Warning.warn("held lock finalized");
+            lk.unlock();
+        }
     }
 }

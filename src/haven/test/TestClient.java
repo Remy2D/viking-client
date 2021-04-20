@@ -26,17 +26,11 @@
 
 package haven.test;
 
+import haven.*;
+
+import java.util.*;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.Collection;
-import java.util.HashSet;
-
-import haven.Coord;
-import haven.HackThread;
-import haven.RemoteUI;
-import haven.Session;
-import haven.UI;
-import haven.Widget;
 
 public class TestClient implements Runnable, UI.Context {
     public Session sess;
@@ -97,12 +91,13 @@ public class TestClient implements Runnable, UI.Context {
 
     public class TestUI extends UI {
         public TestUI(Coord sz, Session sess) {
-            super(TestClient.this, sz, sess);
+            super(TestClient.this, sz, null);
+            this.sess = sess;
         }
 
         public void newwidget(int id, String type, int parent, Object[] pargs, Object... cargs) throws InterruptedException {
             super.newwidget(id, type, parent, pargs, cargs);
-            Widget w = widgets.get(id);
+            Widget w = getwidget(id);
             synchronized (robots) {
                 for (Robot r : robots)
                     r.newwdg(id, w, cargs);
@@ -110,11 +105,7 @@ public class TestClient implements Runnable, UI.Context {
         }
 
         public void destroy(Widget w) {
-            int id;
-            if (!rwidgets.containsKey(w))
-                id = -1;
-            else
-                id = rwidgets.get(w);
+            int id = widgetid(w);
             synchronized (robots) {
                 for (Robot r : robots)
                     r.dstwdg(id, w);
@@ -123,7 +114,7 @@ public class TestClient implements Runnable, UI.Context {
         }
 
         public void uimsg(int id, String msg, Object... args) {
-            Widget w = widgets.get(id);
+            Widget w = getwidget(id);
             synchronized (robots) {
                 for (Robot r : robots)
                     r.uimsg(id, w, msg, args);

@@ -26,15 +26,11 @@
 
 package haven;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
-import java.net.Socket;
+import java.io.*;
+import java.net.*;
 import java.security.MessageDigest;
 
-public class AuthClient {
+public class AuthClient implements Closeable {
     private static final SslHelper ssl;
     private Socket sk;
     private InputStream skin;
@@ -43,7 +39,7 @@ public class AuthClient {
     static {
         ssl = new SslHelper();
         try {
-            ssl.trust(ssl.loadX509(Resource.class.getResourceAsStream("authsrv.crt")));
+            ssl.trust(Resource.class.getResourceAsStream("authsrv.crt"));
         } catch (Exception e) {
             throw (new RuntimeException(e));
         }
@@ -102,14 +98,59 @@ public class AuthClient {
         }
     }
 
-    public byte[] gettoken() throws IOException {
-        Message rpl = cmd("mktoken");
+    public static class TokenInfo {
+        public byte[] id = new byte[]{};
+        public String desc = "";
+
+        public TokenInfo id(byte[] id) {
+            this.id = id;
+            return (this);
+        }
+
+        public TokenInfo desc(String desc) {
+            this.desc = desc;
+            return (this);
+        }
+
+        public Object[] encode() {
+            Object[] ret = {};
+            if (this.id.length > 0)
+                ret = Utils.extend(ret, new Object[]{new Object[]{"id", this.id}});
+            if (this.desc.length() > 0)
+                ret = Utils.extend(ret, new Object[]{new Object[]{"desc", this.desc}});
+            return (ret);
+        }
+
+        public static TokenInfo forhost() {
+            TokenInfo ret = new TokenInfo();
+            if ((ret.id = Utils.getprefb("token-id", ret.id)).length == 0) {
+                ret.id = new byte[16];
+                new java.security.SecureRandom().nextBytes(ret.id);
+                Utils.setprefb("token-id", ret.id);
+            }
+            if ((ret.desc = Utils.getpref("token-desc", null)) == null) {
+                try {
+                    ret.desc = InetAddress.getLocalHost().getHostName();
+                } catch (UnknownHostException e) {
+                    ret.desc = "";
+                }
+            }
+            return (ret);
+        }
+    }
+
+    public byte[] gettoken(TokenInfo info) throws IOException {
+        Message rpl = cmd("mktoken", info.encode());
         String stat = rpl.string();
         if (stat.equals("ok")) {
             return (rpl.bytes(32));
         } else {
             throw (new RuntimeException("Unexpected reply `" + stat + "' from auth server"));
         }
+    }
+
+    public byte[] gettoken() throws IOException {
+        return (gettoken(TokenInfo.forhost()));
     }
 
     public void close() throws IOException {
@@ -133,6 +174,8 @@ public class AuthClient {
                 buf.addstring((String) arg);
             } else if (arg instanceof byte[]) {
                 buf.addbytes((byte[]) arg);
+            } else if (arg instanceof Object[]) {
+                buf.addlist((Object[]) arg);
             } else {
                 throw (new RuntimeException("Illegal argument to esendmsg: " + arg.getClass()));
             }
@@ -184,7 +227,6 @@ public class AuthClient {
 
     public static class NativeCred extends Credentials {
         public final String username;
-        public String pass;
         private byte[] phash;
 
         public NativeCred(String username, byte[] phash) {
@@ -203,7 +245,6 @@ public class AuthClient {
 
         public NativeCred(String username, String pw) {
             this(username, ohdearjava(pw));
-            this.pass = pw;
         }
 
         public String name() {

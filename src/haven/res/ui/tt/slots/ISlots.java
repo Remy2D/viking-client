@@ -1,154 +1,129 @@
-package haven.res.ui.tt.slots;
+package haven.res.ui.tt.slots;/* Preprocessed source code */
+/* $use: lib/tspec */
 
-import haven.GItem.NumberInfo;
-import haven.ItemInfo.Tip;
-
-import haven.CharWnd;
-import haven.Coord;
-import haven.GSprite;
-import haven.GSprite.ImageSprite;
-import haven.Glob;
-import haven.ItemInfo;
-import haven.PUtils;
-import haven.ResData;
-import haven.Resource;
-import haven.Resource.Image;
-import haven.RichText;
-import haven.Text;
-import haven.Utils;
+import haven.*;
 import haven.res.lib.tspec.Spec;
-import haven.res.ui.tt.defn.DefName;
 
+import static haven.PUtils.*;
+
+import java.awt.image.*;
+import java.awt.Font;
 import java.awt.Color;
-import java.awt.image.BufferedImage;
-import java.util.List;
+import java.util.*;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-
-public class ISlots extends Tip implements NumberInfo {
-    public static final Text ch = Text.render(Resource.getLocString(Resource.BUNDLE_LABEL, "Gilding:"));
+/* >tt: Fac */
+public class ISlots extends ItemInfo.Tip implements GItem.NumberInfo {
+    public static final Text ch = Text.render("Gilding:");
+    public static final Text.Foundry progf = new Text.Foundry(Text.dfont.deriveFont(Font.ITALIC), 10, new Color(0, 169, 224));
     public final Collection<SItem> s = new ArrayList<SItem>();
     public final int left;
-    public final double pmin;
-    public final double pmax;
+    public final double pmin, pmax;
     public final Resource[] attrs;
-    public static final String chc = "192,192,255";
-    public static final Object[] defn = new Object[]{new DefName()};
 
-    public ISlots(Owner var1, int var2, double var3, double var5, Resource[] var7) {
-        super(var1);
-        this.left = var2;
-        this.pmin = var3;
-		this.pmax = var5;
-        this.attrs = var7;
+    public ISlots(Owner owner, int left, double pmin, double pmax, Resource[] attrs) {
+        super(owner);
+        this.left = left;
+        this.pmin = pmin;
+        this.pmax = pmax;
+        this.attrs = attrs;
     }
 
-    public void layout(Layout var1) {
-        var1.cmp.add(ch.img, new Coord(0, var1.cmp.sz.y));
-        BufferedImage var2;
-        if (this.attrs.length > 0) {
-            String chanceStr = Resource.getLocString(Resource.BUNDLE_LABEL, "Chance: $col[%s]{%d%%} to $col[%s]{%d%%}");
-            var2 = RichText.render(String.format(chanceStr,
-                    chc,
-                    Long.valueOf(Math.round(100.0D * this.pmin)),
-                    chc,
-                    Long.valueOf(Math.round(100.0D * this.pmax))),
-                    0,
-                    new Object[0]).img;
-            int var3 = var2.getHeight();
-            byte var4 = 10;
-            int var5 = var1.cmp.sz.y;
-            var1.cmp.add(var2, new Coord(var4, var5));
-            int var10 = var4 + var2.getWidth() + 10;
+    public static class Fac implements ItemInfo.InfoFactory {
+        public ItemInfo build(ItemInfo.Owner owner, ItemInfo.Raw rawi, Object... args) {
+            Resource.Resolver rr = owner.context(Resource.Resolver.class);
+            int a = 1;
+            double pmin = ((Number) args[a++]).doubleValue();
+            double pmax = ((Number) args[a++]).doubleValue();
+            List<Resource> attrs = new LinkedList<Resource>();
+            while (args[a] != null) {
+                attrs.add(rr.getres((Integer) args[a++]).get());
+            }
+            a++;
+            int left = (Integer) args[a++];
+            ISlots ret = new ISlots(owner, left, pmin, pmax, attrs.toArray(new Resource[0]));
+            while (a < args.length) {
+                Indir<Resource> res = rr.getres((Integer) args[a++]);
+                Message sdt = Message.nil;
+                if (args[a] instanceof byte[])
+                    sdt = new MessageBuf((byte[]) args[a++]);
+                Object[] raw = (Object[]) args[a++];
+                ret.s.add(ret.new SItem(new ResData(res, sdt), raw));
+            }
+            return (ret);
+        }
+    }
 
-            for (int var6 = 0; var6 < this.attrs.length; ++var6) {
-                BufferedImage var7 = PUtils.convolvedown((this.attrs[var6].layer(Resource.imgc)).img, new Coord(var3, var3), CharWnd.iconfilter);
-                var1.cmp.add(var7, new Coord(var10, var5));
-                var10 += var7.getWidth() + 2;
+    public static final String chc = "192,192,255";
+
+    public void layout(Layout l) {
+        l.cmp.add(ch.img, new Coord(0, l.cmp.sz.y));
+        if (attrs.length > 0) {
+            BufferedImage head = RichText.render(String.format("Chance: $col[%s]{%d%%} to $col[%s]{%d%%}", chc, Math.round(100 * pmin), chc, Math.round(100 * pmax)), 0).img;
+            int h = head.getHeight();
+            int x = 10, y = l.cmp.sz.y;
+            l.cmp.add(head, new Coord(x, y));
+            x += head.getWidth() + 10;
+            for (int i = 0; i < attrs.length; i++) {
+                BufferedImage icon = convolvedown(attrs[i].layer(Resource.imgc).img, new Coord(h, h), CharWnd.iconfilter);
+                l.cmp.add(icon, new Coord(x, y));
+                x += icon.getWidth() + 2;
             }
         } else {
-            String chanceStr = Resource.getLocString(Resource.BUNDLE_LABEL, "Chance: $col[%s]{%d%%}");
-            var2 = RichText.render(String.format(chanceStr,
-                    chc, Integer.valueOf((int) Math.round(100.0D * this.pmin))),
-                    0,
-                    new Object[0]).img;
-            var1.cmp.add(var2, new Coord(10, var1.cmp.sz.y));
+            BufferedImage head = RichText.render(String.format("Chance: $col[%s]{%d%%}", chc, (int) Math.round(100 * pmin)), 0).img;
+            l.cmp.add(head, new Coord(10, l.cmp.sz.y));
         }
-
-        Iterator var8 = this.s.iterator();
-
-        while (var8.hasNext()) {
-            SItem var9 = (SItem) var8.next();
-            var9.layout(var1);
-        }
-
-        if (this.left > 0) {
-            String gildStr = Resource.getLocString(Resource.BUNDLE_LABEL, "Gildable ×%d");
-            String gild2Str = Resource.getLocString(Resource.BUNDLE_LABEL, "Gildable");
-            var1.cmp.add(Text.slotFnd.render(this.left > 1 ? String.format(gildStr, Integer.valueOf(this.left)) : gild2Str).img, new Coord(10, var1.cmp.sz.y));
-        }
-
+        for (SItem si : s)
+            si.layout(l);
+        if (left > 0)
+            l.cmp.add(progf.render((left > 1) ? String.format("Gildable \u00d7%d", left) : "Gildable").img, new Coord(10, l.cmp.sz.y));
     }
 
-    public int order() {
-        return 200;
-    }
+    public static final Object[] defn = {Loading.waitfor(Resource.remote().load("ui/tt/defn", 5))};
 
-    public int itemnum() {
-        return this.s.size();
-    }
-
-    public Color numcolor() {
-        return left > 0 ? new Color(0, 169, 224) : Color.WHITE;
-    }
-
-    public static class SItem {
-        private final ISlots islots;
+    public class SItem {
         public final Resource res;
         public final GSprite spr;
         public final List<ItemInfo> info;
         public final String name;
 
-        public SItem(ISlots var1, ResData var2, Object[] var3) {
-            this.islots = var1;
-            this.res = (Resource)var2.res.get();
-            Spec var4 = new Spec(var2, var1.owner, Utils.extend(new Object[]{ISlots.defn}, var3));
-            this.spr = var4.spr();
-            this.name = var4.name();
-            Spec var5 = new Spec(var2, var1.owner, var3);
-            this.info = var5.info();
+        public SItem(ResData sdt, Object[] raw) {
+            this.res = sdt.res.get();
+            Spec spec1 = new Spec(sdt, owner, Utils.extend(new Object[]{defn}, raw));
+            this.spr = spec1.spr();
+            this.name = spec1.name();
+            Spec spec2 = new Spec(sdt, owner, raw);
+            this.info = spec2.info();
         }
 
         private BufferedImage img() {
-            return this.spr instanceof ImageSprite ? ((ImageSprite)this.spr).image() : ((Image)this.res.layer(Resource.imgc)).img;
+            if (spr instanceof GSprite.ImageSprite)
+                return (((GSprite.ImageSprite) spr).image());
+            return (res.layer(Resource.imgc).img);
         }
 
-
-        public Glob glob() {
-            return this.islots.owner.glob();
+        public void layout(Layout l) {
+            BufferedImage icon = PUtils.convolvedown(img(), new Coord(16, 16), CharWnd.iconfilter);
+            BufferedImage lbl = Text.render(name).img;
+            BufferedImage sub = longtip(info);
+            int x = 10, y = l.cmp.sz.y;
+            l.cmp.add(icon, new Coord(x, y));
+            l.cmp.add(lbl, new Coord(x + 16 + 3, y + ((16 - lbl.getHeight()) / 2)));
+            if (sub != null)
+                l.cmp.add(sub, new Coord(x + 16, y + 16));
         }
+    }
 
-        public List<ItemInfo> info() {
-            return this.info;
-        }
+    public int order() {
+        return (200);
+    }
 
-        public Resource resource() {
-            return this.res;
-        }
+    public int itemnum() {
+        return (s.size());
+    }
 
-        public void layout(Layout var1) {
-            BufferedImage var2 = PUtils.convolvedown(this.img(), new Coord(16, 16), CharWnd.iconfilter);
-            BufferedImage var3 = Text.render(this.name).img;
-            BufferedImage var4 = ItemInfo.longtip(this.info);
-            byte var5 = 10;
-            int var6 = var1.cmp.sz.y;
-            var1.cmp.add(var2, new Coord(var5, var6));
-            var1.cmp.add(var3, new Coord(var5 + 16 + 3, var6 + (16 - var3.getHeight()) / 2));
-            if (var4 != null) {
-                var1.cmp.add(var4, new Coord(var5 + 16, var6 + 16));
-            }
-        }
+    public static final Color avail = new Color(128, 192, 255);
+
+    public Color numcolor() {
+        return ((left > 0) ? avail : Color.WHITE);
     }
 }

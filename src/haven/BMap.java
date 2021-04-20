@@ -26,7 +26,7 @@
 
 package haven;
 
-import java.util.Map;
+import java.util.*;
 
 public interface BMap<K, V> extends Map<K, V> {
     public BMap<V, K> reverse();

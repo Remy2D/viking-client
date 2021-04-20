@@ -26,10 +26,8 @@
 
 package haven;
 
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.WeakReference;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.lang.ref.*;
 
 public class IDRef {
     private static Map<Object, WRef> map = new HashMap<Object, WRef>();

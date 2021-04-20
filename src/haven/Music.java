@@ -26,13 +26,7 @@
 
 package haven;
 
-import javax.sound.midi.InvalidMidiDataException;
-import javax.sound.midi.MetaEventListener;
-import javax.sound.midi.MetaMessage;
-import javax.sound.midi.MidiSystem;
-import javax.sound.midi.MidiUnavailableException;
-import javax.sound.midi.Sequencer;
-import javax.sound.midi.Synthesizer;
+import javax.sound.midi.*;
 
 public class Music {
     private static Player player;
@@ -80,9 +74,9 @@ public class Music {
                 } catch (InvalidMidiDataException e) {
                     return;
                 } catch (IllegalArgumentException e) {
-            /* The soft synthesizer appears to be throwing
-             * non-checked exceptions through from the sampled
-		     * audio system. Ignore them and only them. */
+                    /* The soft synthesizer appears to be throwing
+                     * non-checked exceptions through from the sampled
+                     * audio system. Ignore them and only them. */
                     if (e.getMessage().startsWith("No line matching"))
                         return;
                     throw (e);
@@ -119,14 +113,14 @@ public class Music {
                             synth.close();
                     } catch (Throwable e2) {
                         if (e2 instanceof InterruptedException) {
-			    /* XXX: There appears to be a bug in Sun's
-			     * software MIDI implementation that throws back
-			     * an unchecked InterruptedException here when two
-			     * interrupts come close together (such as in the
-			     * case when the current player is first stopped,
-			     * and then another started immediately afterwards
-			     * on a new song before the first one has had time
-			     * to terminate entirely). */
+                            /* XXX: There appears to be a bug in Sun's
+                             * software MIDI implementation that throws back
+                             * an unchecked InterruptedException here when two
+                             * interrupts come close together (such as in the
+                             * case when the current player is first stopped,
+                             * and then another started immediately afterwards
+                             * on a new song before the first one has had time
+                             * to terminate entirely). */
                         } else {
                             throw (new RuntimeException(e2));
                         }
@@ -167,30 +161,34 @@ public class Music {
     }
 
     static {
-        Console.setscmd("bgm", (cons, args) -> {
-            int i = 1;
-            String opt;
-            boolean loop = false;
-            if (i < args.length) {
-                while ((opt = args[i]).charAt(0) == '-') {
-                    i++;
-                    if (opt.equals("-l"))
-                        loop = true;
+        Console.setscmd("bgm", new Console.Command() {
+            public void run(Console cons, String[] args) {
+                int i = 1;
+                String opt;
+                boolean loop = false;
+                if (i < args.length) {
+                    while ((opt = args[i]).charAt(0) == '-') {
+                        i++;
+                        if (opt.equals("-l"))
+                            loop = true;
+                    }
+                    String resnm = args[i++];
+                    int ver = -1;
+                    if (i < args.length)
+                        ver = Integer.parseInt(args[i++]);
+                    Music.play(Resource.remote().load(resnm, ver), loop);
+                } else {
+                    Music.play(null, false);
                 }
-                String resnm = args[i++];
-                int ver = -1;
-                if (i < args.length)
-                    ver = Integer.parseInt(args[i++]);
-                Music.play(Resource.remote().load(resnm, ver), loop);
-            } else {
-                Music.play(null, false);
             }
         });
-        Console.setscmd("bgmsw", (cons, args) -> {
-            if (args.length < 2)
-                enable(!enabled);
-            else
-                enable(Utils.parsebool(args[1], true));
+        Console.setscmd("bgmsw", new Console.Command() {
+            public void run(Console cons, String[] args) {
+                if (args.length < 2)
+                    enable(!enabled);
+                else
+                    enable(Utils.parsebool(args[1], true));
+            }
         });
     }
 }

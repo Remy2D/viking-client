@@ -26,23 +26,23 @@
 
 package haven;
 
-import static java.lang.Math.PI;
+import haven.purus.Config;
 
 import java.awt.Color;
+import java.awt.Font;
+
+import static java.lang.Math.PI;
 
 public class FlowerMenu extends Widget {
     public static final Color pink = new Color(255, 0, 128);
-    public static final Text.Foundry ptf = new Text.Foundry(Text.dfont, Text.cfg.flowerMenu);
+    public static final Color ptc = Color.YELLOW;
+    public static final Text.Foundry ptf = new Text.Foundry(Text.dfont, 12);
     public static final IBox pbox = Window.wbox;
     public static final Tex pbg = Window.bg;
-    public static final int ph = 30;
+    public static final int ph = UI.scale(30), ppl = 8;
     public Petal[] opts;
     private UI.Grab mg, kg;
-    private static String nextAutoSel;
-    private static long nextAutoSelTimeout;
-    public static String lastSel;
-    private boolean ignoreAutoSetting;
-    
+
     @RName("sm")
     public static class $_ implements Factory {
         public Widget create(UI ui, Object[] args) {
@@ -55,8 +55,7 @@ public class FlowerMenu extends Widget {
 
     public class Petal extends Widget {
         public String name;
-        public double ta;
-        private final static double rad = 75;
+        public double ta, tr;
         public int num;
         private Text text;
         private double a = 1;
@@ -64,31 +63,21 @@ public class FlowerMenu extends Widget {
         public Petal(String name) {
             super(Coord.z);
             this.name = name;
-            text = ptf.render(Resource.getLocString(Resource.BUNDLE_FLOWER, name), Color.YELLOW);
-            resize(text.sz().x + 25, ph);
+            text = ptf.render(name, ptc);
+            resize(text.sz().x + UI.scale(25), ph);
+        }
+
+        public void move(Coord c) {
+            this.c = c.sub(sz.div(2));
         }
 
         public void move(double a, double r) {
-            this.c = Coord.sc(a, r).sub(sz.div(2));
-            // adjust horizontal position for potentially parallel petals to avoid overlap
-            if (r == rad) {
-                for (Petal p : opts) {
-                    if (this.c.x + sz.x >= p.c.x &&
-                            (num == 7 && p.num == 1 || num == 6 && p.num == 2 || num == 5 && p.num == 3)) {
-                        p.c.x = opts[0].c.x + opts[0].sz.x / 2 + 5;
-                        this.c.x = p.c.x - sz.x - 5;
-                        break;
-                    }
-                }
-            }
+            move(Coord.sc(a, r));
         }
 
         public void draw(GOut g) {
             g.chcolor(new Color(255, 255, 255, (int) (255 * a)));
-            g.image(pbg, new Coord(3, 3), new Coord(3, 3), sz.add(new Coord(-6, -6)));
-            // pbg is to short for wide petals
-            if (pbg.sz().x < sz.x)
-                g.image(pbg, new Coord(pbg.sz().x, 3), new Coord(3, 3), sz.add(new Coord(-6, -6)));
+            g.image(pbg, new Coord(3, 3), new Coord(3, 3), sz.add(new Coord(-6, -6)), UI.scale(pbg.sz()));
             pbox.draw(g, Coord.z, sz);
             g.image(text.tex(), sz.div(2).sub(text.sz().div(2)));
         }
@@ -97,26 +86,34 @@ public class FlowerMenu extends Widget {
             choose(this);
             return (true);
         }
+
+        public Area ta(Coord tc) {
+            return (Area.sized(tc.sub(sz.div(2)), sz));
+        }
+
+        public Area ta(double a, double r) {
+            return (ta(Coord.sc(a, r)));
+        }
+    }
+
+    private static double nxf(double a) {
+        return (-1.8633 * a * a + 2.8633 * a);
     }
 
     public class Opening extends NormAnim {
         Opening() {
-            super(0);
+            super(Config.flowermenuSpeed.val);
         }
 
         public void ntick(double s) {
-            for (Petal p : opts) {
-                p.move(p.ta + ((1 - s) * PI), p.rad * s);
-                p.a = s;
-                if (s == 1.0) {
-                    CheckListboxItem itm = Config.flowermenus.get(p.name);
-                    if (itm != null && itm.selected && !ui.modmeta && (!ignoreAutoSetting || p.name.equals("Peer into")) ||
-                            p.name.equals(nextAutoSel) && System.currentTimeMillis() - nextAutoSelTimeout < 2000) {
-                        nextAutoSel = null;
-                        choose(p);
-                        break;
-                    }
-                }
+            double ival = 0.8;
+            double off = (opts.length == 1) ? 0.0 : ((1.0 - ival) / (opts.length - 1));
+            for (int i = 0; i < opts.length; i++) {
+                Petal p = opts[i];
+                double a = Utils.clip((s - (off * i)) * (1.0 / ival), 0, 1);
+                double b = nxf(a);
+                p.move(p.ta + ((1 - b) * PI), p.tr * b);
+                p.a = a;
             }
         }
     }
@@ -130,18 +127,25 @@ public class FlowerMenu extends Widget {
         }
 
         public void ntick(double s) {
-            for (Petal p : opts) {
+            double ival = 0.8;
+            double off = ((1.0 - ival) / (opts.length - 1));
+            for (int i = 0; i < opts.length; i++) {
+                Petal p = opts[i];
                 if (p == chosen) {
                     if (s > 0.6) {
                         p.a = 1 - ((s - 0.6) / 0.4);
                     } else if (s < 0.3) {
-                        p.move(p.ta, p.rad * (1 - (s / 0.3)));
+                        double a = nxf(s / 0.3);
+                        p.move(p.ta, p.tr * (1 - a));
                     }
                 } else {
-                    if (s > 0.3)
+                    if (s > 0.3) {
                         p.a = 0;
-                    else
-                        p.a = 1 - (s / 0.3);
+                    } else {
+                        double a = s / 0.3;
+                        a = Utils.clip((a - (off * i)) * (1.0 / ival), 0, 1);
+                        p.a = 1 - a;
+                    }
                 }
             }
             if (s == 1.0)
@@ -151,13 +155,18 @@ public class FlowerMenu extends Widget {
 
     public class Cancel extends NormAnim {
         Cancel() {
-            super(0);
+            super(0.25);
         }
 
         public void ntick(double s) {
-            for (Petal p : opts) {
-                p.move(p.ta + ((s) * PI), p.rad * (1 - s));
-                p.a = 1 - s;
+            double ival = 0.8;
+            double off = (opts.length == 1) ? 0.0 : ((1.0 - ival) / (opts.length - 1));
+            for (int i = 0; i < opts.length; i++) {
+                Petal p = opts[i];
+                double a = Utils.clip((s - (off * i)) * (1.0 / ival), 0, 1);
+                double b = 1.0 - nxf(1.0 - a);
+                p.move(p.ta + (b * PI), p.tr * (1 - b));
+                p.a = 1 - a;
             }
             if (s == 1.0)
                 ui.destroy(FlowerMenu.this);
@@ -165,16 +174,37 @@ public class FlowerMenu extends Widget {
     }
 
     private void organize(Petal[] opts) {
-        for (int i = 0 ; i < opts.length; i++) {
-            double ta = PI/2 - i * PI/4;
-
-            // slightly adjust 45 degrees angles
-            if (ta == PI/4 || ta == -3*PI/4)
-                ta -= 0.25;
-            if (ta == -PI/4 || ta == -5*PI/4)
-                ta += 0.25;
-
-            opts[i].ta = ta;
+        Area bounds = parent.area().xl(c.inv());
+        int l = 1, p = 0, i = 0, mp = 0, ml = 1, t = 0, tt = -1;
+        boolean muri = false;
+        while (i < opts.length) {
+            place:
+            {
+                double ta = (PI / 2) - (p * (2 * PI / (l * ppl)));
+                double tr = UI.scale(75) + (UI.scale(50) * (l - 1));
+                if (!muri && !bounds.contains(opts[i].ta(ta, tr))) {
+                    if (tt < 0) {
+                        tt = ppl * l;
+                        t = 1;
+                        mp = p;
+                        ml = l;
+                    } else if (++t >= tt) {
+                        muri = true;
+                        p = mp;
+                        l = ml;
+                        continue;
+                    }
+                    break place;
+                }
+                tt = -1;
+                opts[i].ta = ta;
+                opts[i].tr = tr;
+                i++;
+            }
+            if (++p >= (ppl * l)) {
+                l++;
+                p = 0;
+            }
         }
     }
 
@@ -184,8 +214,6 @@ public class FlowerMenu extends Widget {
         for (int i = 0; i < options.length; i++) {
             add(opts[i] = new Petal(options[i]));
             opts[i].num = i;
-            if (options[i].equals("Study") || options[i].equals("Turn"))    // eatable curios & spitroasting
-                ignoreAutoSetting = true;
         }
     }
 
@@ -195,7 +223,17 @@ public class FlowerMenu extends Widget {
         mg = ui.grabmouse(this);
         kg = ui.grabkeys(this);
         organize(opts);
-        new Opening();
+        new Opening().ntick(0);
+        for (int i = 0; i < opts.length; i++) {
+            Boolean pick = Config.flowerOptOpens.val.get(opts[i].name);
+            if (pick == null) {
+                Config.flowerOptOpens.val.put(opts[i].name, false);
+                Config.flowerOptOpens.setVal(Config.flowerOptOpens.val);
+            } else if (pick) {
+                choose(opts[i]);
+                return;
+            }
+        }
     }
 
     public boolean mousedown(Coord c, int button) {
@@ -224,9 +262,6 @@ public class FlowerMenu extends Widget {
 
     public boolean keydown(java.awt.event.KeyEvent ev) {
         char key = ev.getKeyChar();
-        if (Config.userazerty)
-            key = Utils.azerty2qwerty(key);
-
         if ((key >= '0') && (key <= '9')) {
             int opt = (key == '0') ? 10 : (key - '1');
             if (opt < opts.length) {
@@ -234,7 +269,7 @@ public class FlowerMenu extends Widget {
                 kg.remove();
             }
             return (true);
-        } else if (key == 27) {
+        } else if (key_esc.match(ev)) {
             choose(null);
             kg.remove();
             return (true);
@@ -245,16 +280,8 @@ public class FlowerMenu extends Widget {
     public void choose(Petal option) {
         if (option == null) {
             wdgmsg("cl", -1);
-            lastSel = null;
         } else {
             wdgmsg("cl", option.num, ui.modflags());
-            lastSel = option.name;
-            MapView.pllastcc = null;
         }
-    }
-
-    public static void setNextSelection(String name) {
-        nextAutoSel = name;
-        nextAutoSelTimeout = System.currentTimeMillis();
     }
 }

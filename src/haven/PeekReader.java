@@ -26,8 +26,7 @@
 
 package haven;
 
-import java.io.IOException;
-import java.io.Reader;
+import java.io.*;
 
 public class PeekReader extends Reader {
     private final Reader back;

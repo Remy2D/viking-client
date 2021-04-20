@@ -26,90 +26,54 @@
 
 package haven.resutil;
 
-import static haven.glsl.Cons.add;
-import static haven.glsl.Cons.l;
-import static haven.glsl.Cons.mul;
-import static haven.glsl.Cons.neg;
-import static haven.glsl.Cons.reflect;
-import static haven.glsl.Cons.textureCube;
-import static haven.glsl.Cons.vec4;
-import static haven.glsl.Type.MAT3;
-import static haven.glsl.Type.SAMPLERCUBE;
-import static haven.glsl.Type.VEC3;
+import haven.*;
+import haven.render.*;
+import haven.render.sl.*;
 
 import java.awt.Color;
 
-import javax.media.opengl.GL;
+import haven.render.TextureCube.SamplerCube;
 
-import haven.BGL;
-import haven.GLState;
-import haven.GOut;
-import haven.Material;
-import haven.PView;
-import haven.Resource;
-import haven.TexCube;
-import haven.glsl.Expression;
-import haven.glsl.Macro1;
-import haven.glsl.MiscLib;
-import haven.glsl.ProgramContext;
-import haven.glsl.ShaderMacro;
-import haven.glsl.Uniform;
+import static haven.render.sl.Cons.*;
+import static haven.render.sl.Function.PDir.*;
+import static haven.render.sl.Type.*;
 
 @Material.ResName("envref")
-public class EnvMap extends GLState {
+public class EnvMap extends State {
     public static final Slot<EnvMap> slot = new Slot<EnvMap>(Slot.Type.DRAW, EnvMap.class);
-    private static final Uniform csky = new Uniform(SAMPLERCUBE);
-    private static final Uniform ccol = new Uniform(VEC3);
-    private static final Uniform icam = new Uniform(MAT3);
-    private static final TexCube sky = WaterTile.sky;
+    private static final Uniform csky = new Uniform(SAMPLERCUBE, p -> p.get(slot).sky, slot);
+    private static final Uniform ccol = new Uniform(VEC3, p -> p.get(slot).col, slot);
+    private static final Uniform icam = new Uniform(MAT3, p -> Homo3D.camxf(p).transpose().trim3(), Homo3D.cam);
+    private static final SamplerCube sky = WaterTile.sky;
     public final float[] col;
-    private TexUnit tsky;
-    
+
     public EnvMap(Color col) {
-	this.col = new float[] {
-	    col.getRed() / 255.0f,
-	    col.getGreen() / 255.0f,
-	    col.getBlue() / 255.0f,
-	};
+        this.col = new float[]{
+                col.getRed() / 255.0f,
+                col.getGreen() / 255.0f,
+                col.getBlue() / 255.0f,
+        };
     }
 
     public EnvMap(Resource res, Object... args) {
-	this((Color)args[0]);
+        this((Color) args[0]);
     }
 
     private static final ShaderMacro shader = prog -> {
-	prog.dump = true;
-	prog.fctx.fragcol.mod(in -> {
-		return(add(in, mul(textureCube(csky.ref(), neg(mul(icam.ref(),
-								   reflect(MiscLib.fragedir(prog.fctx).depref(),
-									   MiscLib.frageyen(prog.fctx).depref())))),
-				   vec4(ccol.ref(), l(0.0)))));
-	    }, 90);
+        prog.dump = true;
+        FragColor.fragcol(prog.fctx).mod(in -> {
+            return (add(in, mul(textureCube(csky.ref(), neg(mul(icam.ref(),
+                    reflect(Homo3D.fragedir(prog.fctx).depref(),
+                            Homo3D.frageyen(prog.fctx).depref())))),
+                    vec4(ccol.ref(), l(0.0)))));
+        }, 90);
     };
 
-    public ShaderMacro shader() {return(shader);}
-    public boolean reqshader() {return(true);}
-
-    public void reapply(GOut g) {
-	g.gl.glUniform1i(g.st.prog.uniform(csky), tsky.id);
-	g.gl.glUniform3fv(g.st.prog.uniform(ccol), 1, col, 0);
-	g.gl.glUniformMatrix3fv(g.st.prog.uniform(icam), 1, false, PView.camxf(g).transpose().trim3(), 0);
+    public ShaderMacro shader() {
+        return (shader);
     }
 
-    public void apply(GOut g) {
-	BGL gl = g.gl;
-	(tsky = g.st.texalloc()).act(g);
-	gl.glBindTexture(GL.GL_TEXTURE_CUBE_MAP, sky.glid(g));
-	reapply(g);
-    }
-
-    public void unapply(GOut g) {
-	tsky.act(g);
-	g.gl.glBindTexture(GL.GL_TEXTURE_CUBE_MAP, null);
-	tsky.free(); tsky = null;
-    }
-
-    public void prep(Buffer buf) {
-	buf.put(slot, this);
+    public void apply(Pipe buf) {
+        buf.put(slot, this);
     }
 }

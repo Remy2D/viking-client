@@ -26,8 +26,7 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.*;
 
 public class RadioGroup {
     private Widget parent;
@@ -49,7 +48,7 @@ public class RadioGroup {
         }
 
         public boolean mousedown(Coord c, int button) {
-            if (a || button != 1 || c.y < 16 || c.y > sz.y - 10)
+            if (a || button != 1)
                 return (false);
             check(this);
             return (true);
@@ -58,7 +57,7 @@ public class RadioGroup {
         public void changed(boolean val) {
             a = val;
             super.changed(val);
-            lbl = Text.labelFnd.render(lbl.text, a ? java.awt.Color.YELLOW : java.awt.Color.WHITE);
+            lbl = Text.std.render(lbl.text, a ? java.awt.Color.YELLOW : java.awt.Color.WHITE);
         }
     }
 

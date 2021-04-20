@@ -30,18 +30,22 @@ import java.awt.Color;
 
 public class Astronomy {
     public final double dt, mp, yt, sp, sd;
+    public final double years, ym, md;
     public final boolean night;
     public final Color mc;
     public final int is;
-	
-    public Astronomy(double dt, double mp, double yt, boolean night, Color mc, int is, double sp, double sd) {
-	this.dt = dt;
-	this.mp = mp;
-	this.yt = yt;
-	this.night = night;
-	this.mc = mc;
-	this.is = is;
-	this.sp = sp;
-	this.sd = sd;
+
+    public Astronomy(double dt, double mp, double yt, boolean night, Color mc, int is, double sp, double sd, double years, double ym, double md) {
+        this.dt = dt;
+        this.mp = mp;
+        this.yt = yt;
+        this.night = night;
+        this.mc = mc;
+        this.is = is;
+        this.sp = sp;
+        this.sd = sd;
+        this.years = years;
+        this.ym = ym;
+        this.md = md;
     }
 }

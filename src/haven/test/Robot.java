@@ -26,7 +26,7 @@
 
 package haven.test;
 
-import haven.Widget;
+import haven.*;
 
 public class Robot {
     public TestClient c;

@@ -26,25 +26,26 @@
 
 package haven;
 
-import haven.purus.mapper.Mapper;
-import haven.purus.pbot.PBotAPI;
-import integrations.map.Navigation;
+import haven.purus.MultiSession;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import integrations.mapv4.MappingClient;
+import java.awt.Color;
+import java.util.*;
 
 public class Charlist extends Widget {
     public static final Tex bg = Resource.loadtex("gfx/hud/avakort");
-    public static final int margin = 6;
+    public static final int margin = UI.scale(6);
+    public static final int btnw = UI.scale(100);
     public int height, y, sel = 0;
     public IButton sau, sad;
     public List<Char> chars = new ArrayList<Char>();
+    Avaview avalink;
 
     public static class Char {
-        static Text.Foundry tf = new Text.Foundry(Text.serif, 20).aa(true);
-        public String name;
+        public static final Text.Furnace tf = new PUtils.BlurFurn(new PUtils.TexFurn(new Text.Foundry(Text.fraktur, 20).aa(true), Window.ctex), UI.scale(2), UI.scale(2), Color.BLACK);
+        public final String name;
+        public Composited.Desc avadesc;
+        public Resource.Resolver avamap;
+        public Collection<ResData> avaposes;
         Text nt;
         Avaview ava;
         Button plb;
@@ -52,6 +53,13 @@ public class Charlist extends Widget {
         public Char(String name) {
             this.name = name;
             nt = tf.render(name);
+        }
+
+        public void ava(Composited.Desc desc, Resource.Resolver resmap, Collection<ResData> poses) {
+            this.avadesc = desc;
+            this.avamap = resmap;
+            this.avaposes = poses;
+            ava.pop(desc, resmap);
         }
     }
 
@@ -65,7 +73,6 @@ public class Charlist extends Widget {
     public Charlist(int height) {
         super(Coord.z);
         this.height = height;
-        PBotAPI.charlist = this;
         y = 0;
         setcanfocus(true);
         sau = adda(new IButton("gfx/hud/buttons/csau", "u", "d", "o") {
@@ -78,22 +85,26 @@ public class Charlist extends Widget {
                 scroll(1);
             }
         }, bg.sz().x / 2, sau.c.y + sau.sz.y + (bg.sz().y * height) + (margin * (height - 1)), 0.5, 0);
-        sau.hide(); sad.hide();
+        sau.hide();
+        sad.hide();
         resize(new Coord(bg.sz().x, sad.c.y + sad.sz.y));
     }
 
     protected void added() {
+        if (ui.root.children(MultiSession.MultiSessionWindow.class).isEmpty()) {
+            ui.root.multiSessionWindow = ui.root.add(new MultiSession.MultiSessionWindow());
+        }
         parent.setfocus(this);
-        Button btn = new Button(90, "Log out") {
+        parent.add(new Button(UI.scale(90), "Log out") {
             @Override
             public void click() {
                 Session sess = ((RemoteUI) ui.rcvr).sess;
                 synchronized (sess) {
                     sess.close();
                 }
+                super.click();
             }
-        };
-        parent.add(btn, 120, 553);
+        }, UI.scale(120, 553));
     }
 
     public void scroll(int amount) {
@@ -127,12 +138,31 @@ public class Charlist extends Widget {
                 c.plb.show();
                 int off = (bg.sz().y - c.ava.sz.y) / 2;
                 c.ava.c = new Coord(off, off + y);
-                c.plb.c = bg.sz().add(-10, y - 2).sub(c.plb.sz);
-                g.image(c.nt.tex(), new Coord(off + c.ava.sz.x + 5, off + y));
+                c.plb.c = UI.scale(new Coord(-10, -2)).add(bg.sz()).add(0, y).sub(c.plb.sz);
+                g.image(c.nt.tex(), UI.scale(new Coord(5, 0)).add(off + c.ava.sz.x, off + y));
                 y += bg.sz().y + margin;
             }
         }
         super.draw(g);
+    }
+
+    public boolean mousedown(Coord c, int button) {
+        boolean hit = false;
+        if (button == 1) {
+            synchronized (chars) {
+                for (int i = 0, y = sau.c.y + sau.sz.y; (i < height) && (i + this.y < chars.size()); i++, y += bg.sz().y + margin) {
+                    if (c.isect(new Coord(0, y), bg.sz())) {
+                        if (i + this.y != sel)
+                            chsel(i + this.y);
+                        hit = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (super.mousedown(c, button))
+            return (true);
+        return (hit);
     }
 
     public boolean mousewheel(Coord c, int amount) {
@@ -144,14 +174,8 @@ public class Charlist extends Widget {
         if (sender instanceof Button) {
             synchronized (chars) {
                 for (Char c : chars) {
-                    if (sender == c.plb) {
+                    if (sender == c.plb)
                         wdgmsg("play", c.name);
-                        Navigation.setCharacterName(c.name);
-                        Mapper.setCharacterName(c.name);
-                        Mapper.setHat(null, true);
-						if(Config.vendanMapv4)
-                        	MappingClient.getInstance().SetPlayerName(c.name);
-                    }
                 }
             }
         } else if (sender instanceof Avaview) {
@@ -161,61 +185,97 @@ public class Charlist extends Widget {
     }
 
     public void uimsg(String msg, Object... args) {
-        if(msg == "add") {
-            Char c = new Char((String)args[0]);
+        if (msg == "add") {
+            Char c = new Char((String) args[0]);
             c.ava = add(new Avaview(Avaview.dasz, -1, "avacam"));
             c.ava.hide();
-            if(args.length > 1) {
-                Composited.Desc desc = Composited.Desc.decode(ui.sess, (Object[])args[1]);
-                Resource.Resolver map = new Resource.Resolver.ResourceMap(ui.sess, (Object[])args[2]);
-                c.ava.pop(desc, map);
+            if (args.length > 1) {
+                Object[] rawdesc = (Object[]) args[1];
+                Collection<ResData> poses = new ArrayList<>();
+                Composited.Desc desc = Composited.Desc.decode(ui.sess, rawdesc);
+                Resource.Resolver map = new Resource.Resolver.ResourceMap(ui.sess, (Object[]) args[2]);
+                if (rawdesc.length > 3) {
+                    Object[] rawposes = (Object[]) rawdesc[3];
+                    for (int i = 0; i < rawposes.length; i += 2)
+                        poses.add(new ResData(ui.sess.getres((Integer) rawposes[i]), new MessageBuf((byte[]) rawposes[i + 1])));
+                }
+                c.ava(desc, map, poses);
             }
-            c.plb = add(new Button(100, "Play"));
+            c.plb = add(new Button(btnw, "Play"));
             c.plb.hide();
-            synchronized(chars) {
+            synchronized (chars) {
+                int idx = chars.size();
                 chars.add(c);
-                if(chars.size() > height) {
+                if (chars.size() > height) {
                     sau.show();
                     sad.show();
                 }
+                if (idx == sel) {
+                    chsel(sel);
+                }
             }
-        } else if(msg == "ava") {
-            String cnm = (String)args[0];
-            Composited.Desc ava = Composited.Desc.decode(ui.sess, (Object[])args[1]);
-            Resource.Resolver map = new Resource.Resolver.ResourceMap(ui.sess, (Object[])args[2]);
-            synchronized(chars) {
-                for(Char c : chars) {
-                    if(c.name.equals(cnm)) {
-                        c.ava.pop(ava);
+        } else if (msg == "ava") {
+            String cnm = (String) args[0];
+            Object[] rawdesc = (Object[]) args[1];
+            Collection<ResData> poses = new ArrayList<>();
+            Composited.Desc ava = Composited.Desc.decode(ui.sess, rawdesc);
+            Resource.Resolver map = new Resource.Resolver.ResourceMap(ui.sess, (Object[]) args[2]);
+            if (rawdesc.length > 3) {
+                Object[] rawposes = (Object[]) rawdesc[3];
+                for (int i = 0; i < rawposes.length; i += 2)
+                    poses.add(new ResData(ui.sess.getres((Integer) rawposes[i]), new MessageBuf((byte[]) rawposes[i + 1])));
+            }
+            synchronized (chars) {
+                for (Char c : chars) {
+                    if (c.name.equals(cnm)) {
+                        c.ava(ava, map, poses);
                         break;
                     }
                 }
             }
+        } else if (msg == "biggu") {
+            int id = (Integer) args[0];
+            if (id < 0)
+                avalink = null;
+            else
+                avalink = (Avaview) ui.getwidget(id);
+        } else {
+            super.uimsg(msg, args);
         }
     }
 
     private void seladj() {
-        if(sel < y)
+        if (sel < y)
             y = sel;
-        else if(sel >= y + height)
+        else if (sel >= y + height)
             y = sel - height + 1;
     }
 
+    private void chsel(int idx) {
+        sel = idx;
+        seladj();
+        if (avalink != null) {
+            Char chr = chars.get(idx);
+            if (chr.avadesc != null) {
+                avalink.pop(chr.avadesc.clone(), chr.avamap);
+                avalink.chposes(chr.avaposes, false);
+            }
+        }
+    }
+
     public boolean keydown(java.awt.event.KeyEvent ev) {
-        if(ev.getKeyCode() == ev.VK_UP) {
-            sel = Math.max(sel - 1, 0);
-            seladj();
-            return(true);
-        } else if(ev.getKeyCode() == ev.VK_DOWN) {
-            sel = Math.min(sel + 1, chars.size() - 1);
-            seladj();
-            return(true);
-        } else if(ev.getKeyCode() == ev.VK_ENTER) {
-            if((sel >= 0) && (sel < chars.size())) {
+        if (ev.getKeyCode() == ev.VK_UP) {
+            chsel(Math.max(sel - 1, 0));
+            return (true);
+        } else if (ev.getKeyCode() == ev.VK_DOWN) {
+            chsel(Math.min(sel + 1, chars.size() - 1));
+            return (true);
+        } else if (ev.getKeyCode() == ev.VK_ENTER) {
+            if ((sel >= 0) && (sel < chars.size())) {
                 chars.get(sel).plb.click();
             }
-            return(true);
+            return (true);
         }
-        return(false);
+        return (false);
     }
 }

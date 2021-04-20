@@ -26,46 +26,22 @@
 
 package haven.rs;
 
+import haven.*;
+import haven.render.*;
+
+import java.util.*;
+import java.io.*;
 import java.awt.Color;
 import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 
-import haven.Callback;
-import haven.Camera;
-import haven.Composited;
 import haven.Composited.ED;
 import haven.Composited.MD;
-import haven.Coord;
-import haven.Coord3f;
-import haven.DirLight;
-import haven.Drawn;
-import haven.GLState;
-import haven.GOut;
-import haven.Indir;
-import haven.Light;
-import haven.Loading;
-import haven.LocationCam;
-import haven.Message;
-import haven.MessageBuf;
-import haven.PUtils;
-import haven.PView;
-import haven.Projection;
-import haven.RenderList;
-import haven.Rendered;
-import haven.ResData;
-import haven.Resource;
-import haven.Skeleton;
 
 public class AvaRender {
     public static Composited compose(Resource base, List<MD> mod, List<ED> equ) {
         Composited comp = new Composited(base.layer(Skeleton.Res.class).s);
         comp.chmod(mod);
         comp.chequ(equ);
-        comp.changes(true);
         return (comp);
     }
 
@@ -82,9 +58,9 @@ public class AvaRender {
             try {
                 Skeleton.BoneOffset camoff = base.get().layer(Skeleton.BoneOffset.class, camnm);
                 tcomp = compose(base.get(), mod, equ);
-                GLState.Buffer buf = new GLState.Buffer(null);
-                camoff.forpose(tcomp.pose).prep(buf);
-                tcam = new LocationCam(buf.get(PView.loc));
+                Pipe buf = new BufPipe();
+                buf.prep(camoff.forpose(tcomp.pose).get());
+                tcam = new LocationCam(buf.get(Homo3D.loc));
                 break;
             } catch (Loading ev) {
                 ev.waitfor();
@@ -92,58 +68,24 @@ public class AvaRender {
         }
         final Composited comp = tcomp; /* ¦] */
         final Camera cam = tcam;
-        final GBuffer buf = new GBuffer(sz);
-        final BufferedImage[] ret = {null};
-        try {
-            buf.render(new Drawn() {
-                public void draw(GOut g) {
-                    float field = 0.5f;
-                    float aspect = ((float) buf.sz.y) / ((float) buf.sz.x);
-                    Projection proj = Projection.frustum(-field, field, -aspect * field, aspect * field, 1, 5000);
+        final DrawBuffer buf = new DrawBuffer(Context.getdefault().env(), sz);
 
-                    Light.Model lmod = new Light.Model();
-                    lmod.cc = javax.media.opengl.GL2.GL_SEPARATE_SPECULAR_COLOR;
-
-                    BufView view = new BufView(buf, GLState.compose(proj, cam, lmod, new Light.LightList()));
-                    while (true) {
-                        try {
-                            view.render(new Rendered() {
-                                public void draw(GOut g) {
-                                }
-
-                                public boolean setup(RenderList rl) {
-                                    rl.add(comp, null);
-                                    rl.add(new DirLight(Color.WHITE, Color.WHITE, Color.WHITE, new Coord3f(1, 1, 1).norm()), null);
-                                    return (false);
-                                }
-                            }, g);
-                            break;
-                        } catch (Loading l) {
-                            try {
-                                l.waitfor();
-                            } catch (InterruptedException e) {
-                                throw (new IntException(e));
-                            }
-                        }
-                    }
-                    g.getimage(new Callback<BufferedImage>() {
-                        public void done(BufferedImage res) {
-                            ret[0] = res;
-                        }
-                    });
-                }
-            });
-        } catch (IntException e) {
-            throw ((InterruptedException) e.getCause());
-        } finally {
-            buf.dispose();
-        }
-        return (ret[0]);
+        float field = 0.5f;
+        float aspect = ((float) buf.sz.y) / ((float) buf.sz.x);
+        Projection proj = Projection.frustum(-field, field, -aspect * field, aspect * field, 1, 5000);
+        BufferedImage ret = buf.draw(Pipe.Op.compose(proj, cam), new RenderTree.Node() {
+            @Override
+            public void added(RenderTree.Slot slot) {
+                slot.add(comp);
+                slot.add(new DirLight(Color.WHITE, Color.WHITE, Color.WHITE, new Coord3f(1, 1, 1).norm()));
+            }
+        });
+        return (ret);
     }
 
     public static final Server.Command call = new Server.Command() {
         public Object[] run(Server.Client cl, Object... args) throws InterruptedException {
-            Coord sz = (Coord) args[0];
+            Coord sz = UI.scale((Coord) args[0]);
             Indir<Resource> base = Resource.local().load((String) args[1]);
             String camnm = (String) args[2];
             Object[] amod = (Object[]) args[3];
@@ -152,9 +94,9 @@ public class AvaRender {
             for (int i = 0; i < amod.length; i += 2) {
                 Indir<Resource> mr = Resource.local().load((String) amod[i]);
                 Object[] atex = (Object[]) amod[i + 1];
-		    List<ResData> tex = new LinkedList<ResData>();
+                List<ResData> tex = new LinkedList<ResData>();
                 for (int o = 0; o < atex.length; o++)
-			tex.add(new ResData(Resource.local().load((String)atex[o]), Message.nil));
+                    tex.add(new ResData(Resource.local().load((String) atex[o]), Message.nil));
                 mod.add(new MD(mr, tex));
             }
             List<ED> equ = new LinkedList<ED>();
@@ -190,7 +132,7 @@ public class AvaRender {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         Indir<Resource> base = Resource.local().load("gfx/borka/body");
-	List<MD> mod = Arrays.asList(new MD(Resource.local().load("gfx/borka/male"), ResData.wrap(Arrays.asList(Resource.local().load("gfx/borka/male")))));
+        List<MD> mod = Arrays.asList(new MD(Resource.local().load("gfx/borka/male"), ResData.wrap(Arrays.asList(Resource.local().load("gfx/borka/male")))));
         List<ED> equ = new LinkedList<ED>();
         BufferedImage img = render(new Coord(512, 512), base, "avacam", mod, equ);
         img = PUtils.convolvedown(img, new Coord(128, 128), new PUtils.Lanczos(2));

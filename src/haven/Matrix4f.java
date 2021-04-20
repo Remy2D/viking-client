@@ -26,9 +26,6 @@
 
 package haven;
 
-import javax.media.opengl.GL;
-import javax.media.opengl.GL2;
-
 public class Matrix4f {
     public final float[] m;
     public static final Matrix4f id = identity();
@@ -87,15 +84,30 @@ public class Matrix4f {
         m[y + (x * 4)] = v;
     }
 
+    public boolean equals(Matrix4f that) {
+        for (int i = 0; i < 16; i++) {
+            if (this.m[i] != that.m[i])
+                return (false);
+        }
+        return (true);
+    }
+
+    public boolean equals(Object o) {
+        return ((o instanceof Matrix4f) && equals((Matrix4f) o));
+    }
+
+    public int hashCode() {
+        int ret = 0;
+        for (int i = 0; i < 16; i++)
+            ret += Float.floatToIntBits(m[i]);
+        return (ret);
+    }
+
     public Matrix4f add(Matrix4f b) {
         Matrix4f n = new Matrix4f();
         for (int i = 0; i < 16; i++)
             n.m[i] = m[i] + b.m[i];
         return (n);
-    }
-
-    public float[] homoc() {
-        return new float[] { m[12], m[13], m[14], 1 };
     }
 
     public Coord3f mul4(Coord3f b) {
@@ -113,6 +125,14 @@ public class Matrix4f {
         return (new float[]{x, y, z, w});
     }
 
+    public HomoCoord4f mul4(HomoCoord4f b) {
+        float x = (m[0] * b.x) + (m[4] * b.y) + (m[8] * b.z) + (m[12] * b.w);
+        float y = (m[1] * b.x) + (m[5] * b.y) + (m[9] * b.z) + (m[13] * b.w);
+        float z = (m[2] * b.x) + (m[6] * b.y) + (m[10] * b.z) + (m[14] * b.w);
+        float w = (m[3] * b.x) + (m[7] * b.y) + (m[11] * b.z) + (m[15] * b.w);
+        return (new HomoCoord4f(x, y, z, w));
+    }
+
     public Matrix4f mul(Matrix4f o) {
         Matrix4f n = new Matrix4f();
         int i = 0;
@@ -126,7 +146,7 @@ public class Matrix4f {
 
     public Matrix4f mul1(Matrix4f o) {
         int i = 0;
-    /* This should get allocated on the stack unless the JVM sucks. */
+        /* This should get allocated on the stack unless the JVM sucks. */
         float[] n = new float[16];
         for (int x = 0; x < 16; x += 4) {
             for (int y = 0; y < 4; y++) {
@@ -286,20 +306,6 @@ public class Matrix4f {
         for (int i = 0; i < 16; i++)
             r[i] *= det;
         return (new Matrix4f(r));
-    }
-
-    public void getgl(GL gl, int matrix) {
-        gl.glGetFloatv(matrix, m, 0);
-    }
-
-    public void loadgl(GL2 gl) {
-        gl.glLoadMatrixf(m, 0);
-    }
-
-    public static Matrix4f fromgl(GL gl, int matrix) {
-        Matrix4f m = new Matrix4f();
-        m.getgl(gl, matrix);
-        return (m);
     }
 
     public String toString() {

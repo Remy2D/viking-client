@@ -26,14 +26,13 @@
 
 package haven;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.function.Consumer;
+
+import haven.purus.DmgOverlay;
+import haven.purus.GobDecayNum;
+import haven.render.Render;
 
 public class OCache implements Iterable<Gob> {
     public static final int OD_REM = 0;
@@ -61,15 +60,13 @@ public class OCache implements Iterable<Gob> {
     public static final Coord2d posres = new Coord2d(0x1.0p-10, 0x1.0p-10).mul(11, 11);
     /* XXX: Use weak refs */
     private Collection<Collection<Gob>> local = new LinkedList<Collection<Gob>>();
-    private Map<Long, Gob> objs = new TreeMap<Long, Gob>();
-    private Map<Long, Integer> deleted = new TreeMap<Long, Integer>();
+    private HashMultiMap<Long, Gob> objs = new HashMultiMap<Long, Gob>();
     private Glob glob;
-    private Map<Long, DamageSprite> gobdmgs = new HashMap<Long, DamageSprite>();
-    public boolean isfight = false;
     private final Collection<ChangeCallback> cbs = new WeakList<ChangeCallback>();
 
     public interface ChangeCallback {
-        public void changed(Gob ob);
+        public void added(Gob ob);
+
         public void removed(Gob ob);
     }
 
@@ -81,60 +78,86 @@ public class OCache implements Iterable<Gob> {
         cbs.add(cb);
     }
 
-    public void changed(Gob ob) {
-        ob.changed();
-        for(ChangeCallback cb : cbs)
-            cb.changed(ob);
+    public synchronized void uncallback(ChangeCallback cb) {
+        cbs.remove(cb);
     }
 
-    public synchronized void remove(long id, int frame) {
-        if (objs.containsKey(id)) {
-            if (!deleted.containsKey(id) || deleted.get(id) < frame) {
-                Gob old = objs.remove(id);
-                deleted.put(id, frame);
-                old.dispose();
-                for(ChangeCallback cb : cbs)
+    public void add(Gob ob) {
+        synchronized (ob) {
+            Collection<ChangeCallback> cbs;
+            synchronized (this) {
+                cbs = new ArrayList<>(this.cbs);
+                objs.put(ob.id, ob);
+            }
+            for (ChangeCallback cb : cbs)
+                cb.added(ob);
+        }
+    }
+
+    public void remove(Gob ob) {
+        Gob old;
+        Collection<ChangeCallback> cbs;
+        synchronized (this) {
+            old = objs.remove(ob.id, ob);
+            if ((old != null) && (old != ob))
+                throw (new RuntimeException(String.format("object %d removed wrong object", ob.id)));
+            cbs = new ArrayList<>(this.cbs);
+        }
+        if (old != null) {
+            synchronized (old) {
+                for (ChangeCallback cb : cbs)
                     cb.removed(old);
             }
         }
     }
 
-    public synchronized void remove(long id) {
-        Gob old = objs.remove(id);
-        if(old != null) {
-            for(ChangeCallback cb : cbs)
-                cb.removed(old);
-        }
-    }
-
-    public synchronized void tick() {
-        for (Gob g : objs.values()) {
-            g.tick();
-        }
-    }
-
-    public void ctick(int dt) {
+    public void ctick(double dt) {
+        ArrayList<Gob> copy = new ArrayList<Gob>();
         synchronized (this) {
-            ArrayList<Gob> copy = new ArrayList<Gob>();
             for (Gob g : this)
                 copy.add(g);
-            for (Gob g : copy) {
+        }
+        Consumer<Gob> task = g -> {
+            synchronized (g) {
                 g.ctick(dt);
-                if (Config.showdmgop) {
-                    Gob.Overlay dmgol = g.findol(DamageSprite.ID);
-                    if (dmgol != null)
-                        g.ols.remove(dmgol);
-                    if (isfight) {
-                        DamageSprite dmgspr = gobdmgs.get(g.id);
-                        if (dmgspr != null) {
-                            if (dmgspr.owner == g)
-                                g.ols.add(new Gob.Overlay(DamageSprite.ID, dmgspr));
-                            else
-                                g.ols.add(new Gob.Overlay(DamageSprite.ID, new DamageSprite(dmgspr.dmg, dmgspr.arm, g)));
-                        }
-                    }
-                }
             }
+        };
+        if (!Config.par)
+            copy.forEach(task);
+        else
+            copy.parallelStream().forEach(task);
+    }
+
+    public void gtick(Render g) {
+        ArrayList<Gob> copy = new ArrayList<Gob>();
+        synchronized (this) {
+            for (Gob ob : this)
+                copy.add(ob);
+        }
+        if (!Config.par) {
+            copy.forEach(ob -> {
+                synchronized (ob) {
+                    ob.gtick(g);
+                }
+            });
+        } else {
+            Collection<Render> subs = new ArrayList<>();
+            ThreadLocal<Render> subv = new ThreadLocal<>();
+            copy.parallelStream().forEach(ob -> {
+                Render sub = subv.get();
+                if (sub == null) {
+                    sub = g.env().render();
+                    synchronized (subs) {
+                        subs.add(sub);
+                    }
+                    subv.set(sub);
+                }
+                synchronized (ob) {
+                    ob.gtick(sub);
+                }
+            });
+            for (Render sub : subs)
+                g.submit(sub);
         }
     }
 
@@ -146,155 +169,135 @@ public class OCache implements Iterable<Gob> {
         return (new I2<Gob>(objs.values().iterator(), new I2<Gob>(is)));
     }
 
-    public synchronized void ladd(Collection<Gob> gob) {
-	local.add(gob);
-	for(Gob g : gob) {
-	    for(ChangeCallback cb : cbs)
-		cb.changed(g);
-	}
+    public void ladd(Collection<Gob> gob) {
+        Collection<ChangeCallback> cbs;
+        synchronized (this) {
+            cbs = new ArrayList<>(this.cbs);
+            local.add(gob);
+        }
+        for (Gob g : gob) {
+            synchronized (g) {
+                for (ChangeCallback cb : cbs)
+                    cb.added(g);
+            }
+        }
     }
 
-    public synchronized void lrem(Collection<Gob> gob) {
-	local.remove(gob);
-	for(Gob g : gob) {
-	    for(ChangeCallback cb : cbs)
-		cb.removed(g);
-	}
+    public void lrem(Collection<Gob> gob) {
+        Collection<ChangeCallback> cbs;
+        synchronized (this) {
+            cbs = new ArrayList<>(this.cbs);
+            local.remove(gob);
+        }
+        for (Gob g : gob) {
+            synchronized (g) {
+                for (ChangeCallback cb : cbs)
+                    cb.removed(g);
+            }
+        }
     }
 
     public synchronized Gob getgob(long id) {
         return (objs.get(id));
     }
 
-    public synchronized Gob getgob(long id, int frame) {
-        if (!objs.containsKey(id)) {
-            boolean r = false;
-            if (deleted.containsKey(id)) {
-                if (deleted.get(id) < frame)
-                    deleted.remove(id);
-                else
-                    r = true;
-            }
-            if (r) {
-                return (null);
-            } else {
-                Gob g = new Gob(glob, Coord2d.z, id, frame);
-                objs.put(id, g);
-                return (g);
-            }
-        } else {
-            Gob ret = objs.get(id);
-            if (ret.frame >= frame)
-                return (null);
-            else
-                return (ret);
-        }
-    /* XXX: Clean up in deleted */
-    }
-
-    private long nextvirt = -1;
+    private java.util.concurrent.atomic.AtomicLong nextvirt = new java.util.concurrent.atomic.AtomicLong(-1);
 
     public class Virtual extends Gob {
         public Virtual(Coord2d c, double a) {
-            super(OCache.this.glob, c, nextvirt--, 0);
+            super(OCache.this.glob, c, nextvirt.getAndDecrement());
             this.a = a;
             virtual = true;
-            synchronized (OCache.this) {
-                objs.put(id, this);
-                OCache.this.changed(this);
-            }
         }
     }
 
     private Indir<Resource> getres(int id) {
-        return(glob.sess.getres(id));
+        return (glob.sess.getres(id));
     }
 
-    public synchronized void move(Gob g, Coord2d c, double a) {
+    public interface Delta {
+        public void apply(Gob gob);
+    }
+
+    public static void move(Gob g, Coord2d c, double a) {
         g.move(c, a);
-        changed(g);
     }
 
-    public void move(Gob gob, Message msg) {
+    public Delta move(Message msg) {
         Coord2d c = msg.coord().mul(posres);
         int ia = msg.uint16();
-        if(gob != null)
-            move(gob, c, (ia / 65536.0) * Math.PI * 2);
+        return (gob -> move(gob, c, (ia / 65536.0) * Math.PI * 2));
     }
 
-    public synchronized void cres(Gob g, Indir<Resource> res, Message dat) {
+    public static void cres(Gob g, Indir<Resource> res, Message dat) {
         MessageBuf sdt = new MessageBuf(dat);
         Drawable dr = g.getattr(Drawable.class);
         ResDrawable d = (dr instanceof ResDrawable) ? (ResDrawable) dr : null;
-        if ((d != null) && (d.res == res) && !d.sdt.equals(sdt) && (d.spr != null) && (d.spr instanceof Gob.Overlay.CUpd)) {
-            ((Gob.Overlay.CUpd) d.spr).update(sdt);
+        if ((d != null) && (d.res == res) && !d.sdt.equals(sdt) && (d.spr != null) && (d.spr instanceof Sprite.CUpd)) {
+            ((Sprite.CUpd) d.spr).update(sdt);
             d.sdt = sdt;
         } else if ((d == null) || (d.res != res) || !d.sdt.equals(sdt)) {
             g.setattr(new ResDrawable(g, res, sdt));
         }
-        changed(g);
     }
 
-    public void cres(Gob gob, Message msg) {
+    public Delta cres(Message msg) {
         int resid = msg.uint16();
         Message sdt = Message.nil;
-        if((resid & 0x8000) != 0) {
+        if ((resid & 0x8000) != 0) {
             resid &= ~0x8000;
             sdt = new MessageBuf(msg.bytes(msg.uint8()));
         }
-        if(gob != null)
-            cres(gob, getres(resid), sdt);
+        Indir<Resource> cres = getres(resid);
+        Message csdt = sdt;
+        return (gob -> cres(gob, cres, csdt));
     }
 
-    public synchronized void linbeg(Gob g, Coord2d s, Coord2d v) {
+    public static void linbeg(Gob g, Coord2d s, Coord2d v) {
         LinMove lm = g.getattr(LinMove.class);
-        if (lm == null || !lm.s.equals(s) || !lm.v.equals(v)) {
+        if ((lm == null) || !lm.s.equals(s) || !lm.v.equals(v)) {
             g.setattr(new LinMove(g, s, v));
-            changed(g);
         }
     }
 
-    public void linbeg(Gob gob, Message msg) {
+    public Delta linbeg(Message msg) {
         Coord2d s = msg.coord().mul(posres);
         Coord2d v = msg.coord().mul(posres);
-        if(gob != null)
-            linbeg(gob, s, v);
+        return (gob -> linbeg(gob, s, v));
     }
 
-    public synchronized void linstep(Gob g, double t, double e) {
+    public static void linstep(Gob g, double t, double e) {
         Moving m = g.getattr(Moving.class);
-        if (m == null || !(m instanceof LinMove))
+        if ((m == null) || !(m instanceof LinMove))
             return;
         LinMove lm = (LinMove) m;
         if (t < 0)
             g.delattr(Moving.class);
         else
             lm.sett(t);
-
         if (e >= 0)
             lm.e = e;
         else
             lm.e = Double.NaN;
     }
 
-    public void linstep(Gob gob, Message msg) {
+    public Delta linstep(Message msg) {
         double t, e;
         int w = msg.int32();
-        if(w == -1) {
+        if (w == -1) {
             t = e = -1;
-        } else if((w & 0x80000000) == 0) {
+        } else if ((w & 0x80000000) == 0) {
             t = w * 0x1p-10;
             e = -1;
         } else {
             t = (w & ~0x80000000) * 0x1p-10;
             w = msg.int32();
-            e = (w < 0)?-1:(w * 0x1p-10);
+            e = (w < 0) ? -1 : (w * 0x1p-10);
         }
-        if(gob != null)
-            linstep(gob, t, e);
+        return (gob -> linstep(gob, t, e));
     }
 
-    public synchronized void speak(Gob g, float zo, String text) {
+    public static void speak(Gob g, float zo, String text) {
         if (text.length() < 1) {
             g.delattr(Speaking.class);
         } else {
@@ -306,45 +309,42 @@ public class OCache implements Iterable<Gob> {
                 m.update(text);
             }
         }
-        changed(g);
     }
 
-    public void speak(Gob gob, Message msg) {
+    public Delta speak(Message msg) {
         float zo = msg.int16() / 100.0f;
         String text = msg.string();
-        if (gob != null && !text.startsWith(ChatUI.CMD_PREFIX_HLIGHT))
-            speak(gob, zo, text);
+        return (gob -> speak(gob, zo, text));
     }
 
-    public synchronized void composite(Gob g, Indir<Resource> base) {
+    public static void composite(Gob g, Indir<Resource> base) {
         Drawable dr = g.getattr(Drawable.class);
         Composite cmp = (dr instanceof Composite) ? (Composite) dr : null;
         if ((cmp == null) || !cmp.base.equals(base)) {
             cmp = new Composite(g, base);
             g.setattr(cmp);
         }
-        changed(g);
     }
 
-    public void composite(Gob gob, Message msg) {
+    public Delta composite(Message msg) {
         Indir<Resource> base = getres(msg.uint16());
-        if(gob != null)
-            composite(gob, base);
+        return (gob -> composite(gob, base));
     }
 
-    public synchronized void cmppose(Gob g, int pseq, List<ResData> poses, List<ResData> tposes, boolean interp, float ttime) {
+    public static void cmppose(Gob g, int pseq, List<ResData> poses, List<ResData> tposes, boolean interp, float ttime) {
         Composite cmp = (Composite) g.getattr(Drawable.class);
-        if (cmp != null && cmp.pseq != pseq) {
+        if (cmp == null)
+            throw (new RuntimeException(String.format("cmppose on non-composed object: %s %s %s %s", poses, tposes, interp, ttime)));
+        if (cmp.pseq != pseq) {
             cmp.pseq = pseq;
             if (poses != null)
                 cmp.chposes(poses, interp);
             if (tposes != null)
                 cmp.tposes(tposes, WrapMode.ONCE, ttime);
         }
-        changed(g);
     }
 
-    public void cmppose(Gob gob, Message msg) {
+    public Delta cmppose(Message msg) {
         List<ResData> poses = null, tposes = null;
         int pfl = msg.uint8();
         int seq = msg.uint8();
@@ -379,17 +379,19 @@ public class OCache implements Iterable<Gob> {
             }
             ttime = (msg.uint8() / 10.0f);
         }
-        if (gob != null)
-            cmppose(gob, seq, poses, tposes, interp, ttime);
+        List<ResData> cposes = poses, ctposes = tposes;
+        float cttime = ttime;
+        return (gob -> cmppose(gob, seq, cposes, ctposes, interp, cttime));
     }
 
-    public synchronized void cmpmod(Gob g, List<Composited.MD> mod) {
+    public static void cmpmod(Gob g, List<Composited.MD> mod) {
         Composite cmp = (Composite) g.getattr(Drawable.class);
+        if (cmp == null)
+            throw (new RuntimeException(String.format("cmpmod on non-composed object: %s", mod)));
         cmp.chmod(mod);
-        changed(g);
     }
 
-    public void cmpmod(Gob gob, Message msg) {
+    public Delta cmpmod(Message msg) {
         List<Composited.MD> mod = new LinkedList<Composited.MD>();
         int mseq = 0;
         while (true) {
@@ -413,17 +415,17 @@ public class OCache implements Iterable<Gob> {
             md.id = mseq++;
             mod.add(md);
         }
-        if (gob != null)
-            cmpmod(gob, mod);
+        return (gob -> cmpmod(gob, mod));
     }
 
-    public synchronized void cmpequ(Gob g, List<Composited.ED> equ) {
+    public static void cmpequ(Gob g, List<Composited.ED> equ) {
         Composite cmp = (Composite) g.getattr(Drawable.class);
+        if (cmp == null)
+            throw (new RuntimeException(String.format("cmpequ on non-composed object: %s", equ)));
         cmp.chequ(equ);
-        changed(g);
     }
 
-    public void cmpequ(Gob gob, Message msg) {
+    public Delta cmpequ(Message msg) {
         List<Composited.ED> equ = new LinkedList<Composited.ED>();
         int eseq = 0;
         while (true) {
@@ -452,21 +454,19 @@ public class OCache implements Iterable<Gob> {
             ed.id = eseq++;
             equ.add(ed);
         }
-        if (gob != null)
-            cmpequ(gob, equ);
+        return (gob -> cmpequ(gob, equ));
     }
 
-    public synchronized void avatar(Gob g, List<Indir<Resource>> layers) {
+    public static void avatar(Gob g, List<Indir<Resource>> layers) {
         Avatar ava = g.getattr(Avatar.class);
         if (ava == null) {
             ava = new Avatar(g);
             g.setattr(ava);
         }
         ava.setlayers(layers);
-        changed(g);
     }
 
-    public void avatar(Gob gob, Message msg) {
+    public Delta avatar(Message msg) {
         List<Indir<Resource>> layers = new LinkedList<Indir<Resource>>();
         while (true) {
             int layer = msg.uint16();
@@ -474,11 +474,10 @@ public class OCache implements Iterable<Gob> {
                 break;
             layers.add(getres(layer));
         }
-        if (gob != null)
-            avatar(gob, layers);
+        return (gob -> avatar(gob, layers));
     }
 
-    public synchronized void zoff(Gob g, float off) {
+    public static void zoff(Gob g, float off) {
         if (off == 0) {
             g.delattr(DrawOffset.class);
         } else {
@@ -490,202 +489,153 @@ public class OCache implements Iterable<Gob> {
                 dro.off = new Coord3f(0, 0, off);
             }
         }
-        changed(g);
     }
 
-    public void zoff(Gob gob, Message msg) {
+    public Delta zoff(Message msg) {
         float off = msg.int16() / 100.0f;
-        if (gob != null)
-            zoff(gob, off);
+        return (gob -> zoff(gob, off));
     }
 
-    public synchronized void lumin(Gob g, Coord off, int sz, int str) {
+    public static void lumin(Gob g, Coord off, int sz, int str) {
         g.setattr(new Lumin(g, off, sz, str));
-        changed(g);
     }
 
-    public void lumin(Gob gob, Message msg) {
+    public Delta lumin(Message msg) {
         Coord off = msg.coord();
         int sz = msg.uint16();
         int str = msg.uint8();
-        if (gob != null)
-            lumin(gob, off, sz, str);
+        return (gob -> lumin(gob, off, sz, str));
     }
 
-    public synchronized void follow(Gob g, long oid, Indir<Resource> xfres, String xfname) {
-        if (oid == 0xffffffffl) {
+    public static void follow(Gob g, long oid, Indir<Resource> xfres, String xfname) {
+        if (oid == -1) {
             g.delattr(Following.class);
         } else {
-            Following flw = g.getattr(Following.class);
-            if (flw == null) {
-                flw = new Following(g, oid, xfres, xfname);
-                g.setattr(flw);
-            } else {
-                synchronized (flw) {
-                    flw.tgt = oid;
-                    flw.xfres = xfres;
-                    flw.xfname = xfname;
-                    flw.lxfb = null;
-                    flw.xf = null;
-                }
-            }
+            g.setattr(new Following(g, oid, xfres, xfname));
         }
-        changed(g);
     }
 
-    public void follow(Gob gob, Message msg) {
+    public Delta follow(Message msg) {
         long oid = msg.uint32();
-        Indir<Resource> xfres = null;
-        String xfname = null;
         if (oid != 0xffffffffl) {
-            xfres = getres(msg.uint16());
-            xfname = msg.string();
+            Indir<Resource> xfres = getres(msg.uint16());
+            String xfname = msg.string();
+            return (gob -> follow(gob, oid, xfres, xfname));
+        } else {
+            return (gob -> follow(gob, -1, null, null));
         }
-        if (gob != null)
-            follow(gob, oid, xfres, xfname);
     }
 
-    public synchronized void homostop(Gob g) {
+    public static void homostop(Gob g) {
         g.delattr(Homing.class);
-        changed(g);
     }
 
-    public synchronized void homing(Gob g, long oid, Coord2d tc, double v) {
+    public static void homing(Gob g, long oid, Coord2d tc, double v) {
         Homing homo = g.getattr(Homing.class);
-        if((homo == null) || (homo.tgt != oid)) {
+        if ((homo == null) || (homo.tgt != oid)) {
             g.setattr(new Homing(g, oid, tc, v));
         } else {
             homo.tc = tc;
             homo.v = v;
         }
-        changed(g);
     }
 
-    public void homing(Gob gob, Message msg) {
+    public Delta homing(Message msg) {
         long oid = msg.uint32();
-        if(oid == 0xffffffffl) {
-            if(gob != null)
-                homostop(gob);
+        if (oid == 0xffffffffl) {
+            return (gob -> homostop(gob));
         } else {
             Coord2d tgtc = msg.coord().mul(posres);
             double v = msg.int32() * 0x1p-10 * 11;
-            if(gob != null)
-                homing(gob, oid, tgtc, v);
+            return (gob -> homing(gob, oid, tgtc, v));
         }
     }
 
-    public synchronized void overlay(Gob g, int olid, boolean prs, Indir<Resource> resid, Message sdt) {
+    public static void overlay(Gob g, int olid, boolean prs, Indir<Resource> resid, Message sdt) {
         Gob.Overlay ol = g.findol(olid);
         if (resid != null) {
             sdt = new MessageBuf(sdt);
+            Gob.Overlay nol = null;
             if (ol == null) {
-                g.ols.add(ol = new Gob.Overlay(olid, resid, sdt));
-                if (sdt.rt == 7 && isfight && Config.showdmgop)
-                    setdmgoverlay(g, resid, new MessageBuf(sdt));
-            } else if (!ol.sdt.equals(sdt)) {
-                if (ol.spr instanceof Gob.Overlay.CUpd) {
-                    ol.sdt = new MessageBuf(sdt);
-                    ((Gob.Overlay.CUpd) ol.spr).update(ol.sdt);
-                } else {
-                    g.ols.remove(ol);
-                    g.ols.add(ol = new Gob.Overlay(olid, resid, sdt));
-                    if (sdt.rt == 7 && isfight && Config.showdmgop)
-                        setdmgoverlay(g, resid, new MessageBuf(sdt));
-                }
-            }
-            ol.delign = prs;
-        } else {
-            if ((ol != null) && (ol.spr instanceof Gob.Overlay.CDel))
-                ((Gob.Overlay.CDel) ol.spr).delete();
-            else
-                g.ols.remove(ol);
-        }
-        changed(g);
-    }
-
-    private void setdmgoverlay(final Gob g, final Indir<Resource> resid, final MessageBuf sdt) {
-        final int dmg = sdt.int32();
-        // ignore dmg of 1 from scents
-        if (dmg == 1)
-            return;
-        sdt.uint8();
-        final int clr = sdt.uint16();
-        if (clr != 61455 /* damage */ && clr != 36751 /* armor damage */)
-            return;
-
-        Defer.later(new Defer.Callable<Void>() {
-            public Void call() {
-                try {
-                    Resource res = resid.get();
-                    if (res != null && res.name.equals("gfx/fx/floatimg")) {
-                        synchronized (gobdmgs) {
-                            DamageSprite dmgspr = gobdmgs.get(g.id);
-                            if (dmgspr == null)
-                                gobdmgs.put(g.id, new DamageSprite(dmg, clr == 36751, g));
-                            else
-                                dmgspr.update(dmg, clr == 36751);
-                        }
+                g.addol(nol = new Gob.Overlay(g, olid, resid, sdt), false);
+                if (sdt.rt == 7) {
+                    MessageBuf buf = new MessageBuf(sdt);
+                    int dmg = buf.int32();
+                    buf.uint8();
+                    int type = buf.uint16();
+                    if (type == 64527) { // hhp
+                        Gob.Overlay ool = g.findol(2777);
+                        if (ool == null)
+                            g.addol(ool = new Gob.Overlay(g, new DmgOverlay(nol.gob, resid.get()), 2777));
+                        ((DmgOverlay) ool.spr).updDmg(dmg, 1);
+                    } else if (type == 36751) { // armor
+                        Gob.Overlay ool = g.findol(2777);
+                        if (ool == null)
+                            g.addol(ool = new Gob.Overlay(g, new DmgOverlay(nol.gob, resid.get()), 2777));
+                        ((DmgOverlay) ool.spr).updDmg(dmg, 2);
+                    } else if (type == 61455) { // soft hp
+                        Gob.Overlay ool = g.findol(2777);
+                        if (ool == null)
+                            g.addol(ool = new Gob.Overlay(g, new DmgOverlay(nol.gob, resid.get()), 2777));
+                        ((DmgOverlay) ool.spr).updDmg(dmg, 0);
                     }
-                } catch (Loading le) {
-                    Defer.later(this);
                 }
-                return null;
+            } else if (!ol.sdt.equals(sdt)) {
+                if (ol.spr instanceof Sprite.CUpd) {
+                    MessageBuf copy = new MessageBuf(sdt);
+                    ((Sprite.CUpd) ol.spr).update(copy);
+                    ol.sdt = copy;
+                } else {
+                    g.addol(nol = new Gob.Overlay(g, olid, resid, sdt), false);
+                    ol.remove();
+                }
             }
-        });
-    }
-
-    public void removedmgoverlay(long gobid) {
-        synchronized (gobdmgs) {
-            gobdmgs.remove(gobid);
+            if (nol != null)
+                nol.delign = prs;
+        } else {
+            if (ol != null) {
+                if (ol.spr instanceof Sprite.CDel)
+                    ((Sprite.CDel) ol.spr).delete();
+                else
+                    ol.remove();
+            }
         }
     }
 
-    public void overlay(Gob gob, Message msg) {
-        int olid = msg.int32();
-        boolean prs = (olid & 1) != 0;
-        olid >>>= 1;
+    public Delta overlay(Message msg) {
+        int olidf = msg.int32();
+        boolean prs = (olidf & 1) != 0;
+        int olid = olidf >>> 1;
         int resid = msg.uint16();
         Indir<Resource> res;
-        Message sdt = Message.nil;
+        Message sdt;
         if (resid == 65535) {
             res = null;
+            sdt = Message.nil;
         } else {
             if ((resid & 0x8000) != 0) {
                 resid &= ~0x8000;
                 sdt = new MessageBuf(msg.bytes(msg.uint8()));
+            } else {
+                sdt = Message.nil;
             }
             res = getres(resid);
         }
-        if (gob != null)
-            overlay(gob, olid, prs, res, sdt);
+        return (gob -> overlay(gob, olid, prs, res, sdt));
     }
 
-    public synchronized void health(Gob g, int hp) {
-        g.setattr(new GobHealth(g, hp));
-
-        if (Config.showgobhp) {
-            Gob.Overlay ol = g.findol(Sprite.GOB_HEALTH_ID);
-            if (hp < 4) {
-                if (ol == null)
-                    g.addol(new Gob.Overlay(Sprite.GOB_HEALTH_ID, new GobHealthSprite(hp)));
-                else if (((GobHealthSprite) ol.spr).val != hp)
-                    ((GobHealthSprite) ol.spr).update(hp);
-            } else {
-                if (ol != null)
-                    g.ols.remove(ol);
-            }
-        }
-
-        changed(g);
+    public static void health(Gob g, int hp) {
+        if (haven.purus.Config.showGobDecayNum.val)
+            g.setattr(new GobDecayNum(g, hp));
+        g.setattr(new GobHealth(g, hp / 4.0f));
     }
 
-    public void health(Gob gob, Message msg) {
+    public Delta health(Message msg) {
         int hp = msg.uint8();
-        if (gob != null)
-            health(gob, hp);
+        return (gob -> health(gob, hp));
     }
 
-    public synchronized void buddy(Gob g, String name, int group, int type) {
+    public static void buddy(Gob g, String name, int group, int type) {
         if (name == null) {
             g.delattr(KinInfo.class);
         } else {
@@ -696,120 +646,238 @@ public class OCache implements Iterable<Gob> {
                 b.update(name, group, type);
             }
         }
-        changed(g);
     }
 
-    public void buddy(Gob gob, Message msg) {
+    public Delta buddy(Message msg) {
         String name = msg.string();
         if (name.length() > 0) {
             int group = msg.uint8();
             int btype = msg.uint8();
-            if (gob != null)
-                buddy(gob, name, group, btype);
+            return (gob -> buddy(gob, name, group, btype));
         } else {
-            if (gob != null)
-                buddy(gob, null, 0, 0);
+            return (gob -> buddy(gob, null, 0, 0));
         }
     }
 
-    public synchronized void icon(Gob g, Indir<Resource> res) {
+    public static void icon(Gob g, Indir<Resource> res) {
         if (res == null)
             g.delattr(GobIcon.class);
         else
             g.setattr(new GobIcon(g, res));
-        changed(g);
     }
 
-    public void icon(Gob gob, Message msg) {
+    public Delta icon(Message msg) {
         int resid = msg.uint16();
         Indir<Resource> res;
         if (resid == 65535) {
-            if (gob != null)
-                icon(gob, (Indir<Resource>) null);
+            return (gob -> icon(gob, (Indir<Resource>) null));
         } else {
             int ifl = msg.uint8();
-            if (gob != null)
-                icon(gob, getres(resid));
+            return (gob -> icon(gob, getres(resid)));
         }
     }
 
-    public synchronized void resattr(Gob g, Indir<Resource> resid, Message dat) {
+    public static void resattr(Gob g, Indir<Resource> resid, Message dat) {
+        Resource res = resid.get();
+        GAttrib.Parser parser = res.getcode(GAttrib.Parser.class, false);
+        if (parser != null) {
+            parser.apply(g, dat);
+            return;
+        }
         if (dat != null)
             g.setrattr(resid, dat);
         else
             g.delrattr(resid);
-        changed(g);
     }
 
-    public void resattr(Gob gob, Message msg) {
+    public Delta resattr(Message msg) {
         Indir<Resource> resid = getres(msg.uint16());
         int len = msg.uint8();
-        Message dat = (len > 0)?new MessageBuf(msg.bytes(len)):null;
-        if(gob != null)
-            resattr(gob, resid, dat);
+        Message dat = (len > 0) ? new MessageBuf(msg.bytes(len)) : null;
+        return (gob -> resattr(gob, resid, dat));
     }
 
-    public void receive(Gob gob, int type, Message msg) {
+    public Delta parse(int type, Message msg) {
         switch (type) {
             case OD_MOVE:
-                move(gob, msg);
-                break;
+                return (move(msg));
             case OD_RES:
-                cres(gob, msg);
-                break;
+                return (cres(msg));
             case OD_LINBEG:
-                linbeg(gob, msg);
-                break;
+                return (linbeg(msg));
             case OD_LINSTEP:
-                linstep(gob, msg);
-                break;
+                return (linstep(msg));
             case OD_HOMING:
-                homing(gob, msg);
-                break;
+                return (homing(msg));
             case OD_SPEECH:
-                speak(gob, msg);
-                break;
+                return (speak(msg));
             case OD_COMPOSE:
-                composite(gob, msg);
-                break;
+                return (composite(msg));
             case OD_CMPPOSE:
-                cmppose(gob, msg);
-                break;
+                return (cmppose(msg));
             case OD_CMPMOD:
-                cmpmod(gob, msg);
-                break;
+                return (cmpmod(msg));
             case OD_CMPEQU:
-                cmpequ(gob, msg);
-                break;
+                return (cmpequ(msg));
             case OD_ZOFF:
-                zoff(gob, msg);
-                break;
+                return (zoff(msg));
             case OD_LUMIN:
-                lumin(gob, msg);
-                break;
+                return (lumin(msg));
             case OD_AVATAR:
-                avatar(gob, msg);
-                break;
+                return (avatar(msg));
             case OD_FOLLOW:
-                follow(gob, msg);
-                break;
+                return (follow(msg));
             case OD_OVERLAY:
-                overlay(gob, msg);
-                break;
+                return (overlay(msg));
             case OD_HEALTH:
-                health(gob, msg);
-                break;
+                return (health(msg));
             case OD_BUDDY:
-                buddy(gob, msg);
-                break;
+                return (buddy(msg));
             case OD_ICON:
-                icon(gob, msg);
-                break;
+                return (icon(msg));
             case OD_RESATTR:
-                resattr(gob, msg);
-                break;
+                return (resattr(msg));
             default:
                 throw (new Session.MessageException("Unknown objdelta type: " + type, msg));
+        }
+    }
+
+    public class GobInfo {
+        public final long id;
+        public final LinkedList<Delta> pending = new LinkedList<>();
+        public int frame;
+        public boolean nremoved, added, gremoved, virtual;
+        public Gob gob;
+        public Loader.Future<?> applier;
+
+        public GobInfo(long id, int frame) {
+            this.id = id;
+            this.frame = frame;
+        }
+
+        private void apply() {
+            main:
+            {
+                synchronized (this) {
+                    if (nremoved && (!added || gremoved))
+                        break main;
+                    if (nremoved && added && !gremoved) {
+                        remove(gob);
+                        gob.updated();
+                        gremoved = true;
+                        gob = null;
+                        break main;
+                    }
+                    if (gob == null) {
+                        gob = new Gob(glob, Coord2d.z, id);
+                        gob.virtual = virtual;
+                    }
+                }
+                while (true) {
+                    Delta d;
+                    synchronized (this) {
+                        if ((d = pending.peek()) == null)
+                            break;
+                    }
+                    synchronized (gob) {
+                        d.apply(gob);
+                    }
+                    synchronized (this) {
+                        if ((pending.poll()) != d)
+                            throw (new RuntimeException());
+                    }
+                }
+                if (!added) {
+                    add(gob);
+                    added = true;
+                }
+                gob.updated();
+            }
+            synchronized (this) {
+                applier = null;
+                checkdirty(false);
+            }
+        }
+
+        public void checkdirty(boolean interrupt) {
+            synchronized (this) {
+                if (applier == null) {
+                    if (nremoved ? (added && !gremoved) : (!added || !pending.isEmpty())) {
+                        applier = glob.loader.defer(this::apply, null);
+                    }
+                } else if (interrupt) {
+                    applier.restart();
+                }
+            }
+        }
+    }
+
+    private final Map<Long, GobInfo> netinfo = new HashMap<>();
+
+    private GobInfo netremove(long id, int frame) {
+        synchronized (netinfo) {
+            GobInfo ng = netinfo.get(id);
+            if ((ng == null) || (ng.frame > frame))
+                return (null);
+            synchronized (ng) {
+                /* XXX: Clean up removed objects */
+                ng.nremoved = true;
+                ng.checkdirty(true);
+            }
+            return (ng);
+        }
+    }
+
+    private GobInfo netget(long id, int frame) {
+        synchronized (netinfo) {
+            GobInfo ng = netinfo.get(id);
+            if ((ng != null) && ng.nremoved) {
+                if (ng.frame >= frame)
+                    return (null);
+                netinfo.remove(id);
+                ng = null;
+            }
+            if (ng == null) {
+                ng = new GobInfo(id, frame);
+                netinfo.put(id, ng);
+            } else {
+                if (ng.frame >= frame)
+                    return (null);
+            }
+            return (ng);
+        }
+    }
+
+    public GobInfo receive(int fl, long id, int frame, Message msg) {
+        List<Delta> attrs = new ArrayList<>();
+        boolean hasrem = false;
+        GobInfo removed = null;
+        while (true) {
+            int type = msg.uint8();
+            if (type == OD_END) {
+                break;
+            } else if (type == OD_REM) {
+                removed = netremove(id, frame - 1);
+                hasrem = true;
+            } else {
+                attrs.add(parse(type, msg));
+            }
+        }
+        if (hasrem)
+            return (removed);
+        synchronized (netinfo) {
+            if ((fl & 1) != 0)
+                netremove(id, frame - 1);
+            GobInfo ng = netget(id, frame);
+            if (ng != null) {
+                synchronized (ng) {
+                    ng.frame = frame;
+                    ng.virtual = ((fl & 2) != 0);
+                    ng.pending.addAll(attrs);
+                    ng.checkdirty(false);
+                }
+            }
+            return (ng);
         }
     }
 }

@@ -26,10 +26,7 @@
 
 package haven;
 
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
+import java.util.*;
 
 public class I2<T> implements Iterator<T> {
     private Iterator<Iterator<T>> is;

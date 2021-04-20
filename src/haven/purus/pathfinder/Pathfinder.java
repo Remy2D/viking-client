@@ -1,327 +1,427 @@
 package haven.purus.pathfinder;
 
 import haven.*;
-import haven.purus.pbot.PBotUtils;
+import haven.purus.BoundingBox;
+import haven.purus.ClickPath;
+import haven.purus.pbot.api.PBotUtils;
+import haven.resutil.Ridges;
 
 import javax.imageio.ImageIO;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 import java.util.*;
+import java.util.stream.Collectors;
 
-import static haven.OCache.posres;
+public class Pathfinder {
 
-public class Pathfinder extends Thread {
+    private static final boolean PF_DEBUG = false;
 
-	private int button, mod, meshid;
-	private GameUI gui;
-	private Coord2d dest;
-	private Gob destGob;
-	private String action;
-	private boolean DEBUG = false, stop;
+    private static HashSet<String> inaccessibleTiles = new HashSet<String>() {{
+        add("gfx/tiles/nil");
+        add("gfx/tiles/deep");
+        add("gfx/tiles/cave");
+    }};
 
-	// Move to center of the location tile
-	public Pathfinder(GameUI gui, Coord2d dest, String action) {
-		this.gui = gui;
-		this.dest = dest;
-		this.action = action;
-	}
+    private static HashSet<String> accessibleTilesBoating = new HashSet<String>() {{
+        add("gfx/tiles/water");
+        add("gfx/tiles/deep");
+        add("gfx/tiles/odeep");
+        add("gfx/tiles/odeeper");
+    }};
 
-	// Move close to the gob and right or left click it
-	public Pathfinder(GameUI gui, Gob destGob, int button, int mod, int meshid, String action) {
-		this.gui = gui;
-		this.dest = destGob.rc;
-		this.destGob = destGob;
-		this.button = button;
-		this.mod = mod;
-		this.meshid = meshid;
-		this.action = action;
-	}
 
-	public static Line segmentToLine(Coord2d a, Coord2d b) {
-		if(a.y == b.y) { // Horizontal
-			if(a.x == b.x)
-				throw new Error("Segment must have different start and end points!");
-			else
-				return new Line(a.y, 0);
-		} else if(a.x == b.x) { // Vertical
-			return new Line(a.x, Double.POSITIVE_INFINITY);
-		} else {
-			double deltaX = a.x-b.x;
-			double deltaY = a.y-b.y;
-			double slope = deltaY/deltaX;
-			double constant = a.y-slope*a.x;
-			return new Line(constant, deltaY/deltaX);
-		}
-	}
+    private static HashMap<String, Coord2d> doorOffsets = new HashMap<String, Coord2d>() {{
+        put("gfx/terobjs/arch/windmill", new Coord2d(0, 27).add(0, MCache.tilesz.div(2.0).y));
+        put("gfx/terobjs/arch/stonemansion", new Coord2d(49, 0).add(MCache.tilesz.div(2.0).x, 0));
+        put("gfx/terobjs/arch/stonestead", new Coord2d(46, 0).add(MCache.tilesz.div(2.0).x, 0));
+        put("gfx/terobjs/arch/logcabin", new Coord2d(22, 0).add(MCache.tilesz.div(2.0).x, 0));
+        put("gfx/terobjs/arch/stonetower", new Coord2d(37, 0).add(MCache.tilesz.div(2.0).x, 0));
+        put("gfx/terobjs/arch/greathall", new Coord2d(77, 0).add(MCache.tilesz.div(2.0).x, 0));
+        put("gfx/terobjs/arch/timberhouse", new Coord2d(33, 0).add(MCache.tilesz.div(2.0).x, 0));
+    }};
 
-	HashSet<String> inaccessibleTiles = new HashSet<String>() {{
-		add("gfx/tiles/nil");
-		add("gfx/tiles/deep");
-	}};
+    private static void setGridTile(int x, int y, int markId, int[][] grid) {
+        if (x > 0 && y > 0 && x < 1100 && y < 1100)
+            grid[x][y] = markId;
+    }
 
-	HashSet<String> whitelistedGobs = new HashSet<String>() {{
-		add("gfx/terobjs/arch/hwall");
-	}};
+    // http://members.chello.at/~easyfilter/bresenham.html
+    private static void drawCircle(int xm, int ym, int r, int markId, int[][] grid) {
+        int x = -r, y = 0, err = 2 - 2 * r;
+        do {
+            setGridTile(xm - x, ym + y, markId, grid);
+            setGridTile(xm - y, ym - x, markId, grid);
+            setGridTile(xm + x, ym - y, markId, grid);
+            setGridTile(xm + y, ym + x, markId, grid);
+            r = err;
+            if (r <= y) err += ++y * 2 + 1;
+            if (r > x || err > y)
+                err += ++x * 2 + 1;
+        } while (x < 0);
+    }
 
-	private Coord coordToTile(Coord2d c) {
-		return c.div(11, 11).floor();
-	}
+    // http://members.chello.at/~easyfilter/bresenham.html
+    private static void drawLine(int x0, int y0, int x1, int y1, double wd, int markId, int[][] grid) {
+        int dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx - dy, e2, x2, y2;
+        double ed = dx + dy == 0 ? 1 : Math.sqrt((double) dx * dx + (double) dy * dy);
 
-	// True if tile is within the given matrix and its not inaccessible
-	private boolean isAccessible(Coord c, int[][] accessibilityMatrix) {
-		if(c.x > 0 && c.x < accessibilityMatrix.length && c.y > 0 && c.y < accessibilityMatrix[0].length && accessibilityMatrix[c.x][c.y] <= 0)
-			return true;
-		else
-			return false;
-	}
+        for (wd = (wd + 1) / 2; ; ) {
+            setGridTile(x0, y0, markId, grid);
+            e2 = err;
+            x2 = x0;
+            if (2 * e2 >= -dx) {
+                for (e2 += dy, y2 = y0; e2 < ed * wd && (y1 != y2 || dx > dy); e2 += dx) {
+                    setGridTile(x0, y2 += sy, markId, grid);
+                }
+                if (x0 == x1)
+                    break;
+                e2 = err;
+                err -= dy;
+                x0 += sx;
+            }
+            if (2 * e2 <= dy) {
+                for (e2 = dx - e2; e2 < ed * wd && (x1 != x2 || dx < dy); e2 += dy) {
+                    setGridTile(x2 += sx, y0, markId, grid);
+                }
+                if (y0 == y1)
+                    break;
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
 
-	// Click tile at its center point
-	private void clickTile(Coord tile, Coord2d origin) {
-		gui.map.wdgmsg("click", PBotUtils.getCenterScreenCoord(), origin.add(tile.x*11, tile.y*11).add(11/2.0, 11/2.0).floor(posres), 1, 0);
-	}
+    // http://members.chello.at/~easyfilter/bresenham.html
+    private static boolean lineIntersects(int x0, int y0, int x1, int y1, int[][] grid) {
+        int dx = Math.abs(x1 - x0), sx = x0 < x1 ? 1 : -1;
+        int dy = -Math.abs(y1 - y0), sy = y0 < y1 ? 1 : -1;
+        int err = dx + dy, e2;
+        while (true) {
+            if (grid[x0][y0] == 1)
+                return true;
+            if (x0 == x1 && y0 == y1)
+                return false;
+            e2 = 2 * err;
+            if (e2 >= dy) {
+                err += dy;
+                x0 += sx;
+            }
+            if (e2 <= dx) {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
 
-	private void moveToTileAndWait(Coord tile, Coord2d origin) {
-		if(coordToTile(gui.map.player().rc.sub(origin)).equals(tile))
-			return;
-		clickTile(tile, origin);
-		while(gui.map.player().isMoving() || !coordToTile(gui.map.player().rc.sub(origin)).equals(tile)) { // For now lets assume that player starts from different tile so we only have to check that he has moved to correct tile and is not walking anymore
-			sleep(25);
-			if(stop)
-				return;
-		}
-	}
+    private static boolean lineIntersects(Coord c1, Coord c2, int[][] grid) {
+        return lineIntersects(c1.x, c1.y, c2.x, c2.y, grid);
+    }
 
-	@Override
-	public void run() {
-		BufferedImage bMap = null;
-		Graphics g = null;
-		if(DEBUG) {
-			bMap = new BufferedImage(1000, 1000, BufferedImage.TYPE_INT_RGB);
-			g = bMap.getGraphics();
-		}
-		int[][] accessMatrix = new int[111][111]; //  0 <= accessible, 0 < inaccessible, 1 = object blocking, 2 = innaccessible tile, -1 = destinationgob
-		Coord2d origin = new Coord2d(gui.map.player().rc.div(11).floor().mul(11));
-		// Get rid of negative coordinates
-		origin = origin.sub(11*45, 11*45);
+    private static void markPolygon(BoundingBox.Polygon pol, int markId, int wd, int cr, int[][] grid) {
+        Coord prev = pol.vertices.get(pol.vertices.size() - 1).round().add(50 * 11, 50 * 11);
+        for (Coord2d vert : pol.vertices) {
+            Coord c = vert.round().add(50 * 11, 50 * 11);
+            Coord2d onc = new Coord2d(c.sub(prev)).rotate(Math.PI / 2);
+            onc = onc.div(onc.dist(Coord2d.z));
+            for (int i = 1; i <= wd; i++) {
+                Coord2d nc = onc.mul(i);
+                drawLine(new Coord2d(prev).add(nc).round().x, new Coord2d(prev).add(nc).round().y, new Coord2d(c).add(nc).round().x, new Coord2d(c).add(nc).round().y, 1.0, markId, grid);
 
-		for(int i=1; i<90; i++) {
-			for(int j=1; j<90; j++) {
-				try {
-					int t = gui.map.glob.map.gettile(origin.div(11).floor().add(i, j));
-					Resource res = gui.map.glob.map.tilesetr(t);
-					if(res != null && inaccessibleTiles.contains(res.name)) {
-						accessMatrix[i][j] = 2;
-					}
-				} catch(Loading l) {
+                nc = nc.mul(-1);
+                drawLine(new Coord2d(prev).add(nc).round().x, new Coord2d(prev).add(nc).round().y, new Coord2d(c).add(nc).round().x, new Coord2d(c).add(nc).round().y, 1.0, markId, grid);
+            }
 
-				}
-			}
-		}
-		long start = System.currentTimeMillis();
-		synchronized(gui.ui.sess.glob.oc) {
-			for(Gob gob : gui.ui.sess.glob.oc) {
-				if(gob.isplayer())
-					continue;
-				GobHitbox.BBox box = GobHitbox.getBBox(gob);
-				if(box != null && !whitelistedGobs.contains(gob.getres().name)) {
-					Coord2d rel = gob.rc.sub(origin);
+            drawLine(prev.x, prev.y, c.x, c.y, 1.0, markId, grid);
+            prev = c;
+        }
+        for (Coord2d vert : pol.vertices) {
+            Coord c = vert.round().add(50 * 11, 50 * 11);
+            for (int i = 1; i <= cr; i++)
+                drawCircle(c.x, c.y, i, markId, grid);
+        }
+    }
 
-					Coord2d[] points = new Coord2d[4];
+    private static void markPolygon2(BoundingBox.Polygon pol, int[][] grid) {
+        Coord prev = pol.vertices.get(pol.vertices.size() - 1).round().add(50 * 11, 50 * 11);
+        for (Coord2d vert : pol.vertices) {
+            Coord c = vert.round().add(50 * 11, 50 * 11);
+            drawCircle(c.x, c.y, 2, 0, grid);
+            drawCircle(c.x, c.y, 1, 0, grid);
+        }
+        for (Coord2d vert : pol.vertices) {
+            Coord c = vert.round().add(50 * 11, 50 * 11);
+            drawLine(prev.x, prev.y, c.x, c.y, 1.0, -1, grid);
+            prev = c;
+        }
+    }
 
-					points[0] = new Coord2d(box.a.x, box.a.y).rotate(gob.a).add(rel);
-					points[1] = new Coord2d(box.a.x, box.b.y).rotate(gob.a).add(rel);
-					points[2] = new Coord2d(box.b.x, box.b.y).rotate(gob.a).add(rel);
-					points[3] = new Coord2d(box.b.x, box.a.y).rotate(gob.a).add(rel);
+    private static void markTileInaccessible(Coord c, int[][] grid) {
+        Coord2d rc = c.mul(MCache.tilesz);
+        ArrayList<Coord2d> plist = new ArrayList<>();
+        plist.add(rc);
+        plist.add(rc.add(MCache.tilesz.x, 0));
+        plist.add(rc.add(MCache.tilesz.x, MCache.tilesz.y));
+        plist.add(rc.add(0, MCache.tilesz.y));
+        markPolygon(new BoundingBox.Polygon(plist), 1, 0, 0, grid);
+    }
 
-					double maxY = Double.max(Double.max(points[0].y, points[1].y), Double.max(points[2].y, points[3].y));
-					double minY = Double.min(Double.min(points[0].y, points[1].y), Double.min(points[2].y, points[3].y));
-					for(int i=(int)Math.floor(minY); i<=(int)Math.ceil(maxY); i++) {
-						List<Double> plist = new ArrayList<>();
-						for(int j=0; j<points.length; j++) {
-							if(Math.min(points[j].y, points[(j+1)%points.length].y) <= i && i <= Math.max(points[j].y, points[(j+1)%points.length].y)) {
-								Line l = segmentToLine(points[j], points[(j+1)%points.length]);
-								if(l.isVertical())
-									plist.add(l.constant);
-								else if(l.isHorizontal()) {
-									plist.add(Math.min(points[j].x, points[(j+1)%points.length].x));
-									plist.add(Math.max(points[j].x, points[(j+1)%points.length].x));
-								} else {
-									plist.add((l.xAtY(i)));
-								}
-							}
-						}
-						Collections.sort(plist);
-						for(int j=1; j<plist.size(); j+=2) {
-							int left = (int)Math.ceil(plist.get(j-1));
-							int right = (int)Math.floor(plist.get(j));
-							for(int k=left; k<=right; k++) {
-								if(j < 0 || k < 0 || j/11 > 110 || k/11 > 110)
-									continue;
-								if(destGob != null && gob.id == destGob.id)
-									accessMatrix[(k)/11][(i)/11] = -1;
-								else if(accessMatrix[(k)/11][(i)/11] != -1)
-									accessMatrix[(k)/11][(i)/11] = 1;
-							}
-							if(left == right) {
-								j--;
-								continue;
-							}
-						}
-					}
+    public static boolean isMyBoat(Gob gob, Gob player) {
+        while (true) {
+            try {
+                Resource res = gob.getres();
+                if (res == null)
+                    return false;
+                if (gob.getres().name.endsWith("e/rowboat") || gob.getres().name.endsWith("e/dugout")) {
+                    Coord3f gobLoc = gob.getc();
+                    Coord3f plLoc = player.getc(); // Z levels are same if lifted
+                    if (gobLoc.z != plLoc.z && new Coord2d(gobLoc).dist(new Coord2d(plLoc)) < 0.1) {
+                        return true;
+                    }
+                }
+                return false;
+            } catch (Loading l) {
+                Thread.onSpinWait();
+            }
+        }
+    }
 
-				}
-			}
-		}
-		Coord startTile = coordToTile(gui.map.player().rc.sub(origin));
-		Coord destTile = coordToTile(dest.sub(origin));
+    public static void run(Coord2d target, Gob destGob, int button, int mod, int meshid, String action, GameUI gui) {
+        run(target, destGob, button, mod, -1, meshid, action, gui);
+    }
 
-		if(DEBUG) {
-			g.setColor(Color.orange);
-			g.setColor(new Color(104, 0, 98));
-			g.fillRect(startTile.x * 11, startTile.y * 11, 11, 11);
+    public static void run(Coord2d target, Gob destGob, int button, int mod, int overlay, int meshid, String action, GameUI gui) {
+        if (gui.pathfinder != null)
+            gui.pathfinder.stop();
+        gui.pathfinder = new Thread(() -> {
+            BufferedImage bi;
+            Graphics g;
+            if (PF_DEBUG) {
+                bi = new BufferedImage(100 * 11, 100 * 11, BufferedImage.TYPE_INT_RGB);
+                g = bi.getGraphics();
+            }
+            long start = System.currentTimeMillis();
+            ArrayList<BoundingBox.Polygon> bboxes = new ArrayList<>();
+            Gob player = gui.map.player();
+            if (player == null)
+                return;
+            Coord2d origin = player.rc.floor().div(100).mul(new Coord2d(100, 100)).add(45, 45).floor(MCache.tilesz).mul(MCache.tilesz);
+            int[][] grid = new int[100 * 11][100 * 11];
+            Coord tgt;
+            boolean doorOffset = false;
+            if (destGob != null) {
+                Resource res;
+                while (true) {
+                    try {
+                        res = destGob.getres();
+                        break;
+                    } catch (Loading l) {
+                    }
+                }
+                if (button == 3 && res != null && doorOffsets.containsKey(res.name)) {
+                    tgt = destGob.rc.add(doorOffsets.get(res.name).rotate(destGob.a)).sub(origin).round().add(50 * 11, 50 * 11);
+                    doorOffset = true;
+                } else {
+                    tgt = destGob.rc.sub(origin).round().add(50 * 11, 50 * 11);
+                }
+            } else {
+                tgt = target.sub(origin).round().add(50 * 11, 50 * 11);
+            }
+            boolean boating = false;
+            synchronized (gui.ui.sess.glob.oc) {
+                for (Gob gob : gui.ui.sess.glob.oc) {
+                    BoundingBox bb = BoundingBox.getBoundingBox(gob);
+                    if (bb == null || !bb.blocks)
+                        continue;
+                    if (isMyBoat(gob, player)) {
+                        Coord c = origin.div(MCache.tilesz).round();
+                        int t = gui.ui.sess.glob.map.gettile(c);
+                        if (accessibleTilesBoating.contains(gui.ui.sess.glob.map.tilesetr(t).name))
+                            boating = true;
+                        continue;
+                    }
+                    if (gob == player || (gob == destGob && !doorOffset) || (!gob.getres().name.equals("gfx/borka/body") && gob.getc().mul(1, 1, 0).dist(player.getc().mul(1, 1, 0)) < 1)) {
+                        continue;
+                    }
+                    for (BoundingBox.Polygon pol : bb.polygons) {
+                        bboxes.add(new BoundingBox.Polygon(pol.vertices.stream()
+                                .map((v) -> v.rotate(gob.a).add(gob.rc).sub(origin))
+                                .collect(Collectors.toCollection(ArrayList::new))));
+                    }
+                }
+            }
 
-			g.setColor(Color.WHITE);
-			g.fillRect(destTile.x * 11, destTile.y * 11, 11, 11);
+            // Player probably just wants out of the boat
+            if (boating && button == 1 && (mod & UI.MOD_CTRL) != 0) {
+                gui.map.wdgmsg("click", Coord.z, target.floor(OCache.posres), button, mod);
+                return;
+            }
 
-		}
-		// Only pathfind within 37 tiles to every distance around player TODO: Find the precise distance where objects are loaded
-		Coord playerTile = coordToTile(gui.map.player().rc.sub(origin));
-		for(int i=-38; i<=38; i++) {
-			accessMatrix[playerTile.x+38][playerTile.y+i] = 2;
-			accessMatrix[playerTile.x-38][playerTile.y+i] = 2;
-			accessMatrix[playerTile.x+i][playerTile.y+38] = 2;
-			accessMatrix[playerTile.x+i][playerTile.y-38] = 2;
-		}
-		// Color tiles
-		if(DEBUG) {
-			for(int i = 0; i < 100; i++) {
-				for(int j = 0; j < 100; j++) {
-					if(accessMatrix[i][j] == 0)
-						continue;
-					else if(accessMatrix[i][j] == -1)
-						g.setColor(new Color(255, 116, 0));
-					else if(accessMatrix[i][j] == 1)
-						g.setColor(Color.cyan);
-					else if(accessMatrix[i][j] == 2)
-						g.setColor(Color.orange);
-					g.fillRect((i) * 11, (j) * 11, 11, 11);
-				}
-			}
-		}
-		// Move player to tile that is accessible
-		playerTile = coordToTile(gui.map.player().rc.sub(origin));
-		// While player is in tile that is inaccessible, try to move player to accessible tile
-		Random rng = new Random(1337);
-		int timeout = 10000;
-		long startTime = System.currentTimeMillis();
-		while(accessMatrix[playerTile.x][playerTile.y] > 0) {
-			if(System.currentTimeMillis()-startTime > timeout) {
-				// Timeout after 10 seconds
-				return;
-			}
-			// Randomly click around and hope that player moves to correct position, timeout after few retries
-			gui.map.wdgmsg("click", PBotUtils.getCenterScreenCoord(), gui.map.player().rc.add(rng.nextInt()%11, rng.nextInt()%11).floor(posres), 1, 0);
-			do {
-				sleep(250);
-				if(stop)
-					return;
-			} while(gui.map.player().getv() != 0);
-			playerTile = coordToTile(gui.map.player().rc.sub(origin));
-		}
-		playerTile = coordToTile(gui.map.player().rc.sub(origin));
-		clickTile(playerTile, origin);
-		// Find route
-		if(!playerTile.equals(destTile)) { // If player is already in the destination tile, skip this
-			Coord route[];
-			Coord[][] toHere = new Coord[accessMatrix.length][accessMatrix[0].length];
-			int dist[][] = new int[accessMatrix.length][accessMatrix[0].length];
-			LinkedList<Coord> q = new LinkedList<>();
-			q.addFirst(new Coord(coordToTile(gui.map.player().rc.sub(origin))));
-			while(!q.isEmpty()) {
-				Coord cur = q.pollLast();
-				if(cur.equals(destTile))
-					break;
-				Coord[] possibleMoves = new Coord[4];
-				possibleMoves[0] = new Coord(cur.x + 1, cur.y);
-				possibleMoves[1] = new Coord(cur.x - 1, cur.y);
-				possibleMoves[2] = new Coord(cur.x, cur.y + 1);
-				possibleMoves[3] = new Coord(cur.x, cur.y - 1);
-				for(int i = 0; i < possibleMoves.length; i++) {
-					if(isAccessible(possibleMoves[i], accessMatrix) && toHere[possibleMoves[i].x][possibleMoves[i].y] == null) {
-						toHere[possibleMoves[i].x][possibleMoves[i].y] = new Coord(cur);
-						q.addFirst(possibleMoves[i]);
-						dist[possibleMoves[i].x][possibleMoves[i].y] = dist[cur.x][cur.y] + 1;
-					}
-				}
-			}
-			if(toHere[destTile.x][destTile.y] == null) { // A route does not exist!
-				synchronized(gui.map) {
-					gui.map.foundPath = false;
-				}
-				return;
-			}
+            for (int i = -45; i <= 45; i++) {
+                for (int j = -45; j <= 45; j++) {
+                    Coord c = origin.div(MCache.tilesz).round().add(i, j);
+                    int t = gui.ui.sess.glob.map.gettile(c);
+                    while (true) {
+                        try {
+                            Tiler tl = gui.ui.sess.glob.map.tiler(t);
+                            if (tl instanceof Ridges.RidgeTile) {
+                                if (Ridges.brokenp(gui.ui.sess.glob.map, c)) {
+                                    markTileInaccessible(new Coord(i, j), grid);
+                                }
+                            }
+                            break;
+                        } catch (Loading l) {
+                        }
+                        Thread.onSpinWait();
+                    }
+                    while (true) {
+                        try {
+                            Resource res = gui.ui.sess.glob.map.tilesetr(t);
+                            if (boating) {
+                                if (res != null && !accessibleTilesBoating.contains(res.name)) {
+                                    markTileInaccessible(new Coord(i, j), grid);
+                                }
+                            } else {
+                                if (res != null && (inaccessibleTiles.contains(res.name) || res.name.startsWith("gfx/tiles/rocks/"))) {
+                                    markTileInaccessible(new Coord(i, j), grid);
+                                }
+                            }
+                            break;
+                        } catch (Loading l) {
+                        }
+                    }
+                }
+            }
 
-			route = new Coord[dist[destTile.x][destTile.y]];
-			Coord cur = playerTile;
-			route[route.length - 1] = destTile;
-
-			if(DEBUG)
-				g.setColor(Color.green);
-			for(int i = route.length - 2; i >= 0; i--) {
-				route[i] = toHere[route[i + 1].x][route[i + 1].y];
-				if(DEBUG)
-					g.fillRect((route[i].x) * 11, (route[i].y) * 11, 11, 11);
-			}
-			if(DEBUG) {
-				try {
-					ImageIO.write(bMap, "png", new File(System.currentTimeMillis() + ".png"));
-				} catch(IOException e) {
-					e.printStackTrace();
-				}
-			}
-
-			System.out.println("Time taken for finding the route: " + (System.currentTimeMillis() - start));
-			synchronized(gui.map) {
-				gui.map.foundPath = true;
-			}
-			// Walk the route through
-			Coord clickDest = playerTile;
-			for(int i = 0; i < route.length; i++) {
-				if(accessMatrix[route[i].x][route[i].y] == -1)
-					break;
-				if(playerTile.x == route[i].x || playerTile.y == route[i].y) {
-					clickDest = clickDest.add(route[i].sub(clickDest));
-				} else {
-					moveToTileAndWait(clickDest, origin);
-					if(stop)
-						return;
-					playerTile = coordToTile(gui.map.player().rc.sub(origin));
-					clickDest = route[i];
-				}
-			}
-			if(destGob == null && action != null && action.length() > 0)
-				gui.act(action);
-			moveToTileAndWait(clickDest, origin);
-			if(stop)
-				return;
-		}
-
-		if(destGob != null) {
-			if(action != null && action.length() > 0)
-				gui.act(action);
-			if(destGob != null && destGob.rc != null)
-				gui.map.wdgmsg("click", Coord.z, destGob.rc.floor(posres), button, 0, mod, (int) destGob.id, destGob.rc.floor(posres), 0, meshid);
-		}
-	}
-
-	private void sleep(int timeInMillis) {
-		try {
-			Thread.sleep(timeInMillis);
-		} catch(InterruptedException ie) {
-			stop = true;
-		}
-	}
+            for (BoundingBox.Polygon pol : bboxes) {
+                markPolygon(pol, 1, 3, 3, grid);
+            }
+            grid[player.rc.sub(origin).round().add(50 * 11, 50 * 11).x][player.rc.sub(origin).round().add(50 * 11, 50 * 11).y] = 0;
+            for (int i = 1; i <= 1; i++)
+                drawCircle(player.rc.sub(origin).round().add(50 * 11, 50 * 11).x, player.rc.sub(origin).round().add(50 * 11, 50 * 11).y, i, 0, grid);
+            if (destGob != null && !doorOffset) {
+                BoundingBox bb = BoundingBox.getBoundingBox(destGob);
+                if (bb != null) {
+                    for (BoundingBox.Polygon pol : bb.polygons) {
+                        markPolygon2(new BoundingBox.Polygon(pol.vertices.stream()
+                                .map((v) -> v.rotate(destGob.a).add(destGob.rc).sub(origin))
+                                .collect(Collectors.toCollection(ArrayList::new))), grid);
+                    }
+                }
+            }
+            for (int i = -40 * 11; i <= 40 * 11; i++) {
+                grid[50 * 11 - i][50 * 11 - 40 * 11] = 1;
+                grid[50 * 11 - 40 * 11][50 * 11 - i] = 1;
+                grid[50 * 11 + i][50 * 11 + 40 * 11] = 1;
+                grid[50 * 11 + 40 * 11][50 * 11 + i] = 1;
+            }
+            Coord[][] src = new Coord[100 * 11][100 * 11];
+            double[][] cost = new double[100 * 11][100 * 11];
+            for (int i = 0; i < 100 * 11; i++) {
+                for (int j = 0; j < 100 * 11; j++)
+                    cost[i][j] = Double.MAX_VALUE;
+            }
+            PriorityQueue<Pair<Pair<Double, Double>, Coord>> q = new PriorityQueue<>((a, b) -> {
+                return Double.compare(a.a.a, b.a.a);
+            });
+            if (PF_DEBUG) {
+                for (int i = 0; i < grid.length; i++) {
+                    for (int j = 0; j < grid[0].length; j++) {
+                        if (grid[i][j] == 1) {
+                            bi.setRGB(i, j, Color.white.getRGB());
+                        } else if (grid[i][j] == -1) {
+                            bi.setRGB(i, j, Color.GREEN.getRGB());
+                        }
+                    }
+                }
+            }
+            q.add(new Pair(new Pair(0d, 0d), player.rc.sub(origin).add(50 * 11, 50 * 11).round()));
+            ArrayList<Coord> rte = new ArrayList<>();
+            while (!q.isEmpty()) {
+                double cst = q.peek().a.b;
+                Coord c = q.poll().b;
+                if (c.equals(tgt) || grid[c.x][c.y] == -1) {
+                    // backtrack
+                    do {
+                        while (rte.size() >= 2 && !lineIntersects(rte.get(rte.size() - 2), c, grid)) {
+                            rte.remove(rte.size() - 1);
+                        }
+                        rte.add(c);
+                        c = src[c.x][c.y];
+                    } while (c != null);
+                    if (PF_DEBUG) {
+                        System.out.println("RTE FOUND");
+                        System.out.println("length: " + rte.size());
+                    }
+                    q.clear();
+                    break;
+                }
+                if (grid[c.x][c.y] > 0) // visited or blocked
+                    continue;
+                if (PF_DEBUG)
+                    bi.setRGB(c.x, c.y, Color.cyan.getRGB());
+                grid[c.x][c.y] = 2; // visited
+                for (int i = -1; i <= 1; i++) {
+                    for (int j = -1; j <= 1; j++) {
+                        double ncst = cst + (double) Math.sqrt(i * i + j * j);
+                        if (grid[c.x + i][c.y + j] <= 0 && ncst < cost[c.x + i][c.y + j]) {
+                            src[c.x + i][c.y + j] = c;
+                            cost[c.x + i][c.y + j] = ncst;
+                            q.add(new Pair(new Pair(ncst + (double) c.add(i, j).dist(tgt), ncst), c.add(i, j)));
+                        }
+                    }
+                }
+            }
+            if (PF_DEBUG) {
+                g.setColor(Color.ORANGE);
+                for (int i = 1; i < rte.size(); i++) {
+                    g.drawLine(rte.get(i).x, rte.get(i).y, rte.get(i - 1).x, rte.get(i - 1).y);
+                }
+                try {
+                    ImageIO.write(bi, "png", new File("debug/pathfinder.png"));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                System.out.println("Finding route took: " + (System.currentTimeMillis() - start) + " ms");
+            }
+            Collections.reverse(rte);
+            for (int i = 1; i < rte.size() && gui.map.player() != null; i++) {
+                if (destGob != null && (i == rte.size() - 1) && !doorOffset) {
+                    if (action.length() > 0) {
+                        gui.wdgmsg("act", action);
+                    }
+                    if (destGob.rc != null) {
+                        gui.map.wdgmsg("click", gui.map.sz.div(2), destGob.rc.floor(OCache.posres), button, mod, (overlay == -1) ? 0 : 1, (int) destGob.id, destGob.rc.floor(OCache.posres), overlay, meshid);
+                        gui.map.cp = new ClickPath(player, new Coord2d[]{destGob.rc}, gui.ui.sess.glob.map);
+                    }
+                    if (action.length() > 0) {
+                        gui.map.wdgmsg("click", Coord.z, Coord.z, 3, 0);
+                    }
+                    break;
+                }
+                Coord2d[] croute = new Coord2d[rte.size() - i];
+                for (int j = i; j < rte.size(); j++) {
+                    croute[j - i] = origin.add(new Coord2d(rte.get(j).sub(50 * 11, 50 * 11)));
+                }
+                gui.map.cp = new ClickPath(player, croute, gui.ui.sess.glob.map);
+                Coord2d clickTgt = origin.add(new Coord2d(rte.get(i).sub(50 * 11, 50 * 11)));
+                if (i == rte.size() - 1 && !doorOffset)
+                    gui.map.wdgmsg("click", Coord.z, clickTgt.floor(OCache.posres), button, mod);
+                else
+                    gui.map.wdgmsg("click", Coord.z, clickTgt.floor(OCache.posres), 1, 0);
+                while (gui.map.player() != null && ((player.getv() != 0 || player.rc.dist(clickTgt) > 0.5))) {
+                    PBotUtils.sleep(20);
+                    if (destGob != null && player.getv() == 0 && player.rc.dist(origin.add(new Coord2d(rte.get(rte.size() - 1).sub(50 * 11, 50 * 11)))) < 5.5)
+                        break;
+                }
+            }
+            if (doorOffset)
+                gui.map.wdgmsg("click", Coord.z, destGob.rc.floor(OCache.posres), button, mod, 0, (int) destGob.id, destGob.rc.floor(OCache.posres), 0, meshid);
+        }, "PF-thread");
+        gui.pathfinder.start();
+    }
 }

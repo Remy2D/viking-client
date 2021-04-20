@@ -26,29 +26,18 @@
 
 package haven;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
+import java.io.*;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.DataLine;
-import javax.sound.sampled.SourceDataLine;
+import javax.sound.sampled.*;
 
-import dolda.xiphutil.VorbisStream;
+import dolda.xiphutil.*;
 
 public class Audio {
     public static boolean enabled = true;
     public static Player player;
     public static final AudioFormat fmt = new AudioFormat(44100, 16, 2, true, false);
-    private static int bufsize = Utils.getprefi("audiobufsize", 4096);
+    private static int bufsize = 4096;
     public static double volume = 1.0;
 
     static {
@@ -327,6 +316,11 @@ public class Audio {
             }
             return (ns);
         }
+
+        public Resampler sp(double sp) {
+            this.sp = sp;
+            return (this);
+        }
     }
 
     public static class Monitor implements CS {
@@ -419,8 +413,6 @@ public class Audio {
     public static class Player extends HackThread {
         public final CS stream;
         private final int nch;
-        private final Object queuemon = new Object();
-        private Collection<Runnable> queue = new LinkedList<Runnable>();
         private volatile boolean reopen = false;
 
         Player(CS stream) {
@@ -479,14 +471,6 @@ public class Audio {
                     while (true) {
                         if (Thread.interrupted())
                             throw (new InterruptedException());
-                        synchronized (queuemon) {
-                            Collection<Runnable> queue = this.queue;
-                            if (queue.size() > 0) {
-                                this.queue = new LinkedList<Runnable>();
-                                for (Runnable r : queue)
-                                    r.run();
-                            }
-                        }
                         int ret = fillbuf(buf, 0, buf.length);
                         if (ret < 0)
                             return;
@@ -553,13 +537,6 @@ public class Audio {
             ((Mixer) pl.stream).stop(clip);
     }
 
-    public static void queue(Runnable d) {
-        Player pl = ckpl(true);
-        synchronized (pl.queuemon) {
-            pl.queue.add(d);
-        }
-    }
-
     private static Map<Resource, Resource.Audio> reslastc = new HashMap<Resource, Resource.Audio>();
 
     public static CS fromres(Resource res) {
@@ -578,32 +555,12 @@ public class Audio {
             }
             if (sz > 2)
                 reslastc.put(res, clip);
-
-            if (Config.sfxwhipvol != 1.0 && "sfx/balders".equals(res.name))
-                return new Audio.VolAdjust(clip.stream(), Config.sfxwhipvol);
-
             return (clip.stream());
         }
     }
 
     public static void play(Resource res) {
         play(fromres(res));
-    }
-
-    public static void play(Resource res, double vol) {
-        play(new Audio.VolAdjust(fromres(res), vol));
-    }
-
-    public static void play(final Indir<Resource> clip) {
-        queue(new Runnable() {
-            public void run() {
-                try {
-                    play(clip.get());
-                } catch (Loading e) {
-                    queue(this);
-                }
-            }
-        });
     }
 
     public static void main(String[] args) throws Exception {
@@ -623,16 +580,26 @@ public class Audio {
     }
 
     static {
-        Console.setscmd("sfx", (cons, args) -> play(Resource.remote().load(args[1])));
-        Console.setscmd("audiobuf", (cons, args) -> {
-            int nsz = Integer.parseInt(args[1]);
-            if (nsz > 44100)
-                throw (new Exception("Rejecting buffer longer than 1 second"));
-            bufsize = nsz * 4;
-            Utils.setprefi("audiobufsize", bufsize);
-            Player pl = ckpl(false);
-            if (pl != null)
-                pl.reopen();
+        Console.setscmd("sfx", new Console.Command() {
+            public void run(Console cons, String[] args) {
+                play(Loading.waitfor(Resource.remote().load(args[1])));
+            }
+        });
+        Console.setscmd("sfxvol", new Console.Command() {
+            public void run(Console cons, String[] args) {
+                setvolume(Double.parseDouble(args[1]));
+            }
+        });
+        Console.setscmd("audiobuf", new Console.Command() {
+            public void run(Console cons, String[] args) throws Exception {
+                int nsz = Integer.parseInt(args[1]);
+                if (nsz > 44100)
+                    throw (new Exception("Rejecting buffer longer than 1 second"));
+                bufsize = nsz * 4;
+                Player pl = ckpl(false);
+                if (pl != null)
+                    pl.reopen();
+            }
         });
     }
 }

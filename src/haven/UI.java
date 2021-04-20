@@ -26,36 +26,43 @@
 
 package haven;
 
-import java.awt.event.InputEvent;
+import java.util.*;
+import java.awt.Font;
+import java.awt.GraphicsEnvironment;
+import java.awt.GraphicsDevice;
+import java.awt.DisplayMode;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.TreeMap;
+import java.awt.event.InputEvent;
+import java.awt.image.BufferedImage;
+
+import static haven.Utils.el;
+
+import haven.render.Environment;
+import haven.render.Render;
 
 public class UI {
-    public RootWidget root;
     public static int MOD_SHIFT = 1, MOD_CTRL = 2, MOD_META = 4, MOD_SUPER = 8;
-    final private LinkedList<Grab> keygrab = new LinkedList<Grab>(), mousegrab = new LinkedList<Grab>();
-    public Map<Integer, Widget> widgets = new TreeMap<Integer, Widget>();
-    public Map<Widget, Integer> rwidgets = new HashMap<Widget, Integer>();
+    public RootWidget root;
+    private final LinkedList<Grab> keygrab = new LinkedList<Grab>(), mousegrab = new LinkedList<Grab>();
+    private final Map<Integer, Widget> widgets = new TreeMap<Integer, Widget>();
+    private final Map<Widget, Integer> rwidgets = new HashMap<Widget, Integer>();
+    Environment env;
     Receiver rcvr;
     public Coord mc = Coord.z, lcc = Coord.z;
     public Session sess;
     public boolean modshift, modctrl, modmeta, modsuper;
-    public int keycode;
     public Object lasttip;
     double lastevent, lasttick;
     public Widget mouseon;
     public Console cons = new WidgetConsole();
     private Collection<AfterDraw> afterdraws = new LinkedList<AfterDraw>();
     private final Context uictx;
-    public final ActAudio audio = new ActAudio();
-    public int beltWndId = -1;
-	public GameUI gui;
+    public GSettings gprefs = GSettings.load(true);
+    private boolean gprefsdirty = false;
+    public final ActAudio.Root audio = new ActAudio.Root();
+    private static final double scalef;
+    public GameUI gui;
 
     {
         lastevent = lasttick = Utils.rtime();
@@ -66,7 +73,34 @@ public class UI {
     }
 
     public interface Runner {
-        public Session run(UI ui) throws InterruptedException;
+        public Runner run(UI ui) throws InterruptedException;
+
+        public default void init(UI ui) {
+        }
+
+        public default String title() {
+            return (null);
+        }
+
+        public static class Proxy implements Runner {
+            public final Runner back;
+
+            public Proxy(Runner back) {
+                this.back = back;
+            }
+
+            public Runner run(UI ui) throws InterruptedException {
+                return (back.run(ui));
+            }
+
+            public void init(UI ui) {
+                back.init(ui);
+            }
+
+            public String title() {
+                return (back.title());
+            }
+        }
     }
 
     public interface Context {
@@ -77,13 +111,40 @@ public class UI {
         public void draw(GOut g);
     }
 
+    public void setgprefs(GSettings prefs) {
+        synchronized (this) {
+            if (!Utils.eq(prefs, this.gprefs)) {
+                this.gprefs = prefs;
+                gprefsdirty = true;
+            }
+        }
+    }
+
     private class WidgetConsole extends Console {
         {
-            setcmd("q", (cons1, args) -> HackThread.tg().interrupt());
-            setcmd("lo", (cons1, args) -> sess.close());
-            setcmd("kbd", (cons1, args) -> {
-                Config.zkey = args[1].toString().equals("z") ? KeyEvent.VK_Y : KeyEvent.VK_Z;
-                Utils.setprefi("zkey", Config.zkey);
+            setcmd("q", new Command() {
+                public void run(Console cons, String[] args) {
+                    HackThread.tg().interrupt();
+                }
+            });
+            setcmd("lo", new Command() {
+                public void run(Console cons, String[] args) {
+                    sess.close();
+                }
+            });
+            setcmd("gl", new Command() {
+                <T> void merd(GSettings.Setting<T> var, String val) {
+                    setgprefs(gprefs.update(null, var, var.parse(val)));
+                }
+
+                public void run(Console cons, String[] args) throws Exception {
+                    if (args.length < 3)
+                        throw (new Exception("usage: gl SETTING VALUE"));
+                    GSettings.Setting<?> var = gprefs.find(args[1]);
+                    if (var == null)
+                        throw (new Exception("No such setting: " + var));
+                    merd(var, args[2]);
+                }
             });
         }
 
@@ -117,24 +178,39 @@ public class UI {
         }
     }
 
-    public UI(Context uictx, Coord sz, Session sess) {
+    public UI(Context uictx, Coord sz, Runner fun) {
         this.uictx = uictx;
         root = new RootWidget(this, sz);
         widgets.put(0, root);
         rwidgets.put(root, 0);
-        this.sess = sess;
-		if(sess != null)
-			this.sess.glob.ui = this;
-
-	}
+        if (fun != null)
+            fun.init(this);
+    }
 
     public void setreceiver(Receiver rcvr) {
         this.rcvr = rcvr;
     }
 
     public void bind(Widget w, int id) {
-        widgets.put(id, w);
-        rwidgets.put(w, id);
+        synchronized (widgets) {
+            widgets.put(id, w);
+            rwidgets.put(w, id);
+        }
+    }
+
+    public Widget getwidget(int id) {
+        synchronized (widgets) {
+            return (widgets.get(id));
+        }
+    }
+
+    public int widgetid(Widget wdg) {
+        synchronized (widgets) {
+            Integer id = rwidgets.get(wdg);
+            if (id == null)
+                return (-1);
+            return (id);
+        }
     }
 
     public void drawafter(AfterDraw ad) {
@@ -147,6 +223,14 @@ public class UI {
         double now = Utils.rtime();
         root.tick(now - lasttick);
         lasttick = now;
+        if (gprefsdirty) {
+            gprefs.save();
+            gprefsdirty = false;
+        }
+    }
+
+    public void gtick(Render out) {
+        root.gtick(out);
     }
 
     public void draw(GOut g) {
@@ -159,50 +243,22 @@ public class UI {
     }
 
     public void newwidget(int id, String type, int parent, Object[] pargs, Object... cargs) throws InterruptedException {
-        if (Config.quickbelt && type.equals("wnd") && cargs[1].equals("Belt")) {
-            // use custom belt window
-            type = "wnd-belt";
-            beltWndId = id;
-        } else if (type.equals("inv") && pargs[0].toString().equals("study")) {
-            // use custom study inventory
+        if (type.equals("inv") && pargs[0].toString().equals("study")) {
             type = "inv-study";
         }
-
         Widget.Factory f = Widget.gettype2(type);
-        synchronized(this) {
-            if (parent == beltWndId)
-                f = Widget.gettype2("inv-belt");
-
+        if (f == null)
+            throw (new UIException("Bad widget name", type, cargs));
+        synchronized (this) {
             Widget wdg = f.create(this, cargs);
             wdg.attach(this);
             if (parent != 65535) {
-                Widget pwdg = widgets.get(parent);
-                if(pwdg == null)
-                    throw(new UIException("Null parent widget " + parent + " for " + id, type, cargs));
+                Widget pwdg = getwidget(parent);
+                if (pwdg == null)
+                    throw (new UIException("Null parent widget " + parent + " for " + id, type, cargs));
                 pwdg.addchild(wdg, pargs);
-
-                if (pwdg instanceof Window) {
-                    // here be horrors... FIXME
-                    GameUI gui = null;
-                    for (Widget w : rwidgets.keySet()) {
-                        if (w instanceof GameUI) {
-                            gui = (GameUI) w;
-                            break;
-                        }
-                    }
+                if (pwdg instanceof Window) { // Handle modified windows
                     processWindowContent(parent, gui, (Window) pwdg, wdg);
-                }
-            } else {
-                if (wdg instanceof Window) {
-                    // here be horrors... FIXME
-                    GameUI gui = null;
-                    for (Widget w : rwidgets.keySet()) {
-                        if (w instanceof GameUI) {
-                            gui = (GameUI) w;
-                            break;
-                        }
-                    }
-                    processWindowCreation(id, gui, (Window) wdg);
                 }
             }
             bind(wdg, id);
@@ -210,28 +266,21 @@ public class UI {
     }
 
     public void addwidget(int id, int parent, Object[] pargs) {
-        synchronized(this) {
-            Widget wdg = widgets.get(id);
-            if(wdg == null)
-                throw(new UIException("Null child widget " + id + " added to " + parent, null, pargs));
-            Widget pwdg = widgets.get(parent);
-            if(pwdg == null)
-                throw(new UIException("Null parent widget " + parent + " for " + id, null, pargs));
+        synchronized (this) {
+            Widget wdg = getwidget(id);
+            if (wdg == null)
+                throw (new UIException("Null child widget " + id + " added to " + parent, null, pargs));
+            Widget pwdg = getwidget(parent);
+            if (pwdg == null)
+                throw (new UIException("Null parent widget " + parent + " for " + id, null, pargs));
             pwdg.addchild(wdg, pargs);
         }
     }
 
     private void processWindowContent(long wndid, GameUI gui, Window pwdg, Widget wdg) {
-        String cap = pwdg.origcap;
-        if (gui != null && gui.livestockwnd.pendingAnimal != null && gui.livestockwnd.pendingAnimal.wndid == wndid) {
-            if (wdg instanceof TextEntry)
-                gui.livestockwnd.applyName(wdg);
-            else if (wdg instanceof Label)
-                gui.livestockwnd.applyAttr(cap, wdg);
-            else if (wdg instanceof Avaview)
-                gui.livestockwnd.applyId(wdg);
-        } else if (wdg instanceof ISBox && cap.equals("Stockpile")) {
-            TextEntry entry = new TextEntry(40, "") {
+        String cap = pwdg.cap.text;
+        if (wdg instanceof ISBox && cap.equals("Stockpile")) {
+            TextEntry entry = new TextEntry(UI.scale(40), "") {
                 @Override
                 public boolean keydown(KeyEvent ev) {
                     int c = ev.getKeyChar();
@@ -249,7 +298,7 @@ public class UI {
                     return !(c >= KeyEvent.VK_F1 && c <= KeyEvent.VK_F12);
                 }
             };
-            Button btn = new Button(65, "Take") {
+            Button btn = new Button(UI.scale(65), "Take") {
                 @Override
                 public void click() {
                     try {
@@ -261,23 +310,11 @@ public class UI {
                     }
                 }
             };
-            pwdg.add(btn, new Coord(0, wdg.sz.y + 5));
-            pwdg.add(entry, new Coord(btn.sz.x + 5, wdg.sz.y + 5 + 2));
+            pwdg.add(btn, new Coord(0, wdg.sz.y + UI.scale(5)));
+            pwdg.add(entry, new Coord(btn.sz.x + UI.scale(5), wdg.sz.y + UI.scale(5 + 2)));
         }
     }
 
-    private void processWindowCreation(long wdgid, GameUI gui, Window wdg) {
-        String cap = wdg.origcap;
-        if (cap.equals("Charter Stone") || cap.equals("Sublime Portico")) {
-            // show secrets list only for already built chartes/porticos
-            if (wdg.wsz.y >= 80) {
-                wdg.add(new CharterList(150, 5), new Coord(0, 50));
-                wdg.presize();
-            }
-        } else if (gui != null && gui.livestockwnd != null && gui.livestockwnd.getAnimalPanel(cap) != null) {
-            gui.livestockwnd.initPendingAnimal(wdgid, cap);
-        }
-    }
 
     public abstract class Grab {
         public final Widget wdg;
@@ -312,16 +349,18 @@ public class UI {
     }
 
     private void removeid(Widget wdg) {
-        if (rwidgets.containsKey(wdg)) {
-            int id = rwidgets.get(wdg);
-            widgets.remove(id);
-            rwidgets.remove(wdg);
+        synchronized (widgets) {
+            Integer id = rwidgets.get(wdg);
+            if (id != null) {
+                widgets.remove(id);
+                rwidgets.remove(wdg);
+            }
         }
         for (Widget child = wdg.child; child != null; child = child.next)
             removeid(child);
     }
 
-    public void destroy(Widget wdg) {
+    public void removed(Widget wdg) {
         for (Iterator<Grab> i = mousegrab.iterator(); i.hasNext(); ) {
             Grab g = i.next();
             if (g.wdg.hasparent(wdg))
@@ -332,52 +371,53 @@ public class UI {
             if (g.wdg.hasparent(wdg))
                 i.remove();
         }
+    }
+
+    public void destroy(Widget wdg) {
         removeid(wdg);
         wdg.reqdestroy();
     }
 
     public void destroy(int id) {
         synchronized (this) {
-            if (widgets.containsKey(id)) {
-                Widget wdg = widgets.get(id);
+            Widget wdg = getwidget(id);
+            if (wdg != null)
                 destroy(wdg);
-            }
         }
     }
 
     public void wdgmsg(Widget sender, String msg, Object... args) {
-        int id;
-        synchronized(this) {
-            if (msg.endsWith("-identical"))
-                return;
-
-            if(!rwidgets.containsKey(sender)) {
-                System.err.printf("Wdgmsg sender (%s) is not in rwidgets, message is %s\n", sender.getClass().getName(), msg);
-                return;
-            }
-            id = rwidgets.get(sender);
+        if (haven.purus.Config.debugWdgmsg.val) {
+            System.out.println(sender
+                    + " " + msg + Arrays.toString(args));
         }
-        if(rcvr != null)
+        int id = widgetid(sender);
+        if (id < 0) {
+            new Warning("wdgmsg sender (%s) is not in rwidgets, message is %s", sender.getClass().getName(), msg).issue();
+            return;
+        }
+        if (rcvr != null)
             rcvr.rcvmsg(id, msg, args);
     }
 
     public void uimsg(int id, String msg, Object... args) {
-        synchronized (this) {
-            Widget wdg = widgets.get(id);
-            if (wdg != null)
+        Widget wdg = getwidget(id);
+        if (wdg != null) {
+            synchronized (this) {
                 wdg.uimsg(msg.intern(), args);
-            else
-                throw (new UIException("Uimsg to non-existent widget " + id, msg, args));
+            }
+        } else {
+            throw (new UIException("Uimsg to non-existent widget " + id, msg, args));
         }
     }
 
     private void setmods(InputEvent ev) {
         int mod = ev.getModifiersEx();
-        Debug.kf1 = modshift = (mod & InputEvent.SHIFT_DOWN_MASK) != 0;
-        Debug.kf2 = modctrl = (mod & InputEvent.CTRL_DOWN_MASK) != 0;
-        Debug.kf3 = modmeta = (mod & (InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK)) != 0;
-    /*
-    Debug.kf4 = modsuper = (mod & InputEvent.SUPER_DOWN_MASK) != 0;
+        modshift = (mod & InputEvent.SHIFT_DOWN_MASK) != 0;
+        modctrl = (mod & InputEvent.CTRL_DOWN_MASK) != 0;
+        modmeta = (mod & (InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK)) != 0;
+	/*
+	modsuper = (mod & InputEvent.SUPER_DOWN_MASK) != 0;
 	*/
     }
 
@@ -387,14 +427,13 @@ public class UI {
 
     public void keydown(KeyEvent ev) {
         setmods(ev);
-        keycode = ev.getKeyCode();
         for (Grab g : c(keygrab)) {
             if (g.wdg.keydown(ev))
                 return;
         }
-        if(!root.keydown(ev)) {
+        if (!root.keydown(ev)) {
             char key = ev.getKeyChar();
-            if(key == ev.CHAR_UNDEFINED)
+            if (key == ev.CHAR_UNDEFINED)
                 key = 0;
             root.globtype(key, ev);
         }
@@ -402,7 +441,6 @@ public class UI {
 
     public void keyup(KeyEvent ev) {
         setmods(ev);
-        keycode = -1;
         for (Grab g : c(keygrab)) {
             if (g.wdg.keyup(ev))
                 return;
@@ -470,30 +508,137 @@ public class UI {
     }
 
     public Resource getcurs(Coord c) {
-        for(Grab g : mousegrab) {
+        for (Grab g : mousegrab) {
             Resource ret = g.wdg.getcurs(wdgxlate(c, g.wdg));
-            if(ret != null)
-                return(ret);
+            if (ret != null)
+                return (ret);
         }
-        return(root.getcurs(c));
+        return (root.getcurs(c));
     }
 
     public static int modflags(InputEvent ev) {
         int mod = ev.getModifiersEx();
-        return((((mod & InputEvent.SHIFT_DOWN_MASK) != 0) ? MOD_SHIFT : 0) |
-                (((mod & InputEvent.CTRL_DOWN_MASK) != 0)  ? MOD_CTRL : 0) |
+        return ((((mod & InputEvent.SHIFT_DOWN_MASK) != 0) ? MOD_SHIFT : 0) |
+                (((mod & InputEvent.CTRL_DOWN_MASK) != 0) ? MOD_CTRL : 0) |
                 (((mod & (InputEvent.META_DOWN_MASK | InputEvent.ALT_DOWN_MASK)) != 0) ? MOD_META : 0)
                 /* (((mod & InputEvent.SUPER_DOWN_MASK) != 0) ? MOD_SUPER : 0) */);
     }
 
     public int modflags() {
-        return((modshift ? MOD_SHIFT : 0) |
-                (modctrl  ? MOD_CTRL  : 0) |
-                (modmeta  ? MOD_META  : 0) |
+        return ((modshift ? MOD_SHIFT : 0) |
+                (modctrl ? MOD_CTRL : 0) |
+                (modmeta ? MOD_META : 0) |
                 (modsuper ? MOD_SUPER : 0));
     }
 
+    public Environment getenv() {
+        return (env);
+    }
+
     public void destroy() {
+        root.destroy();
         audio.clear();
+    }
+
+    public void sfx(Audio.CS clip) {
+        Audio.play(clip);
+    }
+
+    public void sfx(Resource clip) {
+        sfx(Audio.fromres(clip));
+    }
+
+    public static double scale(double v) {
+        return (v * scalef);
+    }
+
+    public static float scale(float v) {
+        return (v * (float) scalef);
+    }
+
+    public static int scale(int v) {
+        return (Math.round(scale((float) v)));
+    }
+
+    public static int rscale(double v) {
+        return ((int) Math.round(v * scalef));
+    }
+
+    public static Coord scale(Coord v) {
+        return (v.mul(scalef));
+    }
+
+    public static Coord scale(int x, int y) {
+        return (scale(new Coord(x, y)));
+    }
+
+    public static Coord rscale(double x, double y) {
+        return (new Coord(rscale(x), rscale(y)));
+    }
+
+    public static Coord2d scale(Coord2d v) {
+        return (v.mul(scalef));
+    }
+
+    static public Font scale(Font f, float size) {
+        return (f.deriveFont(scale(size)));
+    }
+
+    public static <T extends Tex> ScaledTex<T> scale(T tex) {
+        return (new ScaledTex<T>(tex, UI.scale(tex.sz())));
+    }
+
+    public static <T extends Tex> ScaledTex<T> scale(ScaledTex<T> tex) {
+        return (tex);
+    }
+
+    public static double unscale(double v) {
+        return (v / scalef);
+    }
+
+    public static float unscale(float v) {
+        return (v / (float) scalef);
+    }
+
+    public static int unscale(int v) {
+        return (Math.round(unscale((float) v)));
+    }
+
+    public static Coord unscale(Coord v) {
+        return (v.div(scalef));
+    }
+
+    private static double maxscale = -1;
+
+    public static double maxscale() {
+        synchronized (UI.class) {
+            if (maxscale < 0) {
+                double fscale = 1.25;
+                try {
+                    GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
+                    for (GraphicsDevice dev : env.getScreenDevices()) {
+                        DisplayMode mode = dev.getDisplayMode();
+                        double scale = Math.min(mode.getWidth() / 800.0, mode.getHeight() / 600.0);
+                        fscale = Math.max(fscale, scale);
+                    }
+                } catch (Exception exc) {
+                    new Warning(exc, "could not determine maximum scaling factor").issue();
+                }
+                maxscale = fscale;
+            }
+            return (maxscale);
+        }
+    }
+
+    private static double loadscale() {
+        if (Config.uiscale != null)
+            return (Config.uiscale);
+        double scale = Utils.getprefd("uiscale", 1.0);
+        scale = Math.max(Math.min(scale, maxscale()), 1.0);
+        return (scale);
+    }
+
+    static {
+        scalef = loadscale();
     }
 }

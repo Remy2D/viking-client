@@ -26,100 +26,151 @@
 
 package haven;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.Map;
+import java.util.*;
+import java.util.function.*;
 
-import haven.MorphedMesh.Morpher;
+import haven.render.*;
 import haven.Skeleton.Pose;
 import haven.Skeleton.PoseMod;
 
-public class SkelSprite extends Sprite implements Gob.Overlay.CUpd, Skeleton.HasPose {
-    public static final GLState
-            rigid = new Material.Colors(java.awt.Color.GREEN),
-            morphed = new Material.Colors(java.awt.Color.RED),
-            unboned = new Material.Colors(java.awt.Color.YELLOW);
+public class SkelSprite extends Sprite implements Sprite.CUpd, Skeleton.HasPose {
+    public static final Pipe.Op
+            rigid = new BaseColor(FColor.GREEN),
+            morphed = new BaseColor(FColor.RED),
+            unboned = new BaseColor(FColor.YELLOW);
     public static boolean bonedb = false;
     public static final float ipollen = 0.3f;
     public final Skeleton skel;
     public final Pose pose;
     public PoseMod[] mods = new PoseMod[0];
-    public MeshAnim.Anim[] manims = new MeshAnim.Anim[0];
-    private Morpher.Factory mmorph;
-    private final PoseMorph pmorph;
+    public MeshAnim.Animation[] manims = new MeshAnim.Animation[0];
+    public int curfl;
+    protected final Collection<RenderTree.Slot> slots = new ArrayList<>(1);
     private Pose oldpose;
     private float ipold;
     private boolean stat = true;
-    private Rendered[] parts;
+    private RenderTree.Node[] parts;
+    private Collection<Runnable> tickparts = Collections.emptyList();
+    private Collection<Consumer<Render>> gtickparts = Collections.emptyList();
 
     public static final Factory fact = new Factory() {
         public Sprite create(Owner owner, Resource res, Message sdt) {
             if (res.layer(Skeleton.Res.class) == null)
                 return (null);
-            return (new SkelSprite(owner, res, sdt));
+            return (new SkelSprite(owner, res, sdt) {
+                public String toString() {
+                    return (String.format("#<skel-sprite %s>", res.name));
+                }
+            });
         }
     };
 
-    private SkelSprite(Owner owner, Resource res, Message sdt) {
+    public SkelSprite(Owner owner, Resource res, int fl) {
         super(owner, res);
-        skel = res.layer(Skeleton.Res.class).s;
-        pose = skel.new Pose(skel.bindpose);
-        pmorph = new PoseMorph(pose);
-        int fl = sdt.eom() ? 0xffff0000 : decnum(sdt);
-        chposes(fl, true);
-        chparts(fl);
+        Skeleton.Res sr = res.layer(Skeleton.Res.class);
+        if (sr != null) {
+            skel = sr.s;
+            pose = skel.new Pose(skel.bindpose);
+        } else {
+            skel = null;
+            pose = null;
+        }
+        update(fl, true);
+    }
+
+    public SkelSprite(Owner owner, Resource res) {
+        this(owner, res, 0xffff0000);
+    }
+
+    public SkelSprite(Owner owner, Resource res, Message sdt) {
+        this(owner, res, sdt.eom() ? 0xffff0000 : decnum(sdt));
+    }
+
+    private void parts(RenderTree.Slot slot) {
+        for (RenderTree.Node p : parts)
+            slot.add(p);
+        // slot.add(pose.debug); XXXRENDER
     }
 
     /* XXX: It's ugly to snoop inside a wrapping, but I can't think of
      * a better way to apply morphing to renderlinks right now. */
-    private Rendered animwrap(GLState.Wrapping wrap) {
+    protected RenderTree.Node animwrap(Pipe.Op.Wrapping wrap, Collection<Runnable> tbuf, Collection<Consumer<Render>> gbuf) {
         if (!(wrap.r instanceof FastMesh))
             return (wrap);
         FastMesh m = (FastMesh) wrap.r;
-        for (MeshAnim.Anim anim : manims) {
+        ArrayList<Supplier<Pipe.Op>> states = new ArrayList<>();
+        for (MeshAnim.Animation anim : manims) {
             if (anim.desc().animp(m)) {
-                Rendered ret = wrap.st().apply(new MorphedMesh(m, mmorph));
-                if (bonedb)
-                    ret = morphed.apply(ret);
-                return (ret);
+                wrap = anim.desc().apply(wrap);
+                states.add(anim::state);
+                break;
             }
         }
-        Rendered ret;
         if (PoseMorph.boned(m)) {
             String bnm = PoseMorph.boneidp(m);
             if (bnm == null) {
-                ret = wrap.st().apply(new MorphedMesh(m, pmorph));
+                PoseMorph st = new PoseMorph(pose, m);
+                states.add(st::state);
                 if (bonedb)
-                    ret = morphed.apply(ret);
+                    states.add(() -> morphed);
             } else {
-                ret = pose.bonetrans2(skel.bones.get(bnm).idx).apply(wrap);
+                states.add(pose.bonetrans2(skel.bones.get(bnm).idx));
                 if (bonedb)
-                    ret = rigid.apply(ret);
+                    states.add(() -> rigid);
             }
         } else {
-            ret = wrap;
             if (bonedb)
-                ret = unboned.apply(ret);
+                states.add(() -> unboned);
         }
-        return (ret);
+        Supplier<Pipe.Op> rst;
+        if (states.size() == 0) {
+            return (wrap);
+        } else if (states.size() == 1) {
+            rst = states.get(0);
+        } else {
+            states.trimToSize();
+            rst = () -> {
+                Pipe.Op[] ops = new Pipe.Op[states.size()];
+                for (int i = 0; i < ops.length; i++)
+                    ops[i] = states.get(i).get();
+                return (Pipe.Op.compose(ops));
+            };
+        }
+        return (RUtils.StateTickNode.from(wrap, rst));
+    }
+
+    public void iparts(int mask, Collection<RenderTree.Node> rbuf, Collection<Runnable> tbuf, Collection<Consumer<Render>> gbuf) {
+        for (FastMesh.MeshRes mr : res.layers(FastMesh.MeshRes.class)) {
+            if ((mr.mat != null) && ((mr.id < 0) || (((1 << mr.id) & mask) != 0)))
+                rbuf.add(animwrap(mr.mat.get().apply(mr.m), tbuf, gbuf));
+        }
+        Owner rec = null;
+        for (RenderLink.Res lr : res.layers(RenderLink.Res.class)) {
+            if ((lr.id < 0) || (((1 << lr.id) & mask) != 0)) {
+                if (rec == null)
+                    rec = new RecOwner();
+                RenderTree.Node r = lr.l.make(rec);
+                if (r instanceof Pipe.Op.Wrapping)
+                    r = animwrap((Pipe.Op.Wrapping) r, tbuf, gbuf);
+                rbuf.add(r);
+            }
+        }
     }
 
     private void chparts(int mask) {
-        Collection<Rendered> rl = new LinkedList<Rendered>();
-        for (FastMesh.MeshRes mr : res.layers(FastMesh.MeshRes.class)) {
-            if ((mr.mat != null) && ((mr.id < 0) || (((1 << mr.id) & mask) != 0)))
-                rl.add(animwrap(mr.mat.get().apply(mr.m)));
-        }
-        for (RenderLink.Res lr : res.layers(RenderLink.Res.class)) {
-            if ((lr.id < 0) || (((1 << lr.id) & mask) != 0)) {
-                Rendered r = lr.l.make();
-                if (r instanceof GLState.Wrapping)
-                    r = animwrap((GLState.Wrapping) r);
-                rl.add(r);
-            }
-        }
-        this.parts = rl.toArray(new Rendered[0]);
+        Collection<RenderTree.Node> rl = new ArrayList<>();
+        Collection<Runnable> tbuf = new ArrayList<>();
+        Collection<Consumer<Render>> gbuf = new ArrayList<>();
+        iparts(mask, rl, tbuf, gbuf);
+        /* XXX: Arguably, updating should be forgone if the parts
+         * haven't actually changed. Somewhat ill-defined, however. */
+        RenderTree.Node[] pparts = this.parts;
+        this.parts = rl.toArray(new RenderTree.Node[0]);
+        RUtils.readd(slots, this::parts, () -> {
+            this.parts = pparts;
+        });
+        this.tickparts = tbuf;
+        this.gtickparts = gbuf;
     }
 
     private void rebuild() {
@@ -134,19 +185,17 @@ public class SkelSprite extends Sprite implements Gob.Overlay.CUpd, Skeleton.Has
     }
 
     private void chmanims(int mask) {
-        Collection<MeshAnim.Anim> anims = new LinkedList<MeshAnim.Anim>();
+        Collection<MeshAnim.Animation> anims = new LinkedList<>();
         for (MeshAnim.Res ar : res.layers(MeshAnim.Res.class)) {
             if ((ar.id < 0) || (((1 << ar.id) & mask) != 0))
                 anims.add(ar.make());
         }
-        this.manims = anims.toArray(new MeshAnim.Anim[0]);
-        this.mmorph = MorphedMesh.combine(this.manims);
+        this.manims = anims.toArray(new MeshAnim.Animation[0]);
     }
 
     private Map<Skeleton.ResPose, PoseMod> modids = new HashMap<Skeleton.ResPose, PoseMod>();
 
     private void chposes(int mask, boolean old) {
-        chmanims(mask);
         if (!old) {
             this.oldpose = skel.new Pose(pose);
             this.ipold = 1.0f;
@@ -175,53 +224,75 @@ public class SkelSprite extends Sprite implements Gob.Overlay.CUpd, Skeleton.Has
         rebuild();
     }
 
+    private void update(int fl, boolean old) {
+        chmanims(fl);
+        if (skel != null)
+            chposes(fl, old);
+        chparts(fl);
+        this.curfl = fl;
+    }
+
+    public void update(int fl) {
+        update(fl, false);
+    }
+
+    public void update() {
+        update(curfl);
+    }
+
     public void update(Message sdt) {
         int fl = sdt.eom() ? 0xffff0000 : decnum(sdt);
-        chposes(fl, false);
-        chparts(fl);
+        update(fl);
     }
 
-    public boolean setup(RenderList rl) {
-        for (Rendered p : parts)
-            rl.add(p, null);
-    /* rl.add(pose.debug, null); */
-        return (false);
+    public void added(RenderTree.Slot slot) {
+        parts(slot);
+        slots.add(slot);
     }
 
-    public boolean tick(int idt) {
-        float dt = idt / 1000.0f;
-        if(!stat || (ipold > 0)) {
+    public void removed(RenderTree.Slot slot) {
+        slots.remove(slot);
+    }
+
+    public boolean tick(double ddt) {
+        float dt = (float) ddt;
+        if (!stat || (ipold > 0)) {
             boolean done = true;
-            for(PoseMod m : mods) {
+            for (PoseMod m : mods) {
                 m.tick(dt);
                 done = done && m.done();
             }
-            if(done)
+            if (done)
                 stat = true;
-            if(ipold > 0) {
-                if((ipold -= (dt / ipollen)) < 0) {
+            if (ipold > 0) {
+                if ((ipold -= (dt / ipollen)) < 0) {
                     ipold = 0;
                     oldpose = null;
                 }
             }
             rebuild();
         }
-        for (MeshAnim.Anim anim : manims)
+        for (MeshAnim.Animation anim : manims)
             anim.tick(dt);
+        for (Runnable tpart : tickparts)
+            tpart.run();
         return (false);
     }
 
-    public Object staticp() {
-        if(!stat || (manims.length > 0) || (ipold > 0))
-            return(null);
-        return(Gob.SemiStatic.class);
+    public void gtick(Render g) {
+        for (Consumer<Render> gpart : gtickparts)
+            gpart.accept(g);
     }
 
     public Pose getpose() {
-	    return(pose);
+        return (pose);
     }
 
     static {
-        Console.setscmd("bonedb", (cons, args) -> bonedb = Utils.parsebool(args[1], false));
+        Console.setscmd("bonedb", new Console.Command() {
+            public void run(Console cons, String[] args) {
+                bonedb = Utils.parsebool(args[1], false);
+            }
+        });
     }
 }

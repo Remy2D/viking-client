@@ -26,25 +26,14 @@
 
 package haven.resutil;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import haven.*;
+import haven.render.*;
 
-import haven.Coord3f;
-import haven.GLState;
-import haven.Glob;
-import haven.Gob;
-import haven.Location;
-import haven.Matrix4f;
-import haven.RenderList;
-import haven.Rendered;
-import haven.Resource;
-import haven.Sprite;
-import haven.Transform;
+import java.util.*;
 
 public class CSprite extends Sprite {
     private final Coord3f cc;
-    private final List<Rendered> parts = new ArrayList<Rendered>();
+    private final List<RenderTree.Node> parts = new ArrayList<>();
     private final Random rnd;
 
     public CSprite(Owner owner, Resource res) {
@@ -54,25 +43,22 @@ public class CSprite extends Sprite {
         cc = gob.getrc();
     }
 
-    public void addpart(Location loc, GLState mat, Rendered part) {
-        parts.add(GLState.compose(loc, mat).apply(part));
+    public void addpart(Location loc, Pipe.Op mat, RenderTree.Node part) {
+        /* XXX: Using unnecessarily many slots? Could potentially
+         * intern base slots on material for memory savings. */
+        parts.add(loc.apply(mat.apply(part), false));
     }
 
-    public void addpart(float xo, float yo, GLState mat, Rendered part) {
+    public void addpart(float xo, float yo, Pipe.Op mat, RenderTree.Node part) {
         Coord3f pc = new Coord3f(xo, -yo, owner.context(Glob.class).map.getcz(cc.x + xo, cc.y + yo) - cc.z);
         Location loc = new Location(Transform.makexlate(new Matrix4f(), pc)
                 .mul1(Transform.makerot(new Matrix4f(), Coord3f.zu, (float) (rnd.nextFloat() * Math.PI * 2))));
         addpart(loc, mat, part);
     }
 
-    public boolean setup(RenderList rl) {
-        rl.prepc(Location.goback("gobx"));
-        for (Rendered p : parts)
-            rl.add(p, null);
-        return (false);
-    }
-
-    public Object staticp() {
-	return(CONSTANS);
+    public void added(RenderTree.Slot slot) {
+        slot.ostate(Location.goback("gobx"));
+        for (RenderTree.Node p : parts)
+            slot.add(p);
     }
 }

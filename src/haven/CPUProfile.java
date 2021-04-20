@@ -26,8 +26,7 @@
 
 package haven;
 
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 public class CPUProfile extends Profile {
     public CPUProfile(int hl) {
@@ -37,7 +36,7 @@ public class CPUProfile extends Profile {
     public class Frame extends Profile.Frame {
         private List<Long> pw = new LinkedList<Long>();
         private List<String> nw = new LinkedList<String>();
-        private long then, last;
+        private long then, last, sub;
 
         public Frame() {
             last = then = System.nanoTime();
@@ -45,21 +44,16 @@ public class CPUProfile extends Profile {
 
         public void tick(String nm) {
             long now = System.nanoTime();
-            pw.add(now - last);
+            pw.add(now - last - sub);
             nw.add(nm);
+            sub = 0;
             last = now;
         }
 
         public void add(String nm, long tm) {
             pw.add(tm);
             nw.add(nm);
-        }
-
-        public void tick(String nm, long subtm) {
-            long now = System.nanoTime();
-            pw.add(now - last - subtm);
-            nw.add(nm);
-            last = now;
+            sub += tm;
         }
 
         public void fin() {

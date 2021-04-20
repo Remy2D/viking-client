@@ -26,12 +26,8 @@
 
 package haven;
 
-import java.io.PrintWriter;
-import java.io.Writer;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
+import java.io.*;
 
 public class Console {
     static private Map<String, Command> scommands = new TreeMap<String, Command>();

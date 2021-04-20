@@ -1,17 +1,10 @@
 package dolda.xiphutil;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
+import java.io.*;
 
 import com.jcraft.jogg.Packet;
-import com.jcraft.jorbis.Block;
-import com.jcraft.jorbis.Comment;
-import com.jcraft.jorbis.DspState;
-import com.jcraft.jorbis.Info;
+import com.jcraft.jorbis.*;
 
 /**
  * The <code>VorbisStream</code> class provides a convenient means of
@@ -20,12 +13,12 @@ import com.jcraft.jorbis.Info;
  * from a normal Java IO <code>InputStream</code> object. In the
  * latter case, it will treat the data as Ogg data and construct a
  * <code>PacketStream</code> accordingly.
- * <p/>
+ *
  * <p>Decoded data can be fetched either as arrays of floats,
  * representing individual samples, using the {@link #decode()}
  * function, or a Java IO <code>InputStream</code> can be fetched,
  * which will emit a 16-bit little endian PCM stream.
- * <p/>
+ *
  * <p>After a <code>VorbisStream</code> object has been constructed,
  * it will immediately provide the metadata from the Vorbis stream in
  * public fields. See {@link #uc}, {@link #vnd}, {@link #chn} and
@@ -130,7 +123,7 @@ public class VorbisStream {
      * arrays. It contains one float array for each channel in the
      * Vorbis stream, each of which contains one float for each
      * sample. Each sample ranges from -1.0 to 1.0.
-     * <p/>
+     *
      * <p>The array is guaranteed to contain as many sample arrays as
      * the {@link #chn} field indicates. The sample arrays are also
      * guaranteed to be of pairwise equal length, and to contain at
@@ -244,7 +237,7 @@ public class VorbisStream {
      * Ogg/Vorbis files. It takes one command-line argument to be
      * interpreted as the path to an Ogg/Vorbis file to be decoded
      * into PCM data. The PCM data is output to standard output.
-     * <p/>
+     * <p>
      * You can use the <code>sox</code> program to play Ogg/Vorbis
      * files with this class as well:
      * <pre>

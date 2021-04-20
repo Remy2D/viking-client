@@ -36,8 +36,10 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
     public static final Text.Foundry nfnd = new Text.Foundry(Text.dfont, 10);
     public static final Tex frame = Resource.loadtex("gfx/hud/buffs/frame");
     public static final Tex cframe = Resource.loadtex("gfx/hud/buffs/cframe");
-    public static final Coord imgoff = new Coord(3, 3);
-    public static final Coord ameteroff = new Coord(3, 37), ametersz = new Coord(32, 3);
+    public static final Coord imgoff = UI.scale(new Coord(3, 3));
+    public static final Coord ameteroff = UI.scale(new Coord(3, 37));
+    public static final Coord ametersz = UI.scale(new Coord(32, 3));
+    public static final int textw = UI.scale(200);
     public Indir<Resource> res;
     public double cmeter = -1;
     public double cmrem = -1;
@@ -51,7 +53,6 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
     int ameter = -1;
     int nmeter = -1;
     Tex ntext = null;
-    public Tex atex;
 
     @RName("buff")
     public static class $_ implements Factory {
@@ -119,7 +120,7 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
 
     public void draw(GOut g) {
         g.chcolor(255, 255, 255, a);
-        Double ameter = (this.ameter >= 0) ? (this.ameter / 100.0) : ameteri.get();
+        Double ameter = (this.ameter >= 0) ? Double.valueOf(this.ameter / 100.0) : ameteri.get();
         if (ameter != null) {
             g.image(cframe, Coord.z);
             g.chcolor(0, 0, 0, a);
@@ -134,11 +135,11 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
             g.image(img, imgoff);
             Tex nmeter = (this.nmeter >= 0) ? nmeter() : nmeteri.get();
             if (nmeter != null)
-                g.aimage(nmeter, imgoff.add(img.sz()).sub(1, 1), 1, 1);
+                g.aimage(nmeter, imgoff.add(img.sz()).sub(1, 1), 1, 1, UI.scale(nmeter.sz()));
             Double cmeter;
             if (this.cmeter >= 0) {
                 double m = this.cmeter;
-                if(cmrem >= 0) {
+                if (cmrem >= 0) {
                     double ot = cmrem;
                     double pt = Utils.rtime() - gettime;
                     m *= (ot - pt) / ot;
@@ -177,7 +178,7 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
             img = shorttip();
         Resource.Pagina pag = res.get().layer(Resource.pagina);
         if (pag != null)
-            img = ItemInfo.catimgs(0, img, RichText.render("\n" + pag.text, 200).img);
+            img = ItemInfo.catimgs(0, img, RichText.render("\n" + pag.text, textw).img);
         return (img);
     }
 
@@ -206,17 +207,17 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
     }
 
     public void reqdestroy() {
-	anims.clear();
-	final Coord o = this.c;
-	dest = true;
-	new NormAnim(0.35) {
-	    public void ntick(double a) {
-		Buff.this.a = 255 - (int)(255 * a);
-		Buff.this.c = o.add(0, (int)(a * a * cframe.sz().y));
-		if(a == 1.0)
-		    destroy();
-	    }
-	};
+        anims.clear();
+        final Coord o = this.c;
+        dest = true;
+        new NormAnim(0.35) {
+            public void ntick(double a) {
+                Buff.this.a = 255 - (int) (255 * a);
+                Buff.this.c = o.add(0, (int) (a * a * cframe.sz().y));
+                if (a == 1.0)
+                    destroy();
+            }
+        };
     }
 
     public void move(Coord c, double off) {
@@ -252,15 +253,12 @@ public class Buff extends Widget implements ItemInfo.ResOwner, Bufflist.Managed 
         } else if (msg == "am") {
             this.ameter = (Integer) args[0];
             shorttip = longtip = null;
-            if (atex != null)
-                atex.dispose();
-            atex = null;
         } else if (msg == "nm") {
             this.nmeter = (Integer) args[0];
             ntext = null;
         } else if (msg == "cm") {
-            this.cmeter = ((Number)args[0]).doubleValue() / 100.0;
-            this.cmrem = (args.length > 1) ? (((Number)args[1]).doubleValue() * 0.06) : -1;
+            this.cmeter = ((Number) args[0]).doubleValue() / 100.0;
+            this.cmrem = (args.length > 1) ? (((Number) args[1]).doubleValue() * 0.06) : -1;
             gettime = Utils.rtime();
         } else {
             super.uimsg(msg, args);

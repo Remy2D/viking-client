@@ -26,8 +26,7 @@
 
 package haven;
 
-import java.util.Collection;
-import java.util.LinkedList;
+import java.util.*;
 
 public class Tabs {
     public Widget parent;
@@ -58,9 +57,9 @@ public class Tabs {
             tabs.remove(this);
         }
 
-	public void showtab() {
-	    Tabs.this.showtab(this);
-	}
+        public void showtab() {
+            Tabs.this.showtab(this);
+        }
     }
 
     public Tab add() {

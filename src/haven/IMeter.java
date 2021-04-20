@@ -27,25 +27,22 @@
 package haven;
 
 import java.awt.Color;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.*;
 
 public class IMeter extends Widget {
-    private static final Resource ponysfx = Resource.local().loadwait("sfx/alarmpony");
-    static Coord off = new Coord(22, 7);
-    static Coord fsz = new Coord(101, 24);
-    static Coord msz = new Coord(75, 10);
-    Indir<Resource> bg;
-    List<Meter> meters;
-    private boolean ponyalarm = true;
+    public static final Coord off = UI.scale(22, 7);
+    public static final Coord fsz = UI.scale(101, 24);
+    public static final Coord msz = UI.scale(75, 10);
+    public final Indir<Resource> bg;
+    public List<Meter> meters;
+    private static final Resource horseAlarm = Resource.local().loadwait("sfx/alarms/horsestamina");
+    private boolean alarmPlayed = false;
 
     @RName("im")
     public static class $_ implements Factory {
         public Widget create(UI ui, Object[] args) {
             Indir<Resource> bg = ui.sess.getres((Integer) args[0]);
-            List<Meter> meters = new LinkedList<Meter>();
-            for (int i = 1; i < args.length; i += 2)
-                meters.add(new Meter((Color) args[i], (Integer) args[i + 1]));
+            List<Meter> meters = decmeters(args, 1);
             return (new IMeter(bg, meters));
         }
     }
@@ -57,10 +54,10 @@ public class IMeter extends Widget {
     }
 
     public static class Meter {
-        Color c;
-        public int a;
+        public final Color c;
+        public final double a;
 
-        public Meter(Color c, int a) {
+        public Meter(Color c, double a) {
             this.c = c;
             this.a = a;
         }
@@ -74,7 +71,7 @@ public class IMeter extends Widget {
             g.chcolor();
             for (Meter m : meters) {
                 int w = msz.x;
-                w = (w * m.a) / 100;
+                w = (int) Math.ceil(w * m.a);
                 g.chcolor(m.c);
                 g.frect(off, new Coord(w, msz.y));
             }
@@ -84,23 +81,27 @@ public class IMeter extends Widget {
         }
     }
 
+    private static List<Meter> decmeters(Object[] args, int s) {
+        ArrayList<Meter> buf = new ArrayList<>();
+        for (int a = s; a < args.length; a += 2)
+            buf.add(new Meter((Color) args[a], ((Number) args[a + 1]).doubleValue() * 0.01));
+        buf.trimToSize();
+        return (buf);
+    }
+
     public void uimsg(String msg, Object... args) {
         if (msg == "set") {
-            List<Meter> meters = new LinkedList<Meter>();
-            for (int i = 0; i < args.length; i += 2)
-                meters.add(new Meter((Color) args[i], (Integer) args[i + 1]));
-            this.meters = meters;
-
-            if (ponyalarm) {
+            this.meters = decmeters(args, 0);
+            if (!alarmPlayed) {
                 try {
                     Resource res = bg.get();
                     if (res != null && res.name.equals("gfx/hud/meter/häst")) {
-                        if (meters.get(0).a <= 10) {
-                            Audio.play(ponysfx, 1.0);
-                            ponyalarm = false;
+                        if (meters.get(0).a <= 0.10) {
+                            Audio.play(horseAlarm);
+                            alarmPlayed = true;
                         }
                     }
-                } catch (Loading e) {
+                } catch (Loading l) {
                 }
             }
         } else {

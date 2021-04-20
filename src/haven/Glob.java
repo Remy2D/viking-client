@@ -26,73 +26,62 @@
 
 package haven;
 
-import java.awt.*;
-import java.lang.ref.WeakReference;
 import java.util.*;
+import java.awt.Color;
+
+import haven.purus.MultiSession;
+import haven.purus.TimeWdg;
+import haven.purus.timer.TimerWnd;
+import haven.render.*;
+import haven.render.sl.*;
 
 public class Glob {
     public static final double SERVER_TIME_RATIO = 3.29d;
-    public double serverEpoch, localEpoch = Utils.rtime();
+    public final OCache oc = new OCache(this);
+    public final MCache map;
+    public final Session sess;
+    public final Loader loader = new Loader();
+    public double time, epoch = Utils.rtime();
     public Astronomy ast;
-    public OCache oc = new OCache(this);
-    public MCache map;
-    public UI ui;
-    public Session sess;
     public Party party;
-    public Map<String, CAttr> cattr = new HashMap<String, CAttr>();
     public Color lightamb = null, lightdif = null, lightspc = null;
     public Color olightamb = null, olightdif = null, olightspc = null;
     public Color tlightamb = null, tlightdif = null, tlightspc = null;
-    public static Color dlightamb = new Color(200, 200, 200);
-    public static Color dlightspc = new Color(255, 255, 255);
     public double lightang = 0.0, lightelev = 0.0;
     public double olightang = 0.0, olightelev = 0.0;
     public double tlightang = 0.0, tlightelev = 0.0;
-    public long lchange = -1;
+    public double lchange = -1;
     public Indir<Resource> sky1 = null, sky2 = null;
     public double skyblend = 0.0;
+    public final Map<String, CAttr> cattr = new HashMap<String, CAttr>();
     private Map<Indir<Resource>, Object> wmap = new HashMap<Indir<Resource>, Object>();
-    public static haven.timers.TimersThread timersThread;
-    public String servertime;
-    public Tex servertimetex;
-
-    private static WeakReference<Glob> reference = new WeakReference<>(null);
-
-    public static Glob getByReference() {
-        return reference.get();
-    }
-
-    static {
-        timersThread = new haven.timers.TimersThread();
-        timersThread.start();
-    }
+    public TimeWdg timewdg = new TimeWdg(this);
 
     public Glob(Session sess) {
         this.sess = sess;
         map = new MCache(sess);
         party = new Party(this);
-        reference = new WeakReference<>(this);
     }
 
     @Resource.PublishedCode(name = "wtr")
     public static interface Weather {
-        public void gsetup(RenderList rl);
+        public Pipe.Op state();
 
         public void update(Object... args);
 
-        public boolean tick(int dt);
+        public boolean tick(double dt);
     }
 
-    public static class CAttr extends Observable {
-        String nm;
-        int base, comp;
+    public static class CAttr {
+        public final String nm;
+        public int base, comp;
         public Tex comptex;
 
         public CAttr(String nm, int base, int comp) {
             this.nm = nm.intern();
             this.base = base;
             this.comp = comp;
-            this.comptex = Text.renderstroked(comp + "", Color.WHITE, Color.BLACK, Text.num12boldFnd).tex();
+            this.comptex = Text.render(String.format("%d", comp)).tex();
         }
 
         public void update(int base, int comp) {
@@ -100,9 +89,7 @@ public class Glob {
                 return;
             this.base = base;
             this.comp = comp;
-            setChanged();
-            notifyObservers(null);
-            this.comptex = Text.renderstroked(comp + "", Color.WHITE, Color.BLACK, Text.num12boldFnd).tex();
+            this.comptex = Text.render(String.format("%d", comp)).tex();
         }
     }
 
@@ -115,10 +102,10 @@ public class Glob {
                 oa + (int) ((ta - oa) * a)));
     }
 
-    private void ticklight(int dt) {
+    private void ticklight(double dt) {
         if (lchange >= 0) {
             lchange += dt;
-            if (lchange > 2000) {
+            if (lchange > 2.0) {
                 lchange = -1;
                 lightamb = tlightamb;
                 lightdif = tlightdif;
@@ -126,7 +113,7 @@ public class Glob {
                 lightang = tlightang;
                 lightelev = tlightelev;
             } else {
-                double a = lchange / 2000.0;
+                double a = lchange / 2.0;
                 lightamb = colstep(olightamb, tlightamb, a);
                 lightdif = colstep(olightdif, tlightdif, a);
                 lightspc = colstep(olightspc, tlightspc, a);
@@ -136,16 +123,15 @@ public class Glob {
         }
     }
 
-    private long lastctick = 0;
+    private double lastctick = 0;
 
     public void ctick() {
-        long now = System.currentTimeMillis();
-        int dt;
+        double now = Utils.rtime();
+        double dt;
         if (lastctick == 0)
             dt = 0;
         else
-            dt = (int) (now - lastctick);
-        dt = Math.max(dt, 0);
+            dt = Math.max(now - lastctick, 0.0);
 
         synchronized (this) {
             ticklight(dt);
@@ -161,62 +147,27 @@ public class Glob {
         lastctick = now;
     }
 
+    public void gtick(Render g) {
+        oc.gtick(g);
+        map.gtick(g);
+    }
+
+    private final double timefac = 3.0;
     private double lastrep = 0, rgtime = 0;
 
     public double globtime() {
         double now = Utils.rtime();
-        double raw = ((now - localEpoch) * SERVER_TIME_RATIO) + serverEpoch;
+        double raw = ((now - epoch) * timefac) + time;
         if (lastrep == 0) {
             rgtime = raw;
         } else {
-            double gd = (now - lastrep) * SERVER_TIME_RATIO;
+            double gd = (now - lastrep) * timefac;
             rgtime += gd;
             if (Math.abs(rgtime + gd - raw) > 1.0)
                 rgtime = rgtime + ((raw - rgtime) * (1.0 - Math.pow(10.0, -(now - lastrep))));
         }
         lastrep = now;
-        return rgtime;
-    }
-
-    private static final long secinday = 60 * 60 * 24;
-    private static final long dewyladysmantletimemin = 4 * 60 * 60 + 45 * 60;
-    private static final long dewyladysmantletimemax = 7 * 60 * 60 + 15 * 60;
-
-    private void servertimecalc() {
-        if (ast == null)
-            return;
-
-        long secs = (long)globtime();
-        long day = secs / secinday;
-        long secintoday = secs % secinday;
-        long hours = secintoday / 3600;
-        long mins = (secintoday % 3600) / 60;
-        int nextseason = (int)Math.ceil((1 - ast.sp) * (ast.is == 1 ? 30 : 10));
-
-        String fmt;
-        switch (ast.is) {
-            case 0:
-                fmt = nextseason == 1 ? "Day %d, %02d:%02d. Spring (%d RL day left)." : "Day %d, %02d:%02d. Spring (%d RL days left).";
-                break;
-            case 1:
-                fmt = nextseason == 1 ? "Day %d, %02d:%02d. Summer (%d RL day left)." : "Day %d, %02d:%02d. Summer (%d RL days left).";
-                break;
-            case 2:
-                fmt = nextseason == 1 ? "Day %d, %02d:%02d. Autumn (%d RL day left)." : "Day %d, %02d:%02d. Autumn (%d RL days left).";
-                break;
-            case 3:
-                fmt = nextseason == 1 ? "Day %d, %02d:%02d. Winter (%d RL day left)." : "Day %d, %02d:%02d. Winter (%d RL days left).";
-                break;
-            default:
-                fmt = "Unknown Season";
-        }
-
-        servertime = String.format(Resource.getLocString(Resource.BUNDLE_LABEL, fmt), day, hours, mins, nextseason);
-
-        if (secintoday >= dewyladysmantletimemin && secintoday <= dewyladysmantletimemax)
-            servertime += Resource.getLocString(Resource.BUNDLE_LABEL, " (Dewy Lady's Mantle)");
-
-        servertimetex = Text.render(servertime).tex();
+        return (rgtime);
     }
 
     public void blob(Message msg) {
@@ -226,21 +177,26 @@ public class Glob {
             Object[] a = msg.list();
             int n = 0;
             if (t == "tm") {
-                serverEpoch = ((Number) a[n++]).doubleValue();
-                localEpoch = Utils.rtime();
+                time = ((Number) a[n++]).doubleValue();
+                epoch = Utils.rtime();
                 if (!inc)
                     lastrep = 0;
-                servertimecalc();
+                timewdg.servertimecalc();
+                if (MultiSession.activeSession == sess.ui)
+                    TimerWnd.timerCalc(this);
             } else if (t == "astro") {
                 double dt = ((Number) a[n++]).doubleValue();
                 double mp = ((Number) a[n++]).doubleValue();
                 double yt = ((Number) a[n++]).doubleValue();
                 boolean night = (Integer) a[n++] != 0;
                 Color mc = (Color) a[n++];
-                int is = (n < a.length) ? ((Number)a[n++]).intValue() : 1;
-                double sp = (n < a.length) ? ((Number)a[n++]).doubleValue() : 0.5;
-                double sd = (n < a.length) ? ((Number)a[n++]).doubleValue() : 0.5;
-                ast = new Astronomy(dt, mp, yt, night, mc, is, sp, sd);
+                int is = (n < a.length) ? ((Number) a[n++]).intValue() : 1;
+                double sp = (n < a.length) ? ((Number) a[n++]).doubleValue() : 0.5;
+                double sd = (n < a.length) ? ((Number) a[n++]).doubleValue() : 0.5;
+                double years = (n < a.length) ? ((Number) a[n++]).doubleValue() : 0.5;
+                double ym = (n < a.length) ? ((Number) a[n++]).doubleValue() : 0.5;
+                double md = (n < a.length) ? ((Number) a[n++]).doubleValue() : 0.5;
+                ast = new Astronomy(dt, mp, yt, night, mc, is, sp, sd, years, ym, md);
             } else if (t == "light") {
                 synchronized (this) {
                     tlightamb = (Color) a[n++];
@@ -306,57 +262,58 @@ public class Glob {
         }
     }
 
-    public final Iterable<Weather> weather = new Iterable<Weather>() {
-        public Iterator<Weather> iterator() {
-            return (new Iterator<Weather>() {
-                Iterator<Map.Entry<Indir<Resource>, Object>> bk = wmap.entrySet().iterator();
-                Weather n = null;
-
-                public boolean hasNext() {
-                    if (n == null) {
-                        while (true) {
-                            if (!bk.hasNext())
-                                return (false);
-                            Map.Entry<Indir<Resource>, Object> cur = bk.next();
-                            Object v = cur.getValue();
-                            if (v instanceof Weather) {
-                                n = (Weather) v;
-                                break;
-                            }
-                            Class<? extends Weather> cl = cur.getKey().get().layer(Resource.CodeEntry.class).getcl(Weather.class);
-                            Weather w;
-                            try {
-                                w = Utils.construct(cl.getConstructor(Object[].class), new Object[]{v});
-                            } catch (NoSuchMethodException e) {
-                                throw (new RuntimeException(e));
-                            }
-                            cur.setValue(n = w);
-                        }
+    public Collection<Weather> weather() {
+        synchronized (this) {
+            ArrayList<Weather> ret = new ArrayList<>(wmap.size());
+            for (Map.Entry<Indir<Resource>, Object> cur : wmap.entrySet()) {
+                Object val = cur.getValue();
+                if (val instanceof Weather) {
+                    ret.add((Weather) val);
+                } else {
+                    try {
+                        Class<? extends Weather> cl = cur.getKey().get().layer(Resource.CodeEntry.class).getcl(Weather.class);
+                        Weather w = Utils.construct(cl.getConstructor(Object[].class), new Object[]{val});
+                        cur.setValue(w);
+                        ret.add(w);
+                    } catch (Loading l) {
+                    } catch (NoSuchMethodException e) {
+                        throw (new RuntimeException(e));
                     }
-                    return (true);
                 }
-
-                public Weather next() {
-                    if (!hasNext())
-                        throw (new NoSuchElementException());
-                    Weather ret = n;
-                    n = null;
-                    return (ret);
-                }
-
-                public void remove() {
-                    throw (new UnsupportedOperationException());
-                }
-            });
+            }
+            return (ret);
         }
-    };
+    }
 
     /* XXX: This is actually quite ugly and there should be a better
      * way, but until I can think of such a way, have this as a known
      * entry-point to be forwards-compatible with compiled
      * resources. */
-    public static DirLight amblight(RenderList rl) {
-        return (((MapView) ((PView.WidgetContext) rl.state().get(PView.ctx)).widget()).amb);
+    public static DirLight amblight(Pipe st) {
+        return (((MapView) ((PView.WidgetContext) st.get(RenderContext.slot)).widget()).amblight);
+    }
+
+    public CAttr getcattr(String nm) {
+        synchronized (cattr) {
+            CAttr a = cattr.get(nm);
+            if (a == null) {
+                a = new CAttr(nm, 0, 0);
+                cattr.put(nm, a);
+            }
+            return (a);
+        }
+    }
+
+    public void cattr(String nm, int base, int comp) {
+        synchronized (cattr) {
+            CAttr a = cattr.get(nm);
+            if (a == null) {
+                a = new CAttr(nm, base, comp);
+                cattr.put(nm, a);
+            } else {
+                a.update(base, comp);
+            }
+        }
     }
 
     public void cattr(Message msg) {
@@ -365,14 +322,37 @@ public class Glob {
                 String nm = msg.string();
                 int base = msg.int32();
                 int comp = msg.int32();
-                CAttr a = cattr.get(nm);
-                if (a == null) {
-                    a = new CAttr(nm, base, comp);
-                    cattr.put(nm, a);
-                } else {
-                    a.update(base, comp);
-                }
+                cattr(nm, base, comp);
             }
+        }
+    }
+
+    public static class FrameInfo extends State {
+        public static final Slot<FrameInfo> slot = new Slot<>(Slot.Type.SYS, FrameInfo.class);
+        public static final Uniform u_globtime = new Uniform(Type.FLOAT, "globtime", p -> {
+            FrameInfo inf = p.get(slot);
+            return ((inf == null) ? 0.0f : (float) (inf.globtime % 10000.0));
+        }, slot);
+        public final double globtime;
+
+        public FrameInfo(Glob glob) {
+            this.globtime = glob.globtime();
+        }
+
+        public ShaderMacro shader() {
+            return (null);
+        }
+
+        public void apply(Pipe p) {
+            p.put(slot, this);
+        }
+
+        public static Expression globtime() {
+            return (u_globtime.ref());
+        }
+
+        public String toString() {
+            return (String.format("#<globinfo @%fs>", globtime));
         }
     }
 }

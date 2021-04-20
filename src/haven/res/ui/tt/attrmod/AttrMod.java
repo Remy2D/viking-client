@@ -1,67 +1,67 @@
+/* Preprocessed source code */
 package haven.res.ui.tt.attrmod;
 
-import haven.CharWnd;
-import haven.Coord;
-import haven.ItemInfo;
-import haven.PUtils;
-import haven.Resource;
-import haven.RichText;
-import haven.res.ui.tt.Armor;
+import haven.*;
+import haven.res.lib.tspec.Spec;
+import haven.res.ui.tt.slots.ISlots;
 
+import static haven.PUtils.*;
+
+import java.util.*;
 import java.awt.image.BufferedImage;
-import java.util.ArrayList;
-import java.util.Collection;
 
+/* >tt: AttrMod$Fac */
 public class AttrMod extends ItemInfo.Tip {
-	public final Collection<Mod> mods;
+    public final Collection<Mod> mods;
 
-	public AttrMod(ItemInfo.Owner paramOwner, Collection<Mod> paramCollection) {
-		super(paramOwner);
-		this.mods = paramCollection;
-	}
+    public static class Mod {
+        public final Resource attr;
+        public int mod;
 
-	public static String buff = "128,255,128", debuff = "255,128,128";
+        public Mod(Resource attr, int mod) {
+            this.attr = attr;
+            this.mod = mod;
+        }
+    }
 
-	public static BufferedImage modimg(Collection<Mod> paramCollection) {
-		ArrayList<BufferedImage> arrayList = new ArrayList(paramCollection.size());
-		for (Mod mod : paramCollection) {
-			BufferedImage bufferedImage1 = (RichText.render(String.format("%s $col[%s]{%s%d}", new Object[] { ((Resource.Tooltip)mod.attr.layer(Resource.tooltip)).t, (mod.mod < 0) ? debuff : buff,
-					(char)((mod.mod < 0) ? 45 : 43), Integer.valueOf(Math.abs(mod.mod)) }), 0, new Object[0])).img;
-			BufferedImage bufferedImage2 = PUtils.convolvedown(((Resource.Image)mod.attr.layer(Resource.imgc)).img, new Coord(bufferedImage1
-					.getHeight(), bufferedImage1.getHeight()), CharWnd.iconfilter);
-			arrayList.add(catimgsh(0, new BufferedImage[] { bufferedImage2, bufferedImage1 }));
-		}
-		return catimgs(0, arrayList.<BufferedImage>toArray(new BufferedImage[0]));
-	}
-
-
-	public static class Fac implements ItemInfo.InfoFactory {
-		public Fac() {
-
-		}
-		public ItemInfo build(ItemInfo.Owner paramOwner, Object... paramVarArgs) {
-			Resource.Resolver resolver = (Resource.Resolver)paramOwner.context(Resource.Resolver.class);
-			ArrayList<AttrMod.Mod> arrayList = new ArrayList();
-			for (byte b = 1; b < paramVarArgs.length; b += 2)
-				arrayList.add(new AttrMod.Mod((Resource)resolver.getres(((Integer)paramVarArgs[b]).intValue()).get(), ((Integer)paramVarArgs[b + 1]).intValue()));
-			return (ItemInfo)new AttrMod(paramOwner, arrayList);
-		}
-	}
+    public AttrMod(Owner owner, Collection<Mod> mods) {
+        super(owner);
+        this.mods = mods;
+        if (owner instanceof Spec) {
+            if (((Spec) owner).ctx instanceof GItem && ((GItem) ((Spec) owner).ctx).parent instanceof Equipory) {
+                ((Equipory) ((GItem) ((Spec) owner).ctx).parent).updBuffs = true;
+            }
+        }
+    }
 
 
-	public static class Mod {
-		public final Resource attr;
+    public static class Fac implements InfoFactory {
+        public ItemInfo build(Owner owner, Object... args) {
+            Resource.Resolver rr = owner.context(Resource.Resolver.class);
+            Collection<Mod> mods = new ArrayList<Mod>();
+            for (int a = 1; a < args.length; a += 2)
+                mods.add(new Mod(rr.getres((Integer) args[a]).get(), (Integer) args[a + 1]));
+            return (new AttrMod(owner, mods));
+        }
+    }
 
-		public int mod;
+    public static String buff = "128,255,128", debuff = "255,128,128";
 
-		public Mod(Resource paramResource, int paramInt) {
-			this.attr = paramResource;
-			this.mod = paramInt;
-		}
-	}
+    public static BufferedImage modimg(Collection<Mod> mods) {
+        Collection<BufferedImage> lines = new ArrayList<BufferedImage>(mods.size());
+        for (Mod mod : mods) {
+            BufferedImage line = RichText.render(String.format("%s $col[%s]{%s%d}", mod.attr.layer(Resource.tooltip).t,
+                    (mod.mod < 0) ? debuff : buff, (mod.mod < 0) ? '-' : '+', Math.abs(mod.mod)),
+                    0).img;
+            BufferedImage icon = convolvedown(mod.attr.layer(Resource.imgc).img,
+                    new Coord(line.getHeight(), line.getHeight()),
+                    CharWnd.iconfilter);
+            lines.add(catimgsh(0, icon, line));
+        }
+        return (catimgs(0, lines.toArray(new BufferedImage[0])));
+    }
 
-
-	public BufferedImage tipimg() {
-		return modimg(this.mods);
-	}
+    public BufferedImage tipimg() {
+        return (modimg(mods));
+    }
 }

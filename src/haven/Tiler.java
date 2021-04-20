@@ -26,20 +26,13 @@
 
 package haven;
 
-import haven.Surface.MeshVertex;
-import haven.Surface.Vertex;
+import java.util.*;
+import java.lang.reflect.*;
+import java.lang.annotation.*;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.lang.reflect.Constructor;
-import java.util.Map;
-import java.util.Random;
-import java.util.TreeMap;
-
-import haven.Surface.MeshVertex;
 import haven.Surface.Vertex;
+import haven.Surface.MeshVertex;
+import haven.render.*;
 
 public abstract class Tiler {
     public final int id;
@@ -53,7 +46,7 @@ public abstract class Tiler {
         public Surface.Vertex[] v;
         public float[] tcx, tcy;
         public int[] f;
-        public GLState mat = null;
+        public Pipe.Op mat = null;
 
         public MPart(Coord lc, Coord gc, Surface.Vertex[] v, float[] tcx, float[] tcy, int[] f) {
             this.lc = lc;
@@ -115,8 +108,8 @@ public abstract class Tiler {
             }
         }
 
-        public GLState mcomb(GLState mat) {
-            return ((this.mat == null) ? mat : (GLState.compose(mat, this.mat)));
+        public Pipe.Op mcomb(Pipe.Op mat) {
+            return ((this.mat == null) ? mat : (Pipe.Op.compose(mat, this.mat)));
         }
 
         public static final float[] ctcx = {0, 0, 1, 1}, ctcy = {0, 1, 1, 0};
@@ -154,7 +147,7 @@ public abstract class Tiler {
         private final VertFactory f;
         private final MeshVertex[] map;
 
-        public SModel(MapMesh m, GLState mat, VertFactory f) {
+        public SModel(MapMesh m, NodeWrap mat, VertFactory f) {
             super(m, mat);
             this.f = f;
             this.map = new MeshVertex[m.data(MapMesh.gnd).vl.length];
@@ -175,11 +168,11 @@ public abstract class Tiler {
         }
 
         public static class Key implements MapMesh.DataID<SModel> {
-            public final GLState mat;
+            public final NodeWrap mat;
             public final VertFactory f;
             private final int hash;
 
-            public Key(GLState mat, VertFactory f) {
+            public Key(NodeWrap mat, VertFactory f) {
                 this.mat = mat;
                 this.f = f;
                 this.hash = (mat.hashCode() * 31) + f.hashCode();
@@ -198,7 +191,7 @@ public abstract class Tiler {
             }
         }
 
-        public static SModel get(MapMesh m, GLState mat, VertFactory f) {
+        public static SModel get(MapMesh m, NodeWrap mat, VertFactory f) {
             return (m.data(new Key(mat, f)));
         }
     }
@@ -235,14 +228,14 @@ public abstract class Tiler {
 
     public abstract void trans(MapMesh m, Random rnd, Tiler gt, Coord lc, Coord gc, int z, int bmask, int cmask);
 
-    public GLState drawstate(Glob glob, GLConfig cfg, Coord3f c) {
+    public Pipe.Op drawstate(Glob glob, Coord3f c) {
         return (null);
     }
 
     public static class FactMaker implements Resource.PublishedCode.Instancer {
-        public Factory make(Class<?> cl) throws InstantiationException, IllegalAccessException {
+        public Factory make(Class<?> cl, Resource ires, Object... argv) {
             if (Factory.class.isAssignableFrom(cl)) {
-                return (cl.asSubclass(Factory.class).newInstance());
+                return (Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Factory.class), ires, argv));
             } else if (Tiler.class.isAssignableFrom(cl)) {
                 Class<? extends Tiler> tcl = cl.asSubclass(Tiler.class);
                 try {
@@ -279,13 +272,7 @@ public abstract class Tiler {
             public Object run() {
                 for (Class<?> cl : dolda.jglob.Loader.get(ResName.class).classes()) {
                     String nm = cl.getAnnotation(ResName.class).value();
-                    try {
-                        rnames.put(nm, (Factory) cl.newInstance());
-                    } catch (InstantiationException e) {
-                        throw (new Error(e));
-                    } catch (IllegalAccessException e) {
-                        throw (new Error(e));
-                    }
+                    rnames.put(nm, Utils.construct(cl.asSubclass(Factory.class)));
                 }
                 return (null);
             }

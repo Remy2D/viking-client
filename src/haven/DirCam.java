@@ -26,6 +26,8 @@
 
 package haven;
 
+import haven.render.*;
+
 public class DirCam extends Camera {
     static final Coord3f defdir = new Coord3f(0, 0, -1);
     Matrix4f mat = compute(Coord3f.o, defdir);

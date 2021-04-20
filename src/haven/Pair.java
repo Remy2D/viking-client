@@ -47,6 +47,6 @@ public class Pair<A, B> {
     }
 
     public String toString() {
-	return(String.format("(%s . %s)", a, b));
+        return (String.format("(%s . %s)", a, b));
     }
 }

@@ -26,15 +26,16 @@
 
 package haven;
 
+import haven.purus.Config;
+
 import java.awt.event.KeyEvent;
 
 public class Speedget extends Widget {
     public static final Tex imgs[][];
     public static final String tips[];
     public static final Coord tsz;
-    public static int cur, max;
-    public boolean runonloginset;
-    public static int SpeedToSet = -1;
+    public int cur, max;
+    public int SpeedToSet = -1;
 
     static {
         String[] names = {"crawl", "walk", "run", "sprint"};
@@ -66,15 +67,11 @@ public class Speedget extends Widget {
         super(tsz);
         this.cur = cur;
         this.max = max;
+        SpeedToSet = Config.speedOnLogin.val;
     }
 
     public void draw(GOut g) {
-        if (Config.runonlogin && !runonloginset && max > 1) {
-            set(2);
-            runonloginset = true;
-        }
-
-        if(SpeedToSet > -1) {
+        if (SpeedToSet > -1) {
             set(SpeedToSet);
             SpeedToSet = -1;
         }
@@ -118,48 +115,41 @@ public class Speedget extends Widget {
 
     public boolean mousewheel(Coord c, int amount) {
         if (max >= 0)
-            set((cur + max + 1 + amount) % (max + 1));
+            set(Utils.clip(cur + amount, 0, max));
         return (true);
     }
 
     public Object tooltip(Coord c, Widget prev) {
         if ((cur >= 0) && (cur < tips.length))
-            return (String.format(Resource.getLocString(Resource.BUNDLE_LABEL, "Selected speed: ") + tips[cur]));
+            return (String.format("Selected speed: " + tips[cur]));
         return (null);
     }
 
+    public static final KeyBinding kb_speedup = KeyBinding.get("speed-up", KeyMatch.forchar('R', KeyMatch.S | KeyMatch.C | KeyMatch.M, KeyMatch.C));
+    public static final KeyBinding kb_speeddn = KeyBinding.get("speed-down", KeyMatch.forchar('R', KeyMatch.S | KeyMatch.C | KeyMatch.M, KeyMatch.S | KeyMatch.C));
+    public static final KeyBinding[] kb_speeds = {
+            KeyBinding.get("speed-set/0", KeyMatch.nil),
+            KeyBinding.get("speed-set/1", KeyMatch.nil),
+            KeyBinding.get("speed-set/2", KeyMatch.nil),
+            KeyBinding.get("speed-set/3", KeyMatch.nil),
+    };
+
     public boolean globtype(char key, KeyEvent ev) {
-        if (key == 18) {
+        int dir = 0;
+        if (kb_speedup.key().match(ev))
+            dir = 1;
+        else if (kb_speeddn.key().match(ev))
+            dir = -1;
+        if (dir != 0) {
             if (max >= 0) {
-                int n;
-                if ((ev.getModifiersEx() & KeyEvent.SHIFT_DOWN_MASK) == 0) {
-                    if (cur > max)
-                        n = 0;
-                    else
-                        n = (cur + 1) % (max + 1);
-                } else {
-                    if (cur > max)
-                        n = max;
-                    else
-                        n = (cur + max) % (max + 1);
-                }
-                set(n);
+                set(Utils.clip(cur + dir, 0, max));
             }
             return (true);
-        } else if (ev.isShiftDown()) {
-            int c = ev.getKeyCode();
-            if (c == KeyEvent.VK_Q) {
-                set(0);
-                return true;
-            } else if (c == KeyEvent.VK_W) {
-                set(1);
-                return true;
-            } else if (c == KeyEvent.VK_E) {
-                set(2);
-                return true;
-            } else if (c == KeyEvent.VK_R) {
-                set(3);
-                return true;
+        }
+        for (int i = 0; i < kb_speeds.length; i++) {
+            if (kb_speeds[i].key().match(ev)) {
+                set(i);
+                return (true);
             }
         }
         return (super.globtype(key, ev));

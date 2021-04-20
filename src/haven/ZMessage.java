@@ -26,12 +26,8 @@
 
 package haven;
 
-import java.io.Closeable;
-import java.io.Flushable;
-import java.io.IOException;
-import java.util.zip.DataFormatException;
-import java.util.zip.Deflater;
-import java.util.zip.Inflater;
+import java.util.zip.*;
+import java.io.*;
 
 public class ZMessage extends Message implements Closeable, Flushable {
     private Inflater zi = null;
@@ -44,11 +40,11 @@ public class ZMessage extends Message implements Closeable, Flushable {
     }
 
     public boolean underflow(int hint) {
-	if(zi == null) {
-	    if(eof)
-		return(false);
-	    zi = new Inflater();
-	}
+        if (zi == null) {
+            if (eof)
+                return (false);
+            zi = new Inflater();
+        }
         boolean ret = false;
         if (rbuf.length - rt < 1) {
             byte[] n = new byte[Math.max(1024, rt - rh) + rt - rh];
@@ -59,21 +55,21 @@ public class ZMessage extends Message implements Closeable, Flushable {
         }
         try {
             while (true) {
-		int rv = zi.inflate(rbuf, rt, rbuf.length - rt);
+                int rv = zi.inflate(rbuf, rt, rbuf.length - rt);
                 if (rv == 0) {
-		    if(zi.finished()) {
-			zi.end();
-			zi = null;
-			eof = true;
+                    if (zi.finished()) {
+                        zi.end();
+                        zi = null;
+                        eof = true;
                         return (ret);
                     }
-		    if(zi.needsInput()) {
+                    if (zi.needsInput()) {
                         if (bk.rt - bk.rh < 1) {
                             if (!bk.underflow(128))
                                 throw (new EOF("Unterminated z-blob"));
                         }
-			zi.setInput(bk.rbuf, bk.rh, bk.rt - bk.rh);
-			bk.rh = bk.rt;
+                        zi.setInput(bk.rbuf, bk.rh, bk.rt - bk.rh);
+                        bk.rh = bk.rt;
                     }
                 } else {
                     rt += rv;
@@ -81,54 +77,54 @@ public class ZMessage extends Message implements Closeable, Flushable {
                 }
             }
         } catch (DataFormatException e) {
-	    throw(new FormatError("Malformed z-blob", e));
+            throw (new FormatError("Malformed z-blob", e));
         }
     }
 
     private void flush(boolean sync, boolean finish) {
-	if(zo == null)
-	    zo = new Deflater(9);
-	zo.setInput(wbuf, 0, wh);
-	if(finish)
-	    zo.finish();
-	while(!zo.needsInput() || (finish && !zo.finished())) {
-	    if(bk.wt - bk.wh < 1)
-		bk.overflow(1024);
-	    int rv = zo.deflate(bk.wbuf, bk.wh, bk.wt - bk.wh, sync?Deflater.SYNC_FLUSH:Deflater.NO_FLUSH);
-	    bk.wh += rv;
-	}
-	wh = 0;
-	if(finish) {
-	    zo.end();
-	    zo = null;
-	}
+        if (zo == null)
+            zo = new Deflater(9);
+        zo.setInput(wbuf, 0, wh);
+        if (finish)
+            zo.finish();
+        while (!zo.needsInput() || (finish && !zo.finished())) {
+            if (bk.wt - bk.wh < 1)
+                bk.overflow(1024);
+            int rv = zo.deflate(bk.wbuf, bk.wh, bk.wt - bk.wh, sync ? Deflater.SYNC_FLUSH : Deflater.NO_FLUSH);
+            bk.wh += rv;
+        }
+        wh = 0;
+        if (finish) {
+            zo.end();
+            zo = null;
+        }
     }
 
     public void flush() {
-	flush(true, false);
+        flush(true, false);
     }
 
     public void overflow(int min) {
-	if(wh > 1024)
-	    flush(false, false);
-	if(wt - wh < min) {
-	    int l = (wbuf.length == 0)?1024:wbuf.length;
-	    while(l < wh + min)
-		l *= 2;
-	    byte[] n = new byte[l];
-	    System.arraycopy(wbuf, 0, n, 0, wh);
-	    wbuf = n;
-	    wt = wbuf.length;
-	}
+        if (wh > 1024)
+            flush(false, false);
+        if (wt - wh < min) {
+            int l = (wbuf.length == 0) ? 1024 : wbuf.length;
+            while (l < wh + min)
+                l *= 2;
+            byte[] n = new byte[l];
+            System.arraycopy(wbuf, 0, n, 0, wh);
+            wbuf = n;
+            wt = wbuf.length;
+        }
     }
 
     public void finish() {
-	flush(false, true);
+        flush(false, true);
     }
 
     public void close() throws IOException {
-	finish();
-	if(bk instanceof Closeable)
-	    ((Closeable)bk).close();
+        finish();
+        if (bk instanceof Closeable)
+            ((Closeable) bk).close();
     }
 }

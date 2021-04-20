@@ -26,31 +26,17 @@
 
 package haven;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
-import java.net.Socket;
-import java.net.URL;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.UnrecoverableKeyException;
+import java.util.*;
+import java.io.*;
+import java.net.*;
+import java.security.*;
+import java.security.cert.*;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.CertificateFactory;
 
-import javax.net.ssl.HostnameVerifier;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.KeyManager;
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSession;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.*;
+
+import java.nio.channels.SocketChannel;
+import java.nio.channels.UnresolvedAddressException;
 
 public class SslHelper {
     private KeyStore creds, trusted;
@@ -90,8 +76,8 @@ public class SslHelper {
             } catch (KeyStoreException e) {
                 throw (new RuntimeException(e));
             } catch (UnrecoverableKeyException e) {
-        /* The key should be recoverable at this stage, since
-         * it was loaded successfully. */
+                /* The key should be recoverable at this stage, since
+                 * it was loaded successfully. */
                 throw (new RuntimeException(e));
             } catch (KeyManagementException e) {
                 throw (new RuntimeException(e));
@@ -116,9 +102,9 @@ public class SslHelper {
         try {
             trusted.setCertificateEntry("cert-" + tserial++, cert);
         } catch (KeyStoreException e) {
-	    /* The keystore should have been initialized and should
-	     * not have the generated alias, so this should not
-	     * happen. */
+            /* The keystore should have been initialized and should
+             * not have the generated alias, so this should not
+             * happen. */
             throw (new RuntimeException(e));
         }
     }
@@ -126,6 +112,16 @@ public class SslHelper {
     public static Certificate loadX509(InputStream in) throws IOException, CertificateException {
         CertificateFactory fac = CertificateFactory.getInstance("X.509");
         return (fac.generateCertificate(in));
+    }
+
+    public static Collection<? extends Certificate> loadX509s(InputStream in) throws IOException, CertificateException {
+        CertificateFactory fac = CertificateFactory.getInstance("X.509");
+        return (fac.generateCertificates(in));
+    }
+
+    public void trust(InputStream in) throws IOException, CertificateException {
+        for (Certificate cert : loadX509s(in))
+            trust(cert);
     }
 
     public synchronized void loadCredsPkcs12(InputStream in, char[] pw) throws IOException, CertificateException {

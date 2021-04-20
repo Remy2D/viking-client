@@ -26,9 +26,8 @@
 
 package haven;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
+import java.util.*;
+import java.util.function.*;
 
 public interface OwnerContext {
     public <T> T context(Class<T> cl);
@@ -86,15 +85,15 @@ public interface OwnerContext {
         }
 
         public OwnerContext curry(T on) {
-            return(new OwnerContext() {
+            return (new OwnerContext() {
                 public <C> C context(Class<C> cl) {
-                    return(ClassResolver.this.context(cl, on));
+                    return (ClassResolver.this.context(cl, on));
                 }
             });
         }
     }
 
     public static final ClassResolver<UI> uictx = new ClassResolver<UI>()
-	.add(Glob.class, ui -> ui.sess.glob)
-	.add(Session.class, ui -> ui.sess);
+            .add(Glob.class, ui -> ui.sess.glob)
+            .add(Session.class, ui -> ui.sess);
 }

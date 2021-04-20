@@ -39,6 +39,6 @@ public abstract class Moving extends GAttrib {
     public abstract double getv();
 
     public Object staticp() {
-	return(null);
+        return (null);
     }
 }

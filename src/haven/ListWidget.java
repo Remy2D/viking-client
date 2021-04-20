@@ -52,9 +52,4 @@ public abstract class ListWidget<T> extends Widget {
     public void change(T item) {
         this.sel = item;
     }
-
-    public void change2(T item) {
-        this.sel = item;
-    }
-
 }
