@@ -138,6 +138,7 @@
             <fileset dir="lib/jogl-natives" />
         </copy>
         <copy todir="build" file="etc/run.sh" />
+        <copy todir="build" file="etc/run.bat" />
     </target>
 
     <target name="deftgt" depends="jars, appletview" />
@@ -166,9 +167,7 @@
     </target>
 
     <target name="profile" depends="jars">
-        <nbprofiledirect></nbprofiledirect>
         <java fork="true" jar="build/hafen.jar">
-            <jvmarg value="${profiler.info.jvmargs.agent}" />
             <sysproperty key="haven.dbtext" value="on" />
             <sysproperty key="haven.defserv" value="sh.seatribe.se" />
             <sysproperty key="haven.resdir" value="/home/fredrik/src/hafen/res" />
