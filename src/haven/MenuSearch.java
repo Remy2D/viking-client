@@ -2,6 +2,7 @@ package haven;
 
 import java.util.*;
 import java.awt.event.KeyEvent;
+import java.util.stream.Collectors;
 
 import haven.MenuGrid.Pagina;
 import haven.MenuGrid.PagButton;
@@ -77,8 +78,8 @@ public class MenuSearch extends BetterWindow {
     public MenuSearch(MenuGrid menu) {
         super(Coord.z, "Action search");
         this.menu = menu;
-        rls = add(new Results(UI.scale(250), 25), Coord.z);
-        sbox = add(new TextEntry(UI.scale(250), "") {
+        rls = add(new Results(UI.scale(280), 10), Coord.z);
+        sbox = add(new TextEntry(UI.scale(280), "") {
             protected void changed() {
                 refilter();
             }
@@ -115,31 +116,10 @@ public class MenuSearch extends BetterWindow {
 
     private void updlist() {
         recons = false;
-        Pagina root = this.root;
-        List<PagButton> found = new ArrayList<>();
-        {
-            Collection<Pagina> leaves = new ArrayList<>();
-            synchronized (menu.paginae) {
-                leaves.addAll(menu.paginae);
-            }
-            for (Pagina pag : leaves) {
-                try {
-                    if (root == null) {
-                        found.add(pag.button());
-                    } else {
-                        for (Pagina parent = pag; parent != null; parent = menu.paginafor(parent.act().parent)) {
-                            if (parent == root) {
-                                found.add(pag.button());
-                                break;
-                            }
-                        }
-                    }
-                } catch (Loading l) {
-                    recons = true;
-                }
-            }
-        }
-        Collections.sort(found, Comparator.comparing(PagButton::name));
+        List<PagButton> found = this.menu.paginae.stream()
+                .map(Pagina::button)
+                .sorted(Comparator.comparing(PagButton::name))
+                .collect(Collectors.toList());
         Map<PagButton, Result> prev = new HashMap<>();
         for (Result pr : this.cur)
             prev.put(pr.btn, pr);
