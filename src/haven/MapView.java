@@ -2126,10 +2126,12 @@ public class MapView extends PView implements DTarget, Console.Directory {
 
     private class Click extends Hittest {
         int clickb;
+        Optional<BiConsumer<Gob, Integer>> clickCallback;
 
-        private Click(Coord c, int b) {
+        private Click(Coord c, int b, Optional<BiConsumer<Gob, Integer>> clickCallback) {
             super(c);
             clickb = b;
+            this.clickCallback = clickCallback;
         }
 
         protected void hit(Coord pc, Coord2d mc, ClickData inf) {
@@ -2147,6 +2149,15 @@ public class MapView extends PView implements DTarget, Console.Directory {
                     clickGob = ((Gob.GobClick) inf.ci).gob;
                 }
             }
+
+            if (clickCallback.isPresent()) {
+                if (clickGob == null) {
+                    return;
+                } else {
+                    clickCallback.get().accept(clickGob, clickb);
+                }
+            }
+
             if (clickb == 1 && (modflags & UI.MOD_META) != 0 && clickGob != null) {
                 synchronized (gobCbQueue) {
                     if (!gobCbQueue.isEmpty()) {
@@ -2238,6 +2249,10 @@ public class MapView extends PView implements DTarget, Console.Directory {
     }
 
     public boolean mousedown(Coord c, int button) {
+        return mousedown(c, button, Optional.empty());
+    }
+
+    public boolean mousedown(Coord c, int button, Optional<BiConsumer<Gob, Integer>> clickCallback) {
         if (button == 1) {
             synchronized (areaSelectCbQueue) {
                 if (areaSelectCbQueue.size() > 0) {
@@ -2261,7 +2276,7 @@ public class MapView extends PView implements DTarget, Console.Directory {
                 wdgmsg("place", placing.rc.floor(posres), (int) Math.round(placing.a * 32768 / Math.PI), button, ui.modflags());
         } else if ((grab != null) && grab.mmousedown(c, button)) {
         } else {
-            new Click(c, button).run();
+            new Click(c, button, clickCallback).run();
         }
         return (true);
     }

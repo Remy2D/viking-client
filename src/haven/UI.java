@@ -34,9 +34,6 @@ import java.awt.DisplayMode;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.event.InputEvent;
-import java.awt.image.BufferedImage;
-
-import static haven.Utils.el;
 
 import haven.render.Environment;
 import haven.render.Render;
@@ -63,6 +60,7 @@ public class UI {
     public final ActAudio.Root audio = new ActAudio.Root();
     private static final double scalef;
     public GameUI gui;
+    private boolean locked = false;
 
     {
         lastevent = lasttick = Utils.rtime();
@@ -474,6 +472,9 @@ public class UI {
             if (g.wdg.mousedown(wdgxlate(c, g.wdg), button))
                 return;
         }
+
+        root.multiSessionWindow.doClick(c, button);
+
         root.mousedown(c, button);
     }
 

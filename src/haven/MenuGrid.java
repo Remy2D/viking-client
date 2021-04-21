@@ -49,6 +49,7 @@ public class MenuGrid extends Widget implements KeyBinding.Bindable {
     private UI.Grab grab;
     private int curoff = 0;
     private boolean recons = true;
+    private boolean locked = false;
 
     @RName("scm")
     public static class $_ implements Factory {
@@ -462,6 +463,10 @@ public class MenuGrid extends Widget implements KeyBinding.Bindable {
     }
 
     public void use(PagButton r, boolean reset) {
+        use(r, reset, null);
+    }
+
+    public void use(PagButton r, boolean reset, KeyEvent keyEvent) {
         Collection<PagButton> sub = new ArrayList<>();
         cons(r.pag, sub);
         if (sub.size() > 0) {
@@ -483,6 +488,14 @@ public class MenuGrid extends Widget implements KeyBinding.Bindable {
                     gameui().recentCrafts.push(r.pag);
                     if ((ad[0].equals("craft")))
                         gameui().makewnd.setLastAction(r.pag);
+                }
+                if (ad.length > 0 && (ad[0].equals("shoot"))) {
+                    if (!locked) {
+                        locked = true;
+                        gameui().syslog.append("Aim", Color.YELLOW);
+                        gameui().ui.root.multiSessionWindow.runKeyCommand(keyEvent);
+                        locked = false;
+                    }
                 }
             }
             r.pag.newp = 0;
@@ -604,7 +617,7 @@ public class MenuGrid extends Widget implements KeyBinding.Bindable {
             }
         }
         if (pag != null) {
-            use(pag, true);
+            use(pag, true, ev);
             return (true);
         }
         return (false);

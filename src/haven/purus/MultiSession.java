@@ -3,11 +3,16 @@ package haven.purus;
 import haven.*;
 import haven.Button;
 import haven.Config;
+import haven.purus.pbot.api.PBotGob;
+import haven.purus.pbot.api.PBotSession;
 import haven.render.Render;
 
 import java.awt.*;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
+import java.util.Optional;
+import java.util.function.Consumer;
 
 public class MultiSession {
     public static final ArrayList<UI> sessions = new ArrayList<>();
@@ -18,7 +23,9 @@ public class MultiSession {
 
     public static class MultiSessionWindow extends BetterWindow {
 
+        boolean locked = false;
         boolean update = true;
+        Gob multisessionGob = null;
 
         public MultiSessionWindow() {
             super(UI.scale(0, 0), "Sessions");
@@ -27,6 +34,65 @@ public class MultiSession {
 
         public void update() {
             update = true;
+        }
+
+        public void doClick(Coord c, int button) {
+            if (locked) {
+                if(button == 3) {
+                    rightClick();
+                } else {
+                    ui.gui.map.mousedown(c, button, Optional.of(this::multisessionGobCallback));
+                }
+            }
+        }
+
+        private void multisessionGobCallback(Gob gob, Integer button) {
+            this.multisessionGob = gob;
+
+            switch (button) {
+                case 1:
+                    leftClick();
+                    break;
+                case 3:
+                    rightClick();
+                    break;
+            }
+        }
+
+        private void leftClick() {
+            if (multisessionGob != null) {
+                System.out.println("Each session click: " + multisessionGob.id);
+                runForEachSession(ui -> {
+                    PBotSession pSession = new PBotSession(ui.gui);
+                    PBotGob pGob = new PBotGob(multisessionGob, pSession);
+
+                    pGob.doClick(1, 0, -1, 0);
+                });
+            }
+        }
+
+        private void rightClick() {
+            System.out.println("Each session cancel");
+            runForEachSession(ui -> {
+                PBotSession pSession = new PBotSession(ui.gui);
+                pSession.PBotCharacterAPI().cancelAct();
+            });
+
+            locked = false;
+            multisessionGob = null;
+        }
+
+        public void runKeyCommand(KeyEvent ev) {
+            runForEachSession(ui -> ui.keydown(ev));
+            locked = true;
+        }
+
+        private void runForEachSession(Consumer<? super UI> c) {
+            synchronized (sessions) {
+                sessions.stream()
+                        .filter(ui -> ui != activeSession)
+                        .forEach(c);
+            }
         }
 
         @Override
@@ -109,9 +175,9 @@ public class MultiSession {
 
     public static void setActiveSession(UI ui) {
         if (ui.sess != null)
-            MainFrame.mf.setTitle("Haven and Hearth \u2013 Purus Pasta 2 " + Config.version + " \u2013 " + ui.sess.username);
+            MainFrame.mf.setTitle("Viking Client " + Config.version + " \u2013 " + ui.sess.username);
         else
-            MainFrame.mf.setTitle("Haven and Hearth \u2013 Purus Pasta 2 " + Config.version);
+            MainFrame.mf.setTitle("Viking Client " + Config.version);
         if (activeSession != null) {
             activeSession.audio.amb.setVolumeNoSave(0);
             activeSession.audio.pos.setVolumeNoSave(0);
