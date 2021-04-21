@@ -41,7 +41,7 @@ import haven.render.Render;
 public class UI {
     public static int MOD_SHIFT = 1, MOD_CTRL = 2, MOD_META = 4, MOD_SUPER = 8;
     public RootWidget root;
-    private final LinkedList<Grab> keygrab = new LinkedList<Grab>(), mousegrab = new LinkedList<Grab>();
+    public final LinkedList<Grab> keygrab = new LinkedList<Grab>(), mousegrab = new LinkedList<Grab>();
     private final Map<Integer, Widget> widgets = new TreeMap<Integer, Widget>();
     private final Map<Widget, Integer> rwidgets = new HashMap<Widget, Integer>();
     Environment env;
@@ -60,7 +60,6 @@ public class UI {
     public final ActAudio.Root audio = new ActAudio.Root();
     private static final double scalef;
     public GameUI gui;
-    private boolean locked = false;
 
     {
         lastevent = lasttick = Utils.rtime();
@@ -473,9 +472,11 @@ public class UI {
                 return;
         }
 
-        root.multiSessionWindow.doClick(c, button);
-
-        root.mousedown(c, button);
+        if (root.multiSessionWindow.locked) {
+            root.multiSessionWindow.doClick(c, button);
+        } else {
+            root.mousedown(c, button);
+        }
     }
 
     public void mouseup(MouseEvent ev, Coord c, int button) {

@@ -9,7 +9,6 @@ import haven.render.Render;
 
 import java.awt.*;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -23,7 +22,7 @@ public class MultiSession {
 
     public static class MultiSessionWindow extends BetterWindow {
 
-        boolean locked = false;
+        public boolean locked = false;
         boolean update = true;
         Gob multisessionGob = null;
 
@@ -38,20 +37,25 @@ public class MultiSession {
 
         public void doClick(Coord c, int button) {
             if (locked) {
-                if(button == 3) {
+                if (button == 1) {
+                    startfightSequence(c, button);
+                } else if (button == 3) {
                     rightClick();
-                } else {
-                    ui.gui.map.mousedown(c, button, Optional.of(this::multisessionGobCallback));
                 }
             }
         }
 
+        private void startfightSequence(Coord c, int button) {
+            ui.gui.map.mousedown(c, button, Optional.of(this::multisessionGobCallback));
+        }
+
         private void multisessionGobCallback(Gob gob, Integer button) {
             this.multisessionGob = gob;
-
             switch (button) {
                 case 1:
-                    leftClick();
+                    leftClickGob();
+                    ensureFightOff();
+                    rightClick();
                     break;
                 case 3:
                     rightClick();
@@ -59,10 +63,21 @@ public class MultiSession {
             }
         }
 
-        private void leftClick() {
+        private void ensureFightOff() {
+            System.out.println("Each session fight off");
+            runForEverySession(ui -> {
+                PBotSession pSession = new PBotSession(ui.gui);
+
+                if (pSession.PBotUtils().combatState() != 1) {
+                    ui.gui.fv.current.give.wdgmsg("click", 1);
+                }
+            });
+        }
+
+        private void leftClickGob() {
             if (multisessionGob != null) {
                 System.out.println("Each session click: " + multisessionGob.id);
-                runForEachSession(ui -> {
+                runForEverySession(ui -> {
                     PBotSession pSession = new PBotSession(ui.gui);
                     PBotGob pGob = new PBotGob(multisessionGob, pSession);
 
@@ -73,9 +88,10 @@ public class MultiSession {
 
         private void rightClick() {
             System.out.println("Each session cancel");
-            runForEachSession(ui -> {
+            runForEverySession(ui -> {
                 PBotSession pSession = new PBotSession(ui.gui);
                 pSession.PBotCharacterAPI().cancelAct();
+                ui.mousegrab.clear();
             });
 
             locked = false;
@@ -83,14 +99,21 @@ public class MultiSession {
         }
 
         public void runKeyCommand(KeyEvent ev) {
-            runForEachSession(ui -> ui.keydown(ev));
+            runForOtherSessions(ui -> ui.keydown(ev));
             locked = true;
         }
 
-        private void runForEachSession(Consumer<? super UI> c) {
+        private void runForOtherSessions(Consumer<? super UI> c) {
             synchronized (sessions) {
                 sessions.stream()
                         .filter(ui -> ui != activeSession)
+                        .forEach(c);
+            }
+        }
+
+        private void runForEverySession(Consumer<? super UI> c) {
+            synchronized (sessions) {
+                sessions.stream()
                         .forEach(c);
             }
         }
