@@ -2155,6 +2155,7 @@ public class MapView extends PView implements DTarget, Console.Directory {
                     return;
                 } else {
                     clickCallback.get().accept(clickGob, clickb);
+                    return;
                 }
             }
 

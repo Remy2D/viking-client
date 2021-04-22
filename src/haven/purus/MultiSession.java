@@ -38,14 +38,14 @@ public class MultiSession {
         public void doClick(Coord c, int button) {
             if (locked) {
                 if (button == 1) {
-                    startfightSequence(c, button);
+                    startFightSequence(c, button);
                 } else if (button == 3) {
                     rightClick();
                 }
             }
         }
 
-        private void startfightSequence(Coord c, int button) {
+        private void startFightSequence(Coord c, int button) {
             ui.gui.map.mousedown(c, button, Optional.of(this::multisessionGobCallback));
         }
 
@@ -54,8 +54,7 @@ public class MultiSession {
             switch (button) {
                 case 1:
                     leftClickGob();
-                    ensureFightOff();
-                    rightClick();
+                    new Thread(new HourgrassMonitor(ui.gui, 2000, this::secondCallback)).start();
                     break;
                 case 3:
                     rightClick();
@@ -63,15 +62,36 @@ public class MultiSession {
             }
         }
 
+        private void secondCallback() {
+            doubleTap();
+            ensureFightOff();
+            rightClick();
+        }
+
+        private void doubleTap() {
+            System.out.println("Each session double tap");
+            runForEverySession(ui -> {
+                PBotSession pSession = new PBotSession(ui.gui);
+
+                if (!isSessionInFight(pSession)) {
+                    clickGob(pSession);
+                }
+            });
+        }
+
         private void ensureFightOff() {
             System.out.println("Each session fight off");
             runForEverySession(ui -> {
                 PBotSession pSession = new PBotSession(ui.gui);
 
-                if (pSession.PBotUtils().combatState() != 1) {
+                if (isSessionInFight(pSession)) {
                     ui.gui.fv.current.give.wdgmsg("click", 1);
                 }
             });
+        }
+
+        private boolean isSessionInFight(PBotSession pSession) {
+            return pSession.PBotUtils().combatState() != -1;
         }
 
         private void leftClickGob() {
@@ -79,11 +99,16 @@ public class MultiSession {
                 System.out.println("Each session click: " + multisessionGob.id);
                 runForEverySession(ui -> {
                     PBotSession pSession = new PBotSession(ui.gui);
-                    PBotGob pGob = new PBotGob(multisessionGob, pSession);
-
-                    pGob.doClick(1, 0, -1, 0);
+                    System.out.println("Left");
+                    clickGob(pSession);
                 });
             }
+        }
+
+        private void clickGob(PBotSession pSession) {
+            PBotGob pGob = new PBotGob(multisessionGob, pSession);
+
+            pGob.doClick(1, 0, -1, 0);
         }
 
         private void rightClick() {
