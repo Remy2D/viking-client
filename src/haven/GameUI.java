@@ -28,7 +28,6 @@ package haven;
 
 import haven.purus.*;
 import haven.purus.mapper.Mapper;
-import haven.purus.pathfinder.Pathfinder;
 import haven.purus.pbot.PBotWindow;
 import haven.purus.pbot.api.Callback;
 import haven.purus.pbot.api.PBotSession;
@@ -57,6 +56,8 @@ public class GameUI extends ConsoleHost implements Console.Directory {
     public GobIcon.Settings iconconf;
     public MiniMap mmap;
     public Fightview fv;
+    public FightExtensionsButton fightExtensionsButton;
+    public DoubleTapButton doubleTapButton;
     private List<Widget> meters = new LinkedList<Widget>();
     private Text lastmsg;
     private double msgtime;
@@ -284,6 +285,16 @@ public class GameUI extends ConsoleHost implements Console.Directory {
         zerg.hide();
         statuswdg = add(new StatusWdg());
         add(ui.sess.glob.timewdg, Coord.z);
+
+        if (fightExtensionsButton == null) {
+            fightExtensionsButton = new FightExtensionsButton(ui);
+        }
+        add(fightExtensionsButton, new Coord(430, 10));
+        if (doubleTapButton == null) {
+            doubleTapButton = new DoubleTapButton(ui);
+        }
+        add(doubleTapButton, new Coord(460, 10));
+
         makewnd = add(new CraftWindow(), UI.scale(400, 200));
         makewnd.hide();
         for (int i = 0; i < belt.length; i++) {

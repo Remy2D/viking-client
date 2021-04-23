@@ -22,9 +22,21 @@ public class MultiSession {
 
     public static class MultiSessionWindow extends BetterWindow {
 
+        public boolean fightExtensionsEnabled;
+        public boolean doubleTapEnabled;
         public boolean locked = false;
         boolean update = true;
         Gob multisessionGob = null;
+
+        public void toggleFightExtensionsEnabled() {
+            this.fightExtensionsEnabled ^= true;
+            System.out.println("Toggled fight extensions " + fightExtensionsEnabled);
+        }
+
+        public void toggleDoubleTapEnabled() {
+            this.doubleTapEnabled ^= true;
+            System.out.println("Toggled double tap " + doubleTapEnabled);
+        }
 
         public MultiSessionWindow() {
             super(UI.scale(0, 0), "Sessions");
@@ -63,7 +75,9 @@ public class MultiSession {
         }
 
         private void secondCallback() {
-            doubleTap();
+            if (doubleTapEnabled) {
+                doubleTap();
+            }
             ensureFightOff();
             rightClick();
         }
@@ -124,8 +138,10 @@ public class MultiSession {
         }
 
         public void runKeyCommand(KeyEvent ev) {
-            runForOtherSessions(ui -> ui.keydown(ev));
-            locked = true;
+            if (fightExtensionsEnabled) {
+                runForOtherSessions(ui -> ui.keydown(ev));
+                locked = true;
+            }
         }
 
         private void runForOtherSessions(Consumer<? super UI> c) {
