@@ -652,7 +652,7 @@ public class MiniMap extends Widget {
     public void drawparts(GOut g) {
         drawmap(g);
         drawmarkers(g);
-        if (dlvl == 1)
+        if (dlvl <= 1)
             drawicons(g);
         drawparty(g);
     }
