@@ -1208,7 +1208,7 @@ public class GameUI extends ConsoleHost implements Console.Directory {
                 else if (text.endsWith("on."))
                     toggleBuff("paginae/act/crime", true);
             } else if (text.equals("Travelling the high seas damages boats and ships over time.")) {
-                Audio.play(Resource.local().loadwait("sfx/alarms/shipleak"));
+//                Audio.play(Resource.local().loadwait("sfx/alarms/shipleak"));
             }
         } else if (msg == "prog") {
             if (args.length > 0)
