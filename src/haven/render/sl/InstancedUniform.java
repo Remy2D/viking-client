@@ -28,12 +28,9 @@ package haven.render.sl;
 
 import haven.*;
 import haven.render.*;
-
 import java.util.*;
 import java.nio.*;
-
 import haven.render.State.Slot;
-
 import java.util.function.Function;
 
 public abstract class InstancedUniform {
@@ -42,156 +39,128 @@ public abstract class InstancedUniform {
     public final InstancedAttribute attrib;
 
     public InstancedUniform(Type type, String infix, Slot... deps) {
-        this.deps = deps;
-        uniform = new Uniform(type, infix, this::uniformval, deps);
-        attrib = new InstancedAttribute(type, infix) {
-            public VectorFormat attrfmt() {
-                return (InstancedUniform.this.attrfmt());
-            }
-
-            public void attrfill(ByteBuffer buf, int offset, Pipe state) {
-                InstancedUniform.this.attrfill(buf, offset, state);
-            }
+	this.deps = deps;
+	uniform = new Uniform(type, infix, this::uniformval, deps);
+	attrib = new InstancedAttribute(type, infix) {
+		public VectorFormat attrfmt() {return(InstancedUniform.this.attrfmt());}
+		public void attrfill(ByteBuffer buf, int offset, Pipe state) {InstancedUniform.this.attrfill(buf, offset, state);}
 		/*
 		public void filliarr(GOut g, List<Buffer> inst, GLBuffer buf) {InstancedUniform.this.filliarr(g, inst, buf);}
 		public void bindiarr(GOut g, GLBuffer buf) {InstancedUniform.this.bindiarr(g, buf);}
 		public void unbindiarr(GOut g, GLBuffer buf) {InstancedUniform.this.unbindiarr(g, buf);}
 		*/
-        };
+	    };
     }
 
     private static final Object refproc = new PostProc.AutoID("refproc", 9000);
-
     public Expression ref() {
-        return (new PostProc.AutoMacro(refproc) {
-            public Expression expand(Context ctx) {
-                if (!((ShaderContext) ctx).prog.instanced)
-                    return (uniform.ref());
-                else
-                    return (attrib.ref());
-            }
-        });
+	return(new PostProc.AutoMacro(refproc) {
+		public Expression expand(Context ctx) {
+		    if(!((ShaderContext)ctx).prog.instanced)
+			return(uniform.ref());
+		    else
+			return(attrib.ref());
+		}
+	    });
     }
 
     protected abstract Object uniformval(Pipe state);
-
     protected abstract VectorFormat attrfmt();
-
     protected abstract void attrfill(ByteBuffer buf, int offset, Pipe state);
 
     public static class Float1 extends InstancedUniform {
-        public static final VectorFormat fmt = new VectorFormat(1, NumberFormat.FLOAT32);
-        public final Function<Pipe, Float> value;
+	public static final VectorFormat fmt = new VectorFormat(1, NumberFormat.FLOAT32);
+	public final Function<Pipe, Float> value;
 
-        public Float1(String infix, Function<Pipe, Float> value, Slot... deps) {
-            super(Type.FLOAT, infix, deps);
-            this.value = value;
-        }
+	public Float1(String infix, Function<Pipe, Float> value, Slot... deps) {
+	    super(Type.FLOAT, infix, deps);
+	    this.value = value;
+	}
 
-        protected Object uniformval(Pipe state) {
-            return (value.apply(state));
-        }
+	protected Object uniformval(Pipe state) {return(value.apply(state));}
 
-        protected VectorFormat attrfmt() {
-            return (fmt);
-        }
+	protected VectorFormat attrfmt() {return(fmt);}
 
-        protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
-            buf.putFloat(offset, value.apply(state));
-        }
+	protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
+	    buf.putFloat(offset, value.apply(state));
+	}
     }
 
     public static class Vec4 extends InstancedUniform {
-        public static final VectorFormat fmt = new VectorFormat(4, NumberFormat.FLOAT32);
-        public final Function<Pipe, float[]> value;
+	public static final VectorFormat fmt = new VectorFormat(4, NumberFormat.FLOAT32);
+	public final Function<Pipe, float[]> value;
 
-        public Vec4(String infix, Function<Pipe, float[]> value, Slot... deps) {
-            super(Type.VEC4, infix, deps);
-            this.value = value;
-        }
+	public Vec4(String infix, Function<Pipe, float[]> value, Slot... deps) {
+	    super(Type.VEC4, infix, deps);
+	    this.value = value;
+	}
 
-        protected Object uniformval(Pipe state) {
-            return (value.apply(state));
-        }
+	protected Object uniformval(Pipe state) {return(value.apply(state));}
 
-        protected VectorFormat attrfmt() {
-            return (fmt);
-        }
+	protected VectorFormat attrfmt() {return(fmt);}
 
-        protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
-            float[] val = value.apply(state);
-            for (int i = 0, o = 0; i < 4; i++, o += 4)
-                buf.putFloat(offset + o, val[i]);
-        }
+	protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
+	    float[] val = value.apply(state);
+	    for(int i = 0, o = 0; i < 4; i++, o += 4)
+		buf.putFloat(offset + o, val[i]);
+	}
     }
 
     public static class Int extends InstancedUniform {
-        public static final VectorFormat fmt = new VectorFormat(1, NumberFormat.SINT32);
-        public final Function<Pipe, Integer> value;
+	public static final VectorFormat fmt = new VectorFormat(1, NumberFormat.SINT32);
+	public final Function<Pipe, Integer> value;
 
-        public Int(String infix, Function<Pipe, Integer> value, Slot... deps) {
-            super(Type.INT, infix, deps);
-            this.value = value;
-        }
+	public Int(String infix, Function<Pipe, Integer> value, Slot... deps) {
+	    super(Type.INT, infix, deps);
+	    this.value = value;
+	}
 
-        protected Object uniformval(Pipe state) {
-            return (value.apply(state));
-        }
+	protected Object uniformval(Pipe state) {return(value.apply(state));}
 
-        protected VectorFormat attrfmt() {
-            return (fmt);
-        }
+	protected VectorFormat attrfmt() {return(fmt);}
 
-        protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
-            buf.putInt(offset, value.apply(state));
-        }
+	protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
+	    buf.putInt(offset, value.apply(state));
+	}
     }
 
     public static class IVec2 extends InstancedUniform {
-        public static final VectorFormat fmt = new VectorFormat(2, NumberFormat.SINT32);
-        public final Function<Pipe, int[]> value;
+	public static final VectorFormat fmt = new VectorFormat(2, NumberFormat.SINT32);
+	public final Function<Pipe, int[]> value;
 
-        public IVec2(String infix, Function<Pipe, int[]> value, Slot... deps) {
-            super(Type.IVEC2, infix, deps);
-            this.value = value;
-        }
+	public IVec2(String infix, Function<Pipe, int[]> value, Slot... deps) {
+	    super(Type.IVEC2, infix, deps);
+	    this.value = value;
+	}
 
-        protected Object uniformval(Pipe state) {
-            return (value.apply(state));
-        }
+	protected Object uniformval(Pipe state) {return(value.apply(state));}
 
-        protected VectorFormat attrfmt() {
-            return (fmt);
-        }
+	protected VectorFormat attrfmt() {return(fmt);}
 
-        protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
-            int[] val = value.apply(state);
-            for (int i = 0, o = 0; i < 2; i++, o += 4)
-                buf.putInt(offset + o, val[i]);
-        }
+	protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
+	    int[] val = value.apply(state);
+	    for(int i = 0, o = 0; i < 2; i++, o += 4)
+		buf.putInt(offset + o, val[i]);
+	}
     }
 
     public static class Mat4 extends InstancedUniform {
-        public static final VectorFormat fmt = new VectorFormat(16, NumberFormat.FLOAT32);
-        public final Function<Pipe, Matrix4f> value;
+	public static final VectorFormat fmt = new VectorFormat(16, NumberFormat.FLOAT32);
+	public final Function<Pipe, Matrix4f> value;
 
-        public Mat4(String infix, Function<Pipe, Matrix4f> value, Slot... deps) {
-            super(Type.MAT4, infix, deps);
-            this.value = value;
-        }
+	public Mat4(String infix, Function<Pipe, Matrix4f> value, Slot... deps) {
+	    super(Type.MAT4, infix, deps);
+	    this.value = value;
+	}
 
-        protected Object uniformval(Pipe state) {
-            return (value.apply(state));
-        }
+	protected Object uniformval(Pipe state) {return(value.apply(state));}
 
-        protected VectorFormat attrfmt() {
-            return (fmt);
-        }
+	protected VectorFormat attrfmt() {return(fmt);}
 
-        protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
-            Matrix4f val = value.apply(state);
-            for (int i = 0, o = 0; i < 16; i++, o += 4)
-                buf.putFloat(offset + o, val.m[i]);
-        }
+	protected void attrfill(ByteBuffer buf, int offset, Pipe state) {
+	    Matrix4f val = value.apply(state);
+	    for(int i = 0, o = 0; i < 16; i++, o += 4)
+		buf.putFloat(offset + o, val.m[i]);
+	}
     }
 }

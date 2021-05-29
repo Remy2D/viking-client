@@ -31,28 +31,26 @@ import java.lang.reflect.*;
 
 public abstract class GLState {
     @SuppressWarnings("unchecked")
-    public static final Class<? extends GLState>[] slots = (Class<? extends GLState>[]) new Class[]{
-            VaoState.class,
-            VboState.class,
-            FboState.class,
+    public static final Class<? extends GLState>[] slots = (Class<? extends GLState>[])new Class[] {
+	VaoState.class,
+	VboState.class,
+	FboState.class,
     };
 
     public static int slotidx(Class<? extends GLState> cl) {
-        for (int i = 0; i < slots.length; i++) {
-            if (slots[i] == cl)
-                return (i);
-        }
-        throw (new RuntimeException("No slot for " + cl));
+	for(int i = 0; i < slots.length; i++) {
+	    if(slots[i] == cl)
+		return(i);
+	}
+	throw(new RuntimeException("No slot for " + cl));
     }
 
     public abstract void apply(BGL gl);
-
     public abstract void unapply(BGL gl);
-
     public abstract int slotidx();
 
     public void applyto(BGL gl, GLState to) {
-        unapply(gl);
-        to.apply(gl);
+	unapply(gl);
+	to.apply(gl);
     }
 }

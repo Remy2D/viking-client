@@ -28,25 +28,20 @@ package haven.render.sl;
 
 public abstract class Type {
     private static class Simple extends Type {
-        private final String name;
+	private final String name;
 
-        private Simple(String name) {
-            this.name = name;
-        }
+	private Simple(String name) {
+	    this.name = name;
+	}
 
-        public String name(Context ctx) {
-            return (name);
-        }
-
-        public String toString() {
-            return (name);
-        }
+	public String name(Context ctx) {return(name);}
+	public String toString() {return(name);}
     }
 
     public static class Sampler extends Simple {
-        private Sampler(String name) {
-            super(name);
-        }
+	private Sampler(String name) {
+	    super(name);
+	}
     }
 
     public static final Type VOID = new Simple("void");
@@ -74,7 +69,5 @@ public abstract class Type {
     public static final Type SAMPLERBUFFER = new Sampler("samplerBuffer");
 
     public abstract String name(Context ctx);
-
-    public void use(Context ctx) {
-    }
+    public void use(Context ctx) {}
 }

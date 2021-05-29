@@ -28,17 +28,14 @@ package haven.rs;
 
 import haven.render.*;
 
-/*
+/* 
  * Apparently, Jython generates invalid bytecode when trying to
  * override interface default methods, as in the case of rendertree
  * nodes. Proxying through a class solves that issue.
- *
+ * 
  * Jython 3 cannot come soon enough.
  */
 public class JythonRNode implements RenderTree.Node {
-    public void added(RenderTree.Slot slot) {
-    }
-
-    public void removed(RenderTree.Slot slot) {
-    }
+    public void added(RenderTree.Slot slot) {}
+    public void removed(RenderTree.Slot slot) {}
 }

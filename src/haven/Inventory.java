@@ -37,124 +37,109 @@ public class Inventory extends Widget implements DTarget {
     Map<GItem, WItem> wmap = new HashMap<GItem, WItem>();
 
     static {
-        Coord sz = sqsz.add(1, 1);
-        WritableRaster buf = PUtils.imgraster(sz);
-        for (int i = 1, y = sz.y - 1; i < sz.x - 1; i++) {
-            buf.setSample(i, 0, 0, 20);
-            buf.setSample(i, 0, 1, 28);
-            buf.setSample(i, 0, 2, 21);
-            buf.setSample(i, 0, 3, 167);
-            buf.setSample(i, y, 0, 20);
-            buf.setSample(i, y, 1, 28);
-            buf.setSample(i, y, 2, 21);
-            buf.setSample(i, y, 3, 167);
-        }
-        for (int i = 1, x = sz.x - 1; i < sz.y - 1; i++) {
-            buf.setSample(0, i, 0, 20);
-            buf.setSample(0, i, 1, 28);
-            buf.setSample(0, i, 2, 21);
-            buf.setSample(0, i, 3, 167);
-            buf.setSample(x, i, 0, 20);
-            buf.setSample(x, i, 1, 28);
-            buf.setSample(x, i, 2, 21);
-            buf.setSample(x, i, 3, 167);
-        }
-        for (int y = 1; y < sz.y - 1; y++) {
-            for (int x = 1; x < sz.x - 1; x++) {
-                buf.setSample(x, y, 0, 36);
-                buf.setSample(x, y, 1, 52);
-                buf.setSample(x, y, 2, 38);
-                buf.setSample(x, y, 3, 125);
-            }
-        }
-        invsq = new TexI(PUtils.rasterimg(buf));
+	Coord sz = sqsz.add(1, 1);
+	WritableRaster buf = PUtils.imgraster(sz);
+	for(int i = 1, y = sz.y - 1; i < sz.x - 1; i++) {
+	    buf.setSample(i, 0, 0, 20); buf.setSample(i, 0, 1, 28); buf.setSample(i, 0, 2, 21); buf.setSample(i, 0, 3, 167);
+	    buf.setSample(i, y, 0, 20); buf.setSample(i, y, 1, 28); buf.setSample(i, y, 2, 21); buf.setSample(i, y, 3, 167);
+	}
+	for(int i = 1, x = sz.x - 1; i < sz.y - 1; i++) {
+	    buf.setSample(0, i, 0, 20); buf.setSample(0, i, 1, 28); buf.setSample(0, i, 2, 21); buf.setSample(0, i, 3, 167);
+	    buf.setSample(x, i, 0, 20); buf.setSample(x, i, 1, 28); buf.setSample(x, i, 2, 21); buf.setSample(x, i, 3, 167);
+	}
+	for(int y = 1; y < sz.y - 1; y++) {
+	    for(int x = 1; x < sz.x - 1; x++) {
+		buf.setSample(x, y, 0, 36); buf.setSample(x, y, 1, 52); buf.setSample(x, y, 2, 38); buf.setSample(x, y, 3, 125);
+	    }
+	}
+	invsq = new TexI(PUtils.rasterimg(buf));
     }
 
     @RName("inv")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            return (new Inventory((Coord) args[0]));
-        }
+	public Widget create(UI ui, Object[] args) {
+	    return(new Inventory((Coord)args[0]));
+	}
     }
 
     public void draw(GOut g) {
-        Coord c = new Coord();
-        for (c.y = 0; c.y < isz.y; c.y++) {
-            for (c.x = 0; c.x < isz.x; c.x++) {
-                g.image(invsq, c.mul(sqsz));
-            }
-        }
-        super.draw(g);
+	Coord c = new Coord();
+	for(c.y = 0; c.y < isz.y; c.y++) {
+	    for(c.x = 0; c.x < isz.x; c.x++) {
+		g.image(invsq, c.mul(sqsz));
+	    }
+	}
+	super.draw(g);
     }
-
+	
     public Inventory(Coord sz) {
-        super(sqsz.mul(sz).add(1, 1));
-        isz = sz;
+	super(sqsz.mul(sz).add(1, 1));
+	isz = sz;
     }
-
+    
     public boolean mousewheel(Coord c, int amount) {
-        if (ui.modshift) {
-            Inventory minv = getparent(GameUI.class).maininv;
-            if (minv != this) {
-                if (amount < 0)
-                    wdgmsg("invxf", minv.wdgid(), 1);
-                else if (amount > 0)
-                    minv.wdgmsg("invxf", this.wdgid(), 1);
-            }
-        }
-        return (true);
+	if(ui.modshift) {
+	    Inventory minv = getparent(GameUI.class).maininv;
+	    if(minv != this) {
+		if(amount < 0)
+		    wdgmsg("invxf", minv.wdgid(), 1);
+		else if(amount > 0)
+		    minv.wdgmsg("invxf", this.wdgid(), 1);
+	    }
+	}
+	return(true);
     }
-
+    
     public void addchild(Widget child, Object... args) {
-        add(child);
-        Coord c = (Coord) args[0];
-        if (child instanceof GItem) {
-            GItem i = (GItem) child;
-            wmap.put(i, add(new WItem(i), c.mul(sqsz).add(1, 1)));
-        }
+	add(child);
+	Coord c = (Coord)args[0];
+	if(child instanceof GItem) {
+	    GItem i = (GItem)child;
+	    wmap.put(i, add(new WItem(i), c.mul(sqsz).add(1, 1)));
+	}
     }
-
+    
     public void cdestroy(Widget w) {
-        super.cdestroy(w);
-        if (w instanceof GItem) {
-            GItem i = (GItem) w;
-            ui.destroy(wmap.remove(i));
-        }
+	super.cdestroy(w);
+	if(w instanceof GItem) {
+	    GItem i = (GItem)w;
+	    ui.destroy(wmap.remove(i));
+	}
     }
-
+    
     public boolean drop(Coord cc, Coord ul) {
-        Coord dc;
-        if (dropul)
-            dc = ul.add(sqsz.div(2)).div(sqsz);
-        else
-            dc = cc.div(sqsz);
-        wdgmsg("drop", dc);
-        return (true);
+	Coord dc;
+	if(dropul)
+	    dc = ul.add(sqsz.div(2)).div(sqsz);
+	else
+	    dc = cc.div(sqsz);
+	wdgmsg("drop", dc);
+	return(true);
     }
-
+	
     public boolean iteminteract(Coord cc, Coord ul) {
-        return (false);
+	return(false);
     }
-
+	
     public void uimsg(String msg, Object... args) {
-        if (msg == "sz") {
-            isz = (Coord) args[0];
-            resize(invsq.sz().add(UI.scale(new Coord(-1, -1))).mul(isz).add(UI.scale(new Coord(1, 1))));
-        } else if (msg == "mode") {
-            dropul = (((Integer) args[0]) == 0);
-        } else {
-            super.uimsg(msg, args);
-        }
+	if(msg == "sz") {
+	    isz = (Coord)args[0];
+	    resize(invsq.sz().add(UI.scale(new Coord(-1, -1))).mul(isz).add(UI.scale(new Coord(1, 1))));
+	} else if(msg == "mode") {
+	    dropul = (((Integer)args[0]) == 0);
+	} else {
+	    super.uimsg(msg, args);
+	}
     }
 
-    @Override
-    public void wdgmsg(Widget sender, String msg, Object... args) {
-        if (msg.equals("transfer-identical")) {
-            children().stream().filter((w) -> w instanceof WItem && ((WItem) w).item.getname().equals((String) args[0]))
-                    .sorted(Comparator.comparingDouble(a -> ((WItem) a).quality()))
-                    .forEach(item -> ((WItem) item).item.wdgmsg("transfer", Coord.z));
-            return;
-        }
-        super.wdgmsg(sender, msg, args);
-    }
+	@Override
+	public void wdgmsg(Widget sender, String msg, Object... args) {
+    	if(msg.equals("transfer-identical")) {
+    		children().stream().filter((w) -> w instanceof WItem && ((WItem) w).item.getname().equals((String) args[0]))
+					.sorted(Comparator.comparingDouble(a -> ((WItem) a).quality()))
+					.forEach(item -> ((WItem) item).item.wdgmsg("transfer", Coord.z));
+    		return;
+		}
+		super.wdgmsg(sender, msg, args);
+	}
 }

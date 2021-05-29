@@ -28,37 +28,36 @@ package haven.resutil;
 
 import haven.*;
 import haven.render.*;
-
 import java.util.*;
 
 public class CSprite extends Sprite {
     private final Coord3f cc;
     private final List<RenderTree.Node> parts = new ArrayList<>();
     private final Random rnd;
-
+    
     public CSprite(Owner owner, Resource res) {
-        super(owner, res);
-        rnd = owner.mkrandoom();
-        Gob gob = (Gob) owner;
-        cc = gob.getrc();
+	super(owner, res);
+	rnd = owner.mkrandoom();
+	Gob gob = (Gob)owner;
+	cc = gob.getrc();
     }
 
     public void addpart(Location loc, Pipe.Op mat, RenderTree.Node part) {
-        /* XXX: Using unnecessarily many slots? Could potentially
-         * intern base slots on material for memory savings. */
-        parts.add(loc.apply(mat.apply(part), false));
+	/* XXX: Using unnecessarily many slots? Could potentially
+	 * intern base slots on material for memory savings. */
+	parts.add(loc.apply(mat.apply(part), false));
     }
 
     public void addpart(float xo, float yo, Pipe.Op mat, RenderTree.Node part) {
-        Coord3f pc = new Coord3f(xo, -yo, owner.context(Glob.class).map.getcz(cc.x + xo, cc.y + yo) - cc.z);
-        Location loc = new Location(Transform.makexlate(new Matrix4f(), pc)
-                .mul1(Transform.makerot(new Matrix4f(), Coord3f.zu, (float) (rnd.nextFloat() * Math.PI * 2))));
-        addpart(loc, mat, part);
+	Coord3f pc = new Coord3f(xo, -yo, owner.context(Glob.class).map.getcz(cc.x + xo, cc.y + yo) - cc.z);
+	Location loc = new Location(Transform.makexlate(new Matrix4f(), pc)
+				    .mul1(Transform.makerot(new Matrix4f(), Coord3f.zu, (float)(rnd.nextFloat() * Math.PI * 2))));
+	addpart(loc, mat, part);
     }
 
     public void added(RenderTree.Slot slot) {
-        slot.ostate(Location.goback("gobx"));
-        for (RenderTree.Node p : parts)
-            slot.add(p);
+	slot.ostate(Location.goback("gobx"));
+	for(RenderTree.Node p : parts)
+	    slot.add(p);
     }
 }

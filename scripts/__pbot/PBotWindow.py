@@ -1,7 +1,6 @@
 from .PBotInventory import PBotInventory
 from typing import Optional, List, Tuple
 
-
 class PBotWindow(object):
     def __init__(self, window):
         self.__window = window
@@ -21,9 +20,18 @@ class PBotWindow(object):
     def get_stockpile_used_capacity(self) -> int:
         return self.__window.getStockpileUsedCapacity()
 
-    ## Put an item from the hand to a stockpile window that is currently open
-    def put_item_from_hand_to_stockpile(self):
-        self.__window.putItemFromHandToStockpile()
+    ## Returns remaining capacity of the stockpile window which is currently open
+    # @return remaining capacity, or -1 if stockpile window could not be found
+    def get_stockpile_remaining_capacity(self) -> int:
+        used = self.get_stockpile_used_capacity()
+        total = self.get_stockpile_total_capacity()
+        if used == -1 or total == -1:
+            return -1
+        return total-used
+
+    ## Take an item from the stockpile to hand
+    def take_items_from_stockpile_to_hand(self):
+        self.__window.takeItemsFromStockpileHand()
 
     ## Attempts to get items from the stockpile that is currently open
     # @param count how many items to take
@@ -40,11 +48,20 @@ class PBotWindow(object):
     def get_stockpile_total_capacity(self) -> int:
         return self.__window.getStockpileTotalCapacity()
 
+    ## Take item from stockpile to hand or put item from hand into stockpile
+    def hand_click_stockpile(self):
+        self.__window.handClickStockpile()
+
     ## Tries to find an inventories attached to the given window, such as cupboard
     # @return list of inventories attached
     def get_inventories(self) -> List[PBotInventory]:
         return [PBotInventory(x) for x in self.__window.getInventories()]
 
     ## Close this window
-    def close(self):
-        self.__window.closeWnd()
+    # @param immediately close the widget immediately or wait for server to close it
+    def close(self, immediately: bool = True):
+        self.__window.closeWnd(immediately)
+
+    ## Hide the window, used to "close" craft window
+    def hide(self):
+        self.__window.hideWnd()

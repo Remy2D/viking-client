@@ -31,23 +31,17 @@ import haven.render.sl.*;
 
 public class PointSize extends State {
     public static final Slot<State> slot = new Slot<>(Slot.Type.GEOM, State.class);
-    public static final Uniform u_ptsz = new Uniform(Type.FLOAT, "pointsize", p -> ((PointSize) p.get(slot)).sz, slot);
+    public static final Uniform u_ptsz = new Uniform(Type.FLOAT, "pointsize", p -> ((PointSize)p.get(slot)).sz, slot);
     public final float sz;
 
     public PointSize(float sz) {
-        this.sz = sz;
+	this.sz = sz;
     }
 
     private static final ShaderMacro shader = prog -> {
-        prog.vctx.ptsz.mod(in -> u_ptsz.ref(), 0);
-        prog.vctx.ptsz.force();
+	prog.vctx.ptsz.mod(in -> u_ptsz.ref(), 0);
+	prog.vctx.ptsz.force();
     };
-
-    public ShaderMacro shader() {
-        return (shader);
-    }
-
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
+    public ShaderMacro shader() {return(shader);}
+    public void apply(Pipe p) {p.put(slot, this);}
 }

@@ -30,10 +30,10 @@ import haven.*;
 
 public class Camera extends Transform {
     public Camera(Matrix4f xf) {
-        super(xf);
+	super(xf);
     }
 
     public void apply(Pipe p) {
-        p.put(Homo3D.cam, this);
+	p.put(Homo3D.cam, this);
     }
 }

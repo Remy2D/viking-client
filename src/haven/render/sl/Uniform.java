@@ -29,7 +29,6 @@ package haven.render.sl;
 import java.util.*;
 import java.util.function.*;
 import java.util.function.Function;
-
 import haven.render.*;
 
 public class Uniform extends Variable.Global {
@@ -37,52 +36,52 @@ public class Uniform extends Variable.Global {
     public final Collection<State.Slot<?>> deps;
 
     public Uniform(Type type, Symbol name, Function<Pipe, Object> value, State.Slot<?>... deps) {
-        super(type, name);
-        this.value = value;
-        ArrayList<State.Slot<?>> depl = new ArrayList<>();
-        for (State.Slot<?> slot : deps)
-            depl.add(slot);
-        depl.trimToSize();
-        this.deps = depl;
+	super(type, name);
+	this.value = value;
+	ArrayList<State.Slot<?>> depl = new ArrayList<>();
+	for(State.Slot<?> slot : deps)
+	    depl.add(slot);
+	depl.trimToSize();
+	this.deps = depl;
     }
 
     public Uniform(Type type, String infix, Function<Pipe, Object> value, State.Slot<?>... deps) {
-        this(type, new Symbol.Shared("s_" + infix), value, deps);
+	this(type, new Symbol.Shared("s_" + infix), value, deps);
     }
 
     public Uniform(Type type, Function<Pipe, Object> value, State.Slot<?>... deps) {
-        this(type, new Symbol.Shared(), value, deps);
+	this(type, new Symbol.Shared(), value, deps);
     }
 
     private class Def extends Definition {
-        public void output(Output out) {
-            if (out.ctx instanceof ShaderContext) {
-                ((ShaderContext) out.ctx).prog.uniforms.add(Uniform.this);
-            }
-            out.write("uniform ");
-            super.output(out);
-        }
+	public void output(Output out) {
+	    if(out.ctx instanceof ShaderContext) {
+		((ShaderContext)out.ctx).prog.uniforms.add(Uniform.this);
+	    }
+	    out.write("uniform ");
+	    super.output(out);
+	}
     }
 
     public void use(Context ctx) {
-        type.use(ctx);
-        if (!defined(ctx))
-            ctx.vardefs.add(new Def());
-        if ((type == Type.SAMPLER2DMS) || (type == Type.SAMPLER2DMSARRAY))
-            ctx.exts.add("GL_ARB_texture_multisample");
+	type.use(ctx);
+	if(!defined(ctx))
+	    ctx.vardefs.add(new Def());
+	if((type == Type.SAMPLER2DMS) || (type == Type.SAMPLER2DMSARRAY))
+	    ctx.exts.add("GL_ARB_texture_multisample");
     }
 
     public String toString() {
-        return (String.format("#<uniform %s %s %s>", type, name, deps));
+	return(String.format("#<uniform %s %s %s>", type, name, deps));
     }
 
     public static class Data<T> {
-        public final Function<Pipe, T> value;
-        public final State.Slot<?>[] deps;
+	public final Function<Pipe, T> value;
+	public final State.Slot<?>[] deps;
 
-        public Data(Function<Pipe, T> value, State.Slot<?>... deps) {
-            this.value = value;
-            this.deps = deps;
-        }
+	public Data(Function<Pipe, T> value, State.Slot<?>... deps) {
+	    this.value = value;
+	    this.deps = deps;
+	}
     }
 }

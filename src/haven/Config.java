@@ -32,13 +32,14 @@ import java.io.InputStream;
 import java.net.URL;
 import java.io.PrintStream;
 
+import java.nio.file.Path;
 import static haven.Utils.getprop;
 
 public class Config {
-    public static String version;
-    public static String gitrev;
+	public static String version;
+	public static String gitrev;
 
-    public static String authuser = getprop("haven.authuser", null);
+	public static String authuser = getprop("haven.authuser", null);
     public static String authserv = getprop("haven.authserv", null);
     public static String defserv = getprop("haven.defserv", "127.0.0.1");
     public static String[] servargs = null;
@@ -52,10 +53,10 @@ public class Config {
     public static boolean profilegpu = getprop("haven.profilegpu", "off").equals("on");
     public static boolean par = true;
     public static boolean fscache = getprop("haven.fscache", "on").equals("on");
-    public static String resdir = getprop("haven.resdir", System.getenv("HAFEN_RESDIR"));
+    public static Path resdir = getpath("haven.resdir", System.getenv("HAFEN_RESDIR"));
     public static boolean nopreload = getprop("haven.nopreload", "no").equals("yes");
-    public static String loadwaited = getprop("haven.loadwaited", null);
-    public static String allused = getprop("haven.allused", null);
+    public static Path loadwaited = getpath("haven.loadwaited", null);
+    public static Path allused = getpath("haven.allused", null);
     public static int mainport = getint("haven.mainport", 1870);
     public static int authport = getint("haven.authport", 1871);
     public static boolean softres = getprop("haven.softres", "on").equals("on");
@@ -63,154 +64,170 @@ public class Config {
     public static byte[] authck = null, inittoken = null;
     public static String prefspec = "hafen";
     public static final String confid = "Purus-Pasta-the-new-2";
+    public static String script;
+	public static boolean noui = false;
 
-    static {
-        String p;
-        if ((p = getprop("haven.authck", null)) != null)
-            authck = Utils.hex2byte(p);
-        if ((p = getprop("haven.inittoken", null)) != null)
-            inittoken = Utils.hex2byte(p);
+	static {
+	String p;
+	if((p = getprop("haven.authck", null)) != null)
+	    authck = Utils.hex2byte(p);
+	if((p = getprop("haven.inittoken", null)) != null)
+	    inittoken = Utils.hex2byte(p);
     }
-
+    
     private static int getint(String name, int def) {
-        String val = getprop(name, null);
-        if (val == null)
-            return (def);
-        return (Integer.parseInt(val));
+	String val = getprop(name, null);
+	if(val == null)
+	    return(def);
+	return(Integer.parseInt(val));
     }
 
     private static URL geturl(String name, String def) {
-        String val = getprop(name, def);
-        if (val.equals(""))
-            return (null);
-        try {
-            return (new URL(val));
-        } catch (java.net.MalformedURLException e) {
-            throw (new RuntimeException(e));
-        }
+	String val = getprop(name, def);
+	if(val.equals(""))
+	    return(null);
+	try {
+	    return(new URL(val));
+	} catch(java.net.MalformedURLException e) {
+	    throw(new RuntimeException(e));
+	}
+    }
+
+    private static Path getpath(String name, String def) {
+	String val = getprop(name, def);
+	if((val == null) || val.equals(""))
+	    return(null);
+	return(Utils.path(val));
     }
 
     private static Double getfloat(String name, Double def) {
-        String val = getprop(name, null);
-        if (val == null)
-            return (def);
-        return (Double.parseDouble(val));
+	String val = getprop(name, null);
+	if(val == null)
+	    return(def);
+	return(Double.parseDouble(val));
     }
 
     private static void usage(PrintStream out) {
-        out.println("usage: haven.jar [OPTIONS] [SERVER[:PORT]]");
-        out.println("Options include:");
-        out.println("  -h                 Display this help");
-        out.println("  -d                 Display debug text");
-        out.println("  -P                 Enable profiling");
-        out.println("  -G                 Enable GPU profiling");
-        out.println("  -U URL             Use specified external resource URL");
-        out.println("  -r DIR             Use specified resource directory (or HAVEN_RESDIR)");
-        out.println("  -A AUTHSERV[:PORT] Use specified authentication server");
-        out.println("  -u USER            Authenticate as USER (together with -C)");
-        out.println("  -C HEXCOOKIE       Authenticate with specified hex-encoded cookie");
+	out.println("usage: haven.jar [OPTIONS] [SERVER[:PORT]]");
+	out.println("Options include:");
+	out.println("  -h                 Display this help");
+	out.println("  -d                 Display debug text");
+	out.println("  -P                 Enable profiling");
+	out.println("  -G                 Enable GPU profiling");
+	out.println("  -U URL             Use specified external resource URL");
+	out.println("  -r DIR             Use specified resource directory (or HAVEN_RESDIR)");
+	out.println("  -A AUTHSERV[:PORT] Use specified authentication server");
+	out.println("  -u USER            Authenticate as USER (together with -C)");
+	out.println("  -C HEXCOOKIE       Authenticate with specified hex-encoded cookie");
     }
 
     public static void cmdline(String[] args) {
-        PosixArgs opt = PosixArgs.getopt(args, "hdPGU:r:A:u:C:");
-        if (opt == null) {
-            usage(System.err);
-            System.exit(1);
-        }
-        for (char c : opt.parsed()) {
-            switch (c) {
-                case 'h':
-                    usage(System.out);
-                    System.exit(0);
-                    break;
-                case 'd':
-                    dbtext = true;
-                    break;
-                case 'P':
-                    profile = true;
-                    break;
-                case 'G':
-                    profilegpu = true;
-                    break;
-                case 'r':
-                    resdir = opt.arg;
-                    break;
-                case 'A':
-                    int p = opt.arg.indexOf(':');
-                    if (p >= 0) {
-                        authserv = opt.arg.substring(0, p);
-                        authport = Integer.parseInt(opt.arg.substring(p + 1));
-                    } else {
-                        authserv = opt.arg;
-                    }
-                    break;
-                case 'U':
-                    try {
-                        resurl = new URL(opt.arg);
-                    } catch (java.net.MalformedURLException e) {
-                        System.err.println(e);
-                        System.exit(1);
-                    }
-                    break;
-                case 'u':
-                    authuser = opt.arg;
-                    break;
-                case 'C':
-                    authck = Utils.hex2byte(opt.arg);
-                    break;
-            }
-        }
-        if (opt.rest.length > 0) {
-            int p = opt.rest[0].indexOf(':');
-            if (p >= 0) {
-                defserv = opt.rest[0].substring(0, p);
-                mainport = Integer.parseInt(opt.rest[0].substring(p + 1));
-            } else {
-                defserv = opt.rest[0];
-            }
-        }
-        if (opt.rest.length > 1)
-            servargs = Utils.splice(opt.rest, 1);
+	PosixArgs opt = PosixArgs.getopt(args, "hdPGU:r:A:u:C:S:N:");
+	if(opt == null) {
+	    usage(System.err);
+	    System.exit(1);
+	}
+	for(char c : opt.parsed()) {
+	    switch(c) {
+	    case 'h':
+		usage(System.out);
+		System.exit(0);
+		break;
+	    case 'd':
+		dbtext = true;
+		break;
+	    case 'P':
+		profile = true;
+		break;
+	    case 'G':
+		profilegpu = true;
+		break;
+	    case 'r':
+		resdir = Utils.path(opt.arg);
+		break;
+	    case 'A':
+		int p = opt.arg.indexOf(':');
+		if(p >= 0) {
+		    authserv = opt.arg.substring(0, p);
+		    authport = Integer.parseInt(opt.arg.substring(p + 1));
+		} else {
+		    authserv = opt.arg;
+		}
+		break;
+	    case 'U':
+		try {
+		    resurl = new URL(opt.arg);
+		} catch(java.net.MalformedURLException e) {
+		    System.err.println(e);
+		    System.exit(1);
+		}
+		break;
+	    case 'u':
+		authuser = opt.arg;
+		break;
+	    case 'C':
+		authck = Utils.hex2byte(opt.arg);
+		break;
+			case 'S':
+				script = opt.arg;
+				break;
+			case 'N':
+				noui = true;
+				break;
+	    }
+	}
+		// Loftar pls
+		/*
+		if(opt.rest.length > 0) {
+	    int p = opt.rest[0].indexOf(':');
+	    if(p >= 0) {
+		defserv = opt.rest[0].substring(0, p);
+		mainport = Integer.parseInt(opt.rest[0].substring(p + 1));
+	    } else {
+		defserv = opt.rest[0];
+	    }
+	}
+	if(opt.rest.length > 1)
+	    servargs = Utils.splice(opt.rest, 1);*/
     }
 
     static {
-        Console.setscmd("stats", new Console.Command() {
-            public void run(Console cons, String[] args) {
-                dbtext = Utils.parsebool(args[1]);
-            }
-        });
-        Console.setscmd("par", new Console.Command() {
-            public void run(Console cons, String[] args) {
-                par = Utils.parsebool(args[1]);
-            }
-        });
-        Console.setscmd("profile", new Console.Command() {
-            public void run(Console cons, String[] args) {
-                if (args[1].equals("none") || args[1].equals("off")) {
-                    profile = profilegpu = false;
-                } else if (args[1].equals("cpu")) {
-                    profile = true;
-                } else if (args[1].equals("gpu")) {
-                    profilegpu = true;
-                } else if (args[1].equals("all")) {
-                    profile = profilegpu = true;
-                }
-            }
-        });
-        try {
-            InputStream in = ErrorHandler.class.getResourceAsStream("/buildinfo");
-            try {
-                if (in != null) {
-                    java.util.Scanner s = new java.util.Scanner(in);
-                    String[] binfo = s.next().split(",");
-                    version = binfo[0];
-                    gitrev = binfo[1];
-                }
-            } finally {
-                in.close();
-            }
-        } catch (Exception e) {
-        }
+	Console.setscmd("stats", new Console.Command() {
+		public void run(Console cons, String[] args) {
+		    dbtext = Utils.parsebool(args[1]);
+		}
+	    });
+	Console.setscmd("par", new Console.Command() {
+		public void run(Console cons, String[] args) {
+		    par = Utils.parsebool(args[1]);
+		}
+	    });
+	Console.setscmd("profile", new Console.Command() {
+		public void run(Console cons, String[] args) {
+		    if(args[1].equals("none") || args[1].equals("off")) {
+			profile = profilegpu = false;
+		    } else if(args[1].equals("cpu")) {
+			profile = true;
+		    } else if(args[1].equals("gpu")) {
+			profilegpu = true;
+		    } else if(args[1].equals("all")) {
+			profile = profilegpu = true;
+		    }
+		}
+	    });
+		try {
+			InputStream in = ErrorHandler.class.getResourceAsStream("/buildinfo");
+			try {
+				if (in != null) {
+					java.util.Scanner s = new java.util.Scanner(in);
+					String[] binfo = s.next().split(",");
+					version = binfo[0];
+					gitrev = binfo[1];
+				}
+			} finally {
+				in.close();
+			}
+		} catch (Exception e) {}
 
-    }
+	}
 }

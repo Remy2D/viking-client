@@ -16,14 +16,11 @@ if version_info.major < 3:
     def items(d):
         return d.items()
 
-
     def iteritems(d):
         return d.iteritems()
 
-
     def next(x):
         return x.next()
-
 
     range = xrange  # noqa
 
@@ -41,33 +38,25 @@ if version_info.major < 3:
 
     tobytestr = str
 
-
     def isbytestr(s):
         return isinstance(s, str)
-
 
     def ispython3bytestr(s):
         return False
 
-
     def isbytearray(s):
         return isinstance(s, bytearray)
-
 
     def bytetoint(b):
         return ord(b)
 
-
     def bytetostr(b):
         return b
-
 
     def strtobyte(b):
         return b
 
-
     import Queue
-
     Empty = Queue.Empty
     Queue = Queue.Queue
 
@@ -75,10 +64,8 @@ else:
     def items(d):
         return list(d.items())
 
-
     def iteritems(d):
         return d.items()
-
 
     next = next
 
@@ -96,39 +83,31 @@ else:
 
     bytestr = bytes
 
-
     def tobytestr(s):
         return bytes(s, "ascii")
-
 
     def isbytestr(s):
         return isinstance(s, bytes)
 
-
     def ispython3bytestr(s):
         return isinstance(s, bytes)
-
 
     def isbytearray(s):
         return isinstance(s, bytearray)
 
-
     def bytetoint(b):
         return b
-
 
     def bytetostr(b):
         return str(b, encoding="ascii")
 
-
     def strtobyte(s):
         return bytes(s, encoding="ascii")
 
-
     import queue
-
     Queue = queue.Queue
     Empty = queue.Empty
+
 
 if hasattr(inspect, "getattr_static"):
     def hasattr2(obj, attr):

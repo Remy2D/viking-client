@@ -33,67 +33,65 @@ public interface OwnerContext {
     public <T> T context(Class<T> cl);
 
     public static class NoContext extends RuntimeException {
-        public final Class<?> requested;
+	public final Class<?> requested;
 
-        public NoContext(String message, Throwable cause, Class<?> requested) {
-            super(message, cause);
-            this.requested = requested;
-        }
-
-        public NoContext(String message, Class<?> requested) {
-            super(message);
-            this.requested = requested;
-        }
-
-        public NoContext(Class<?> requested) {
-            this(String.format("No %s context here", requested), requested);
-        }
+	public NoContext(String message, Throwable cause, Class<?> requested) {
+	    super(message, cause);
+	    this.requested = requested;
+	}
+	public NoContext(String message, Class<?> requested) {
+	    super(message);
+	    this.requested = requested;
+	}
+	public NoContext(Class<?> requested) {
+	    this(String.format("No %s context here", requested), requested);
+	}
     }
 
     public static class ClassResolver<T> {
-        private final Map<Class<?>, Function<T, ?>> reg = new HashMap<>();
+	private final Map<Class<?>, Function<T, ?>> reg = new HashMap<>();
 
-        public <C> ClassResolver<T> add(Class<C> cl, Function<T, ? extends C> p) {
-            synchronized (reg) {
-                reg.put(cl, p);
-            }
-            return (this);
-        }
+	public <C> ClassResolver<T> add(Class<C> cl, Function<T, ? extends C> p) {
+	    synchronized(reg) {
+		reg.put(cl, p);
+	    }
+	    return(this);
+	}
 
-        @SuppressWarnings("unchecked")
-        private <C> Function<T, ? extends C> get(Class<C> cl) {
-            Function<T, ?> p;
-            synchronized (reg) {
-                p = reg.get(cl);
-                if (p == null) {
-                    for (Map.Entry<Class<?>, Function<T, ?>> pr : reg.entrySet()) {
-                        if (cl.isAssignableFrom(pr.getKey())) {
-                            reg.put(cl, p = pr.getValue());
-                            break;
-                        }
-                    }
-                }
-            }
-            return ((Function<T, ? extends C>) p);
-        }
+	@SuppressWarnings("unchecked")
+	private <C> Function<T, ? extends C> get(Class<C> cl) {
+	    Function<T, ?> p;
+	    synchronized(reg) {
+		p = reg.get(cl);
+		if(p == null) {
+		    for(Map.Entry<Class<?>, Function<T, ?>> pr : reg.entrySet()) {
+			if(cl.isAssignableFrom(pr.getKey())) {
+			    reg.put(cl, p = pr.getValue());
+			    break;
+			}
+		    }
+		}
+	    }
+	    return((Function<T, ? extends C>)p);
+	}
 
-        public <C> C context(Class<C> cl, T on) {
-            Function<T, ? extends C> p = get(cl);
-            if (p == null)
-                throw (new NoContext(cl));
-            return (get(cl).apply(on));
-        }
+	public <C> C context(Class<C> cl, T on) {
+	    Function<T, ? extends C> p = get(cl);
+	    if(p == null)
+		throw(new NoContext(cl));
+	    return(get(cl).apply(on));
+	}
 
-        public OwnerContext curry(T on) {
-            return (new OwnerContext() {
-                public <C> C context(Class<C> cl) {
-                    return (ClassResolver.this.context(cl, on));
-                }
-            });
-        }
+	public OwnerContext curry(T on) {
+	    return(new OwnerContext() {
+		    public <C> C context(Class<C> cl) {
+			return(ClassResolver.this.context(cl, on));
+		    }
+		});
+	}
     }
 
     public static final ClassResolver<UI> uictx = new ClassResolver<UI>()
-            .add(Glob.class, ui -> ui.sess.glob)
-            .add(Session.class, ui -> ui.sess);
+	.add(Glob.class, ui -> ui.sess.glob)
+	.add(Session.class, ui -> ui.sess);
 }

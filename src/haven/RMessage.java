@@ -50,18 +50,15 @@ public class RMessage extends PMessage {
     public int seq;
 
     public RMessage(int type, byte[] blob, int off, int len) {
-        super(type, blob, off, len);
+	super(type, blob, off, len);
     }
-
     public RMessage(int type, byte[] blob) {
-        super(type, blob);
+	super(type, blob);
     }
-
     public RMessage(int type) {
-        super(type);
+	super(type);
     }
-
     public RMessage(PMessage msg) {
-        super(msg);
+	super(msg);
     }
 }

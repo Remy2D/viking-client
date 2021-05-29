@@ -35,80 +35,78 @@ public class ICheckBox extends ACheckBox {
 
     @RName("ichk")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            Tex up = Loading.waitfor(ui.sess.getres((Integer) args[0])).layer(Resource.imgc).tex();
-            Tex down = Loading.waitfor(ui.sess.getres((Integer) args[1])).layer(Resource.imgc).tex();
-            Tex hoverup = (args.length > 2) ? Loading.waitfor(ui.sess.getres((Integer) args[1])).layer(Resource.imgc).tex() : up;
-            Tex hoverdown = (args.length > 3) ? Loading.waitfor(ui.sess.getres((Integer) args[1])).layer(Resource.imgc).tex() : down;
-            ICheckBox ret = new ICheckBox(up, down, hoverup, hoverdown);
-            ret.canactivate = true;
-            return (ret);
-        }
+	public Widget create(UI ui, Object[] args) {
+	    Tex up = Loading.waitfor(ui.sess.getres((Integer)args[0])).layer(Resource.imgc).tex();
+	    Tex down = Loading.waitfor(ui.sess.getres((Integer)args[1])).layer(Resource.imgc).tex();
+	    Tex hoverup = (args.length > 2) ? Loading.waitfor(ui.sess.getres((Integer)args[1])).layer(Resource.imgc).tex() : up;
+	    Tex hoverdown = (args.length > 3) ? Loading.waitfor(ui.sess.getres((Integer)args[1])).layer(Resource.imgc).tex() : down;
+	    ICheckBox ret = new ICheckBox(up, down, hoverup, hoverdown);
+	    ret.canactivate = true;
+	    return(ret);
+	}
     }
 
     public ICheckBox(Tex up, Tex down, Tex hoverup, Tex hoverdown) {
-        super(up.sz());
-        this.up = up;
-        this.down = down;
-        this.hoverup = hoverup;
-        this.hoverdown = hoverdown;
-        if (up instanceof TexI)
-            this.img = ((TexI) up).back;
-        else
-            this.img = null;
+	super(up.sz());
+	this.up = up;
+	this.down = down;
+	this.hoverup = hoverup;
+	this.hoverdown = hoverdown;
+	if(up instanceof TexI)
+	    this.img = ((TexI)up).back;
+	else
+	    this.img = null;
     }
 
     public ICheckBox(Tex up, Tex down, Tex hover) {
-        this(up, down, hover, down);
+	this(up, down, hover, down);
     }
 
     public ICheckBox(Tex up, Tex down) {
-        this(up, down, up);
+	this(up, down, up);
     }
 
     public ICheckBox(String base, String up, String down, String hoverup, String hoverdown) {
-        this(Resource.loadtex(base + up), Resource.loadtex(base + down), Resource.loadtex(base + hoverup), Resource.loadtex(base + hoverdown));
+	this(Resource.loadtex(base + up), Resource.loadtex(base + down), Resource.loadtex(base + hoverup), Resource.loadtex(base + hoverdown));
     }
-
     public ICheckBox(String base, String up, String down, String hover) {
-        this(Resource.loadtex(base + up), Resource.loadtex(base + down), Resource.loadtex(base + hover));
+	this(Resource.loadtex(base + up), Resource.loadtex(base + down), Resource.loadtex(base + hover));
     }
-
     public ICheckBox(String base, String up, String down) {
-        this(Resource.loadtex(base + up), Resource.loadtex(base + down));
+	this(Resource.loadtex(base + up), Resource.loadtex(base + down));
     }
 
     public void draw(GOut g) {
-        if (!state())
-            g.image(h ? hoverup : up, Coord.z);
-        else
-            g.image(h ? hoverdown : down, Coord.z);
+	if(!state())
+	    g.image(h ? hoverup : up, Coord.z);
+	else
+	    g.image(h ? hoverdown : down, Coord.z);
         super.draw(g);
     }
 
     public boolean checkhit(Coord c) {
-        if (!c.isect(Coord.z, sz))
-            return (false);
-        if ((img == null) || img.getRaster().getNumBands() < 4)
-            return (true);
-        return (img.getRaster().getSample(c.x, c.y, 3) >= 128);
+	if(!c.isect(Coord.z, sz))
+	    return(false);
+	if((img == null) || img.getRaster().getNumBands() < 4)
+	    return(true);
+	return(img.getRaster().getSample(c.x, c.y, 3) >= 128);
     }
 
     public boolean mousedown(Coord c, int button) {
-        if ((button == 1) && checkhit(c)) {
-            click();
-            return (true);
-        }
-        return (super.mousedown(c, button));
+	if((button == 1) && checkhit(c)) {
+	    click();
+	    return(true);
+	}
+	return(super.mousedown(c, button));
     }
 
     public void mousemove(Coord c) {
-        this.h = checkhit(c);
+	this.h = checkhit(c);
     }
 
     public Object tooltip(Coord c, Widget prev) {
-        if (!checkhit(c))
-            return (null);
-        return (super.tooltip(c, prev));
+	if(!checkhit(c))
+	    return(null);
+	return(super.tooltip(c, prev));
     }
 }

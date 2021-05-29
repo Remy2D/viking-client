@@ -27,12 +27,10 @@
 package haven.resutil;
 
 import java.util.*;
-
 import haven.*;
 import haven.render.*;
 import haven.render.sl.*;
 import haven.render.sl.ValBlock.Value;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Function.PDir.*;
 import static haven.render.sl.Type.*;
@@ -43,23 +41,20 @@ public class TexAnim extends State {
     public final Coord3f ax;
 
     public TexAnim(Coord3f ax) {
-        this.ax = ax;
+	this.ax = ax;
     }
 
     public TexAnim(Resource res, Object... args) {
-        this(new Coord3f(((Number) args[0]).floatValue(), ((Number) args[1]).floatValue(), 0));
+	this(new Coord3f(((Number)args[0]).floatValue(), ((Number)args[1]).floatValue(), 0));
     }
 
     private static final Uniform cax = new Uniform(VEC2, p -> p.get(slot).ax, slot);
     private static final ShaderMacro shader = prog -> {
-        Tex2D.rtexcoord.value(prog.vctx).mod(in -> add(in, mul(cax.ref(), FrameInfo.time())), 0);
+	Tex2D.rtexcoord.value(prog.vctx).mod(in -> add(in, mul(cax.ref(), FrameInfo.time())), 0);
     };
-
-    public ShaderMacro shader() {
-        return (shader);
-    }
+    public ShaderMacro shader() {return(shader);}
 
     public void apply(Pipe buf) {
-        buf.put(slot, this);
+	buf.put(slot, this);
     }
 }

@@ -42,24 +42,24 @@ public class ProgramContext {
     private final Collection<Object> mods = new LinkedList<Object>();
 
     public ProgramContext() {
-        vctx = new VertexContext(this);
-        fctx = new FragmentContext(this);
+	vctx = new VertexContext(this);
+	fctx = new FragmentContext(this);
     }
 
     public void module(Object mod) {
-        mods.add(mod);
+	mods.add(mod);
     }
 
     public <T> T getmod(Class<T> cl) {
-        T ret = null;
-        for (Object mod : mods) {
-            if (cl.isInstance(mod)) {
-                if (ret == null)
-                    ret = cl.cast(mod);
-                else
-                    throw (new RuntimeException("multiple modules of " + cl + " installed: " + ret + " and " + mod));
-            }
-        }
-        return (ret);
+	T ret = null;
+	for(Object mod : mods) {
+	    if(cl.isInstance(mod)) {
+		if(ret == null)
+		    ret = cl.cast(mod);
+		else
+		    throw(new RuntimeException("multiple modules of " + cl + " installed: " + ret + " and " + mod));
+	    }
+	}
+	return(ret);
     }
 }

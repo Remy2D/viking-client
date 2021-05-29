@@ -36,127 +36,116 @@ public class FastArrayList<E> extends AbstractList<E> {
     }
 
     public FastArrayList(int sz) {
-        bk = new Object[sz];
+	bk = new Object[sz];
     }
 
     private Object[] ensure(int sz) {
-        if ((bk == null) || (bk.length < sz)) {
-            int ns = (bk == null) ? 8 : bk.length;
-            while (ns < sz)
-                ns <<= 1;
-            bk = Arrays.copyOf(bk, ns);
-        }
-        return (bk);
+	if((bk == null) || (bk.length < sz)) {
+	    int ns = (bk == null) ? 8 : bk.length;
+	    while(ns < sz)
+		ns <<= 1;
+	    bk = Arrays.copyOf(bk, ns);
+	}
+	return(bk);
     }
 
     public int size() {
-        return (n);
+	return(n);
     }
 
     @SuppressWarnings("unchecked")
     public E get(int i) {
-        if (i >= n)
-            throw (new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
-        return ((E) bk[i]);
+	if(i >= n)
+	    throw(new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
+	return((E)bk[i]);
     }
 
     public boolean add(E e) {
-        ensure(n + 1)[n++] = e;
-        return (true);
+	ensure(n + 1)[n++] = e;
+	return(true);
     }
 
     @SuppressWarnings("unchecked")
     public E set(int i, E el) {
-        if (i >= n)
-            throw (new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
-        E ret = (E) bk[i];
-        bk[i] = el;
-        return (ret);
+	if(i >= n)
+	    throw(new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
+	E ret = (E)bk[i];
+	bk[i] = el;
+	return(ret);
     }
 
     public void add(int i, E el) {
-        if (i > n)
-            throw (new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
-        ensure(n + 1)[n++] = bk[i];
-        bk[i] = el;
+	if(i > n)
+	    throw(new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
+	ensure(n + 1)[n++] = bk[i];
+	bk[i] = el;
     }
 
     @SuppressWarnings("unchecked")
     public E remove(int i) {
-        if (i >= n)
-            throw (new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
-        E ret = (E) bk[i];
-        n--;
-        bk[i] = bk[n];
-        bk[n] = null;
-        return (ret);
+	if(i >= n)
+	    throw(new IndexOutOfBoundsException(String.format("%d >= %d", i, n)));
+	E ret = (E)bk[i];
+	n--;
+	bk[i] = bk[n];
+	bk[n] = null;
+	return(ret);
     }
 
     public void clear() {
-        bk = null;
-        n = 0;
+	bk = null;
+	n = 0;
     }
 
     public Iterator<E> iterator() {
-        return (listIterator());
+	return(listIterator());
     }
 
     public ListIterator<E> listIterator() {
-        return (listIterator(0));
+	return(listIterator(0));
     }
 
     public ListIterator<E> listIterator(int start) {
-        return (new ListIterator<E>() {
-            private int cur = start, last = -1;
+	return(new ListIterator<E>() {
+		private int cur = start, last = -1;
 
-            public boolean hasPrevious() {
-                return (cur > 0);
-            }
+		public boolean hasPrevious() {return(cur > 0);}
+		public boolean hasNext() {return(cur < n);}
+		public int nextIndex() {return(cur);}
+		public int previousIndex() {return(cur - 1);}
 
-            public boolean hasNext() {
-                return (cur < n);
-            }
+		@SuppressWarnings("unchecked")
+		public E previous() {
+		    if((cur <= 0) || (cur > n))
+			throw(new NoSuchElementException());
+		    return((E)bk[last = --cur]);
+		}
 
-            public int nextIndex() {
-                return (cur);
-            }
+		@SuppressWarnings("unchecked")
+		public E next() {
+		    if((cur < 0) || (cur >= n))
+			throw(new NoSuchElementException());
+		    return((E)bk[last = cur++]);
+		}
 
-            public int previousIndex() {
-                return (cur - 1);
-            }
+		public void remove() {
+		    if(last < 0)
+			throw(new IllegalStateException());
+		    FastArrayList.this.remove(last);
+		    if(last < cur)
+			cur--;
+		    last = -1;
+		}
 
-            @SuppressWarnings("unchecked")
-            public E previous() {
-                if ((cur <= 0) || (cur > n))
-                    throw (new NoSuchElementException());
-                return ((E) bk[last = --cur]);
-            }
+		public void set(E e) {
+		    if(last < 0)
+			throw(new IllegalStateException());
+		    FastArrayList.this.set(cur, e);
+		}
 
-            @SuppressWarnings("unchecked")
-            public E next() {
-                if ((cur < 0) || (cur >= n))
-                    throw (new NoSuchElementException());
-                return ((E) bk[last = cur++]);
-            }
-
-            public void remove() {
-                if (last < 0)
-                    throw (new IllegalStateException());
-                FastArrayList.this.remove(last);
-                if (last < cur)
-                    cur--;
-                last = -1;
-            }
-
-            public void set(E e) {
-                if (last < 0)
-                    throw (new IllegalStateException());
-                FastArrayList.this.set(cur, e);
-            }
-
-            public void add(E e) {
-                FastArrayList.this.add(last = cur++, e);
-            }
-        });
+		public void add(E e) {
+		    FastArrayList.this.add(last = cur++, e);
+		}
+	    });
     }
 }

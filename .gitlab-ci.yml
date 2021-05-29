@@ -1,8 +1,8 @@
 image: openjdk:15-buster
 
 before_script:
-  - apt-get -y update
-  - apt-get -y install ant rsync doxygen
+    - apt-get -y update
+    - apt-get -y install ant rsync doxygen
 
 deploy:
   stage: deploy

@@ -30,7 +30,7 @@ import com.jogamp.opengl.*;
 
 public abstract class GLQuery extends GLObject {
     public GLQuery(GLEnvironment env) {
-        super(env);
+	super(env);
     }
 
     public abstract boolean check(GL3 gl);

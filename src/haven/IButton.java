@@ -37,73 +37,73 @@ public class IButton extends SIWidget {
 
     @RName("ibtn")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            return (new IButton(Resource.loadsimg((String) args[0]), Resource.loadsimg((String) args[1])));
-        }
+	public Widget create(UI ui, Object[] args) {
+	    return(new IButton(Resource.loadsimg((String)args[0]), Resource.loadsimg((String)args[1])));
+	}
     }
 
     public IButton(BufferedImage up, BufferedImage down, BufferedImage hover, Runnable action) {
-        super(Utils.imgsz(up));
-        this.up = up;
-        this.down = down;
-        this.hover = hover;
-        this.action = action;
+	super(Utils.imgsz(up));
+	this.up = up;
+	this.down = down;
+	this.hover = hover;
+	this.action = action;
     }
 
     public IButton(BufferedImage up, BufferedImage down, BufferedImage hover) {
-        this(up, down, hover, null);
-        this.action = () -> wdgmsg("activate");
+	this(up, down, hover, null);
+	this.action = () -> wdgmsg("activate");
     }
 
     public IButton(BufferedImage up, BufferedImage down) {
-        this(up, down, up);
+	this(up, down, up);
     }
 
     public IButton(String base, String up, String down, String hover, Runnable action) {
-        this(Resource.loadsimg(base + up), Resource.loadsimg(base + down), Resource.loadsimg(base + (hover == null ? up : hover)), action);
+	this(Resource.loadsimg(base + up), Resource.loadsimg(base + down), Resource.loadsimg(base + (hover == null?up:hover)), action);
     }
 
     public IButton(String base, String up, String down, String hover) {
-        this(base, up, down, hover, null);
-        this.action = () -> wdgmsg("activate");
+	this(base, up, down, hover, null);
+	this.action = () -> wdgmsg("activate");
     }
 
     public IButton action(Runnable action) {
-        this.action = action;
-        return (this);
+	this.action = action;
+	return(this);
     }
 
     public void draw(BufferedImage buf) {
-        Graphics g = buf.getGraphics();
-        BufferedImage img;
-        if (a)
-            img = down;
-        else if (h)
-            img = hover;
-        else
-            img = up;
-        g.drawImage(img, 0, 0, null);
-        g.dispose();
+	Graphics g = buf.getGraphics();
+	BufferedImage img;
+	if(a)
+	    img = down;
+	else if(h)
+	    img = hover;
+	else
+	    img = up;
+	g.drawImage(img, 0, 0, null);
+	g.dispose();
     }
 
     public boolean checkhit(Coord c) {
-        if (!c.isect(Coord.z, sz))
-            return (false);
-        if (up.getRaster().getNumBands() < 4)
-            return (true);
-        return (up.getRaster().getSample(c.x, c.y, 3) >= 128);
+	if(!c.isect(Coord.z, sz))
+	    return(false);
+	if(up.getRaster().getNumBands() < 4)
+	    return(true);
+	return(up.getRaster().getSample(c.x, c.y, 3) >= 128);
     }
 
     public void click() {
-        if (action != null)
-            action.run();
+	if(action != null)
+	    action.run();
     }
 
     public boolean gkeytype(java.awt.event.KeyEvent ev) {
-        click();
-        return (true);
+	click();
+	return(true);
     }
-
+    
     protected void depress() {
     }
 
@@ -111,48 +111,48 @@ public class IButton extends SIWidget {
     }
 
     public boolean mousedown(Coord c, int button) {
-        if (button != 1)
-            return (false);
-        if (!checkhit(c))
-            return (false);
-        a = true;
-        d = ui.grabmouse(this);
-        depress();
-        redraw();
-        return (true);
+	if(button != 1)
+	    return(false);
+	if(!checkhit(c))
+	    return(false);
+	a = true;
+	d = ui.grabmouse(this);
+	depress();
+	redraw();
+	return(true);
     }
 
     public boolean mouseup(Coord c, int button) {
-        if ((d != null) && button == 1) {
-            d.remove();
-            d = null;
-            mousemove(c);
-            if (checkhit(c)) {
-                unpress();
-                click();
-            }
-            return (true);
-        }
-        return (false);
+	if((d != null) && button == 1) {
+	    d.remove();
+	    d = null;
+	    mousemove(c);
+	    if(checkhit(c)) {
+		unpress();
+		click();
+	    }
+	    return(true);
+	}
+	return(false);
     }
 
     public void mousemove(Coord c) {
-        boolean h = checkhit(c);
-        boolean a = false;
-        if (d != null) {
-            a = h;
-            h = true;
-        }
-        if ((h != this.h) || (a != this.a)) {
-            this.h = h;
-            this.a = a;
-            redraw();
-        }
+	boolean h = checkhit(c);
+	boolean a = false;
+	if(d != null) {
+	    a = h;
+	    h = true;
+	}
+	if((h != this.h) || (a != this.a)) {
+	    this.h = h;
+	    this.a = a;
+	    redraw();
+	}
     }
 
     public Object tooltip(Coord c, Widget prev) {
-        if (!checkhit(c))
-            return (null);
-        return (super.tooltip(c, prev));
+	if(!checkhit(c))
+	    return(null);
+	return(super.tooltip(c, prev));
     }
 }

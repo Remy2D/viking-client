@@ -29,80 +29,80 @@ package haven;
 public class RemoteUI implements UI.Receiver, UI.Runner {
     public final Session sess;
     private Session ret;
-
+	
     public RemoteUI(Session sess) {
-        this.sess = sess;
-        Widget.initnames();
+	this.sess = sess;
+	Widget.initnames();
     }
-
+	
     public void rcvmsg(int id, String name, Object... args) {
-        PMessage msg = new PMessage(RMessage.RMSG_WDGMSG);
-        msg.adduint16(id);
-        msg.addstring(name);
-        msg.addlist(args);
-        sess.queuemsg(msg);
+	PMessage msg = new PMessage(RMessage.RMSG_WDGMSG);
+	msg.adduint16(id);
+	msg.addstring(name);
+	msg.addlist(args);
+	sess.queuemsg(msg);
     }
-
+	
     public void ret(Session sess) {
-        synchronized (this.sess) {
-            this.ret = sess;
-            this.sess.notifyAll();
-        }
+	synchronized(this.sess) {
+	    this.ret = sess;
+	    this.sess.notifyAll();
+	}
     }
 
     public UI.Runner run(UI ui) throws InterruptedException {
-        try {
-            ui.setreceiver(this);
-            while (true) {
-                PMessage msg;
-                while ((msg = sess.getuimsg()) != null) {
-                    if (msg.type == RMessage.RMSG_NEWWDG) {
-                        int id = msg.uint16();
-                        String type = msg.string();
-                        int parent = msg.uint16();
-                        Object[] pargs = msg.list();
-                        Object[] cargs = msg.list();
-                        ui.newwidget(id, type, parent, pargs, cargs);
-                    } else if (msg.type == RMessage.RMSG_WDGMSG) {
-                        int id = msg.uint16();
-                        String name = msg.string();
-                        ui.uimsg(id, name, msg.list());
-                    } else if (msg.type == RMessage.RMSG_DSTWDG) {
-                        int id = msg.uint16();
-                        ui.destroy(id);
-                    } else if (msg.type == RMessage.RMSG_ADDWDG) {
-                        int id = msg.uint16();
-                        int parent = msg.uint16();
-                        Object[] pargs = msg.list();
-                        ui.addwidget(id, parent, pargs);
-                    } else if (msg.type == RMessage.RMSG_WDGBAR) {
-                        /* Ignore for now. */
-                    }
-                }
-                synchronized (sess) {
-                    if (ret != null) {
-                        sess.close();
-                        return (new RemoteUI(ret));
-                    }
-                    if (!sess.alive())
-                        return (null);
-                    sess.wait();
-                }
-            }
-        } finally {
-            sess.close();
-            synchronized (sess) {
-                while (sess.alive())
-                    sess.wait();
-            }
-        }
+	try {
+	    ui.setreceiver(this);
+	    while(true) {
+		PMessage msg;
+		while((msg = sess.getuimsg()) != null) {
+		    if(msg.type == RMessage.RMSG_NEWWDG) {
+			int id = msg.uint16();
+			String type = msg.string();
+			int parent = msg.uint16();
+			Object[] pargs = msg.list();
+			Object[] cargs = msg.list();
+			ui.newwidget(id, type, parent, pargs, cargs);
+		    } else if(msg.type == RMessage.RMSG_WDGMSG) {
+			int id = msg.uint16();
+			String name = msg.string();
+			ui.uimsg(id, name, msg.list());
+		    } else if(msg.type == RMessage.RMSG_DSTWDG) {
+			int id = msg.uint16();
+			ui.destroy(id);
+		    } else if(msg.type == RMessage.RMSG_ADDWDG) {
+			int id = msg.uint16();
+			int parent = msg.uint16();
+			Object[] pargs = msg.list();
+			ui.addwidget(id, parent, pargs);
+		    } else if(msg.type == RMessage.RMSG_WDGBAR) {
+			/* Ignore for now. */
+		    }
+		}
+		synchronized(sess) {
+		    if(ret != null) {
+			sess.close();
+			return(new RemoteUI(ret));
+		    }
+		    if(!sess.alive())
+			return(null);
+		    sess.wait();
+		}
+	    }
+	} finally {
+	    sess.close();
+	    synchronized(sess) {
+		while(sess.alive())
+		    sess.wait();
+	    }
+	}
     }
 
     public void init(UI ui) {
-        ui.sess = sess;
+	ui.sess = sess;
     }
 
     public String title() {
-        return (sess.username);
+	return(sess.username);
     }
 }

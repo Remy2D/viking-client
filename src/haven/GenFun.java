@@ -36,66 +36,66 @@ public class GenFun<T> {
     private final Map<Class<?>, T> registry = new HashMap<>();
 
     public GenFun(Class<T> iface) {
-        this.iface = iface;
-        this.call = iface.cast(Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[]{iface}, new Handler()));
+	this.iface = iface;
+	this.call = iface.cast(Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[] {iface}, new Handler()));
     }
 
     public GenFun<T> register(Class<?> cl, T impl) {
-        synchronized (registry) {
-            registry.put(cl, impl);
-            cache.clear();
-        }
-        return (this);
+	synchronized(registry) {
+	    registry.put(cl, impl);
+	    cache.clear();
+	}
+	return(this);
     }
 
     private static final InvocationHandler passthrough = new InvocationHandler() {
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            try {
-                return (method.invoke(args[0], args));
-            } catch (IllegalAccessException e) {
-                throw (new RuntimeException(e));
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof RuntimeException)
-                    throw ((RuntimeException) e.getCause());
-                throw (new RuntimeException(e));
-            }
-        }
-    };
+	    public Object invoke(Object proxy, Method method, Object[] args) {
+		try {
+		    return(method.invoke(args[0], args));
+		} catch(IllegalAccessException e) {
+		    throw(new RuntimeException(e));
+		} catch(InvocationTargetException e) {
+		    if(e.getCause() instanceof RuntimeException)
+			throw((RuntimeException)e.getCause());
+		    throw(new RuntimeException(e));
+		}
+	    }
+	};
 
     public static class MissingImplementationException extends RuntimeException {
-        public MissingImplementationException(GenFun function, Object target) {
-            super("Missing implementation for genfun on " + function.iface.getName() + " for " + target.getClass().getName());
-        }
+	public MissingImplementationException(GenFun function, Object target) {
+	    super("Missing implementation for genfun on " + function.iface.getName() + " for " + target.getClass().getName());
+	}
     }
 
     private class Handler implements InvocationHandler {
-        public Object invoke(Object proxy, Method method, Object[] args) {
-            Class<?> cl = args[0].getClass();
-            T impl = cache.get(cl);
-            if (impl == null) {
-                if (iface.isAssignableFrom(cl)) {
-                    impl = iface.cast(Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[]{iface}, passthrough));
-                } else {
-                    synchronized (registry) {
-                        for (Class<?> scl = cl; scl != null; scl = scl.getSuperclass()) {
-                            if ((impl = registry.get(scl)) != null)
-                                break;
-                        }
-                    }
-                }
-                if (impl == null)
-                    throw (new MissingImplementationException(GenFun.this, args[0]));
-                cache.put(cl, impl);
-            }
-            try {
-                return (method.invoke(impl, args));
-            } catch (IllegalAccessException e) {
-                throw (new RuntimeException(e));
-            } catch (InvocationTargetException e) {
-                if (e.getCause() instanceof RuntimeException)
-                    throw ((RuntimeException) e.getCause());
-                throw (new RuntimeException(e));
-            }
-        }
+	public Object invoke(Object proxy, Method method, Object[] args) {
+	    Class<?> cl = args[0].getClass();
+	    T impl = cache.get(cl);
+	    if(impl == null) {
+		if(iface.isAssignableFrom(cl)) {
+		    impl = iface.cast(Proxy.newProxyInstance(iface.getClassLoader(), new Class<?>[] {iface}, passthrough));
+		} else {
+		    synchronized(registry) {
+			for(Class<?> scl = cl; scl != null; scl = scl.getSuperclass()) {
+			    if((impl = registry.get(scl)) != null)
+				break;
+			}
+		    }
+		}
+		if(impl == null)
+		    throw(new MissingImplementationException(GenFun.this, args[0]));
+		cache.put(cl, impl);
+	    }
+	    try {
+		return(method.invoke(impl, args));
+	    } catch(IllegalAccessException e) {
+		throw(new RuntimeException(e));
+	    } catch(InvocationTargetException e) {
+		if(e.getCause() instanceof RuntimeException)
+		    throw((RuntimeException)e.getCause());
+		throw(new RuntimeException(e));
+	    }
+	}
     }
 }

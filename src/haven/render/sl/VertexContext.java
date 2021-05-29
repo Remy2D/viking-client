@@ -30,15 +30,14 @@ import java.util.function.*;
 
 public class VertexContext extends ShaderContext {
     public VertexContext(ProgramContext prog) {
-        super(prog);
+	super(prog);
     }
 
     public final Function.Def main = new Function.Def(Type.VOID, new Symbol.Fix("main"));
     public final ValBlock mainvals = new ValBlock();
     private final OrderList<Consumer<Block>> code = new OrderList<>();
-
     {
-        code.add(mainvals::cons, 0);
+	code.add(mainvals::cons, 0);
     }
 
     public static final Variable gl_Position = new Variable.Implicit(Type.VEC4, new Symbol.Fix("gl_Position"));
@@ -47,48 +46,41 @@ public class VertexContext extends ShaderContext {
     public static final Variable gl_VertexID = new Variable.Implicit(Type.INT, new Symbol.Fix("gl_VertexID"));
     public static final Variable gl_InstanceID = new Variable.Implicit(Type.INT, new Symbol.Fix("gl_InstanceID"));
 
-    public Expression vertid() {
-        return (gl_VertexID.ref());
-    }
-
-    public Expression instid() {
-        return (gl_InstanceID.ref());
-    }
+    public Expression vertid() {return(gl_VertexID.ref());}
+    public Expression instid() {return(gl_InstanceID.ref());}
 
     public final ValBlock.Value posv = mainvals.new Value(Type.VEC4, new Symbol.Gen("posv")) {
-        {
-            force();
-        }
+	    {force();}
 
-        public Expression root() {
-            return (Vec4Cons.z);
-        }
+	    public Expression root() {
+		return(Vec4Cons.z);
+	    }
 
-        public void cons2(Block blk) {
-            tgt = gl_Position.ref();
-            blk.add(new LBinOp.Assign(tgt, init));
-        }
-    };
+	    public void cons2(Block blk) {
+		tgt = gl_Position.ref();
+		blk.add(new LBinOp.Assign(tgt, init));
+	    }
+	};
     public final ValBlock.Value ptsz = mainvals.new Value(Type.FLOAT, new Symbol.Gen("ptsz")) {
-        public Expression root() {
-            return (new FloatLiteral(1.0));
-        }
+	    public Expression root() {
+		return(new FloatLiteral(1.0));
+	    }
 
-        protected void cons2(Block blk) {
-            tgt = gl_PointSize.ref();
-            blk.add(new LBinOp.Assign(tgt, init));
-        }
-    };
+	    protected void cons2(Block blk) {
+		tgt = gl_PointSize.ref();
+		blk.add(new LBinOp.Assign(tgt, init));
+	    }
+	};
 
     public void mainmod(Consumer<Block> macro, int order) {
-        code.add(macro, order);
+	code.add(macro, order);
     }
 
     public void construct(java.io.Writer out) {
-        for (Consumer<Block> macro : code)
-            macro.accept(main.code);
-        main.define(this);
-        PostProc.autoproc(this);
-        output(new Output(out, this));
+	for(Consumer<Block> macro : code)
+	    macro.accept(main.code);
+	main.define(this);
+	PostProc.autoproc(this);
+	output(new Output(out, this));
     }
 }

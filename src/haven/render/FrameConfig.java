@@ -34,30 +34,23 @@ public class FrameConfig extends State {
     public static final Uniform u_numsamples = new Uniform(Type.INT, "numsamples", p -> p.get(slot).samples, slot);
     public static final Uniform u_screensize = new Uniform(Type.VEC2, "screensize", p -> p.get(slot).sz, slot);
     public static final Uniform u_pixelpitch = new Uniform(Type.VEC2, "pixelpitch", p -> {
-        Coord sz = p.get(slot).sz;
-        return (new float[]{1.0f / sz.x, 1.0f / sz.y});
-    }, slot);
+	    Coord sz = p.get(slot).sz;
+	    return(new float[] {1.0f / sz.x, 1.0f / sz.y});
+	}, slot);
     public final Coord sz;
     public final int samples;
 
     public FrameConfig(Coord sz, int samples) {
-        this.sz = sz;
-        this.samples = samples;
+	this.sz = sz;
+	this.samples = samples;
     }
 
     public FrameConfig(Coord sz) {
-        this(sz, 1);
+	this(sz, 1);
     }
 
-    public ShaderMacro shader() {
-        return (null);
-    }
+    public ShaderMacro shader() {return(null);}
+    public void apply(Pipe p) {p.put(slot, this);}
 
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
-
-    public String toString() {
-        return (String.format("#<framecfg %sx%s %s>", sz.x, sz.y, samples));
-    }
+    public String toString() {return(String.format("#<framecfg %sx%s %s>", sz.x, sz.y, samples));}
 }

@@ -1,10 +1,7 @@
 # Chop trees in the selected area, bind water containers to belts for server side autodrink
 import time
 import random
-
 sess = None
-
-
 class Listener(object):
     def callback(self, area):
         # Chop trees
@@ -15,15 +12,13 @@ class Listener(object):
                 sess.PBotCharacterAPI().msgToChat("Area Chat", "Energy is too low, stopping!")
                 return
             resname = gob.getResname()
-            if (not resname.startswith("gfx/terobjs/trees/") and not resname.startswith(
-                    "gfx/terobjs/bushes/")) or resname.endswith("log") or resname.endswith(
-                    "stump") or resname.endswith("trunk"):
+            if (not resname.startswith("gfx/terobjs/trees/") and not resname.startswith("gfx/terobjs/bushes/")) or resname.endswith("log") or resname.endswith("stump") or resname.endswith("trunk"):
                 continue
             else:
                 if sess.PBotGobAPI().findGobById(gob.getId()) == None:
                     continue
-                gob.pfClick(3, 0)
-                menu = sess.PBotUtils().getFlowermenu(1000 * 30)
+                gob.pfClick(3,0)
+                menu = sess.PBotUtils().getFlowermenu(1000*30)
                 if menu == None:
                     sess.PBotCharacterAPI().msgToChat("Area Chat", "Flowermenu timeout!")
                     continue
@@ -32,9 +27,8 @@ class Listener(object):
                 while sess.PBotGobAPI().findGobById(gob.getId()) != None:
                     time.sleep(0.1)
 
-                    if timeout - time.time() > 30:
-                        sess.PBotCharacterAPI().msgToChat("Area Chat",
-                                                          "Timeout exceeded! Stopping, probably ran out of water");
+                    if timeout-time.time() > 30:
+                        sess.PBotCharacterAPI().msgToChat("Area Chat", "Timeout exceeded! Stopping, probably ran out of water");
                         return
                 trees += 1
         # Remove stumps
@@ -48,23 +42,19 @@ class Listener(object):
             else:
                 if sess.PBotGobAPI().findGobById(gob.getId()) == None:
                     continue
-                gob.pfClick(1, 0, list(["destroy"]))
+                gob.pfClick(1,0,list(["destroy"]))
                 timeout = time.time()
                 while sess.PBotGobAPI().findGobById(gob.getId()) != None:
                     time.sleep(0.1)
 
-                    if timeout - time.time() > 60:
-                        sess.PBotCharacterAPI().msgToChat("Area Chat",
-                                                          "Timeout exceeded! Stopping, probably ran out of water");
+                    if timeout-time.time() > 60:
+                        sess.PBotCharacterAPI().msgToChat("Area Chat", "Timeout exceeded! Stopping, probably ran out of water");
                         return
                 stumps += 1
-        sess.PBotCharacterAPI().msgToChat("Area Chat",
-                                          "Finished. Got rid of {} trees and {} stumps".format(
-                                              trees, stumps))
+        sess.PBotCharacterAPI().msgToChat("Area Chat", "Finished. Got rid of {} trees and {} stumps".format(trees, stumps))
 
     class Java:
         implements = ["haven.purus.pbot.api.Callback"]
-
 
 class Script:
     def run(self, session):

@@ -32,73 +32,61 @@ public interface DataBuffer {
     public int size();
 
     public enum Usage {
-        EPHEMERAL, STREAM, STATIC;
+	EPHEMERAL, STREAM, STATIC;
     }
 
     public interface Filler<T extends DataBuffer> {
-        public FillBuffer fill(T buf, Environment env);
+	public FillBuffer fill(T buf, Environment env);
+	public default void done() {}
 
-        public default void done() {
-        }
+	public static Filler<DataBuffer> of(ByteBuffer data) {
+	    return((tgt, env) -> {
+		    FillBuffer buf = env.fillbuf(tgt);
+		    buf.pull(data.slice());
+		    return(buf);
+		});
+	}
+	public static Filler<DataBuffer> of(byte[] data) {
+	    return(of(ByteBuffer.wrap(data)));
+	}
+	public static Filler<DataBuffer> of(short[] data) {
+	    return((tgt, env) -> {
+		    FillBuffer buf = env.fillbuf(tgt);
+		    buf.push().asShortBuffer().put(data);
+		    return(buf);
+		});
+	};
+	public static Filler<DataBuffer> of(int[] data) {
+	    return((tgt, env) -> {
+		    FillBuffer buf = env.fillbuf(tgt);
+		    buf.push().asIntBuffer().put(data);
+		    return(buf);
+		});
+	};
+	public static Filler<DataBuffer> of(float[] data) {
+	    return((tgt, env) -> {
+		    FillBuffer buf = env.fillbuf(tgt);
+		    buf.push().asFloatBuffer().put(data);
+		    return(buf);
+		});
+	};
 
-        public static Filler<DataBuffer> of(ByteBuffer data) {
-            return ((tgt, env) -> {
-                FillBuffer buf = env.fillbuf(tgt);
-                buf.pull(data.slice());
-                return (buf);
-            });
-        }
-
-        public static Filler<DataBuffer> of(byte[] data) {
-            return (of(ByteBuffer.wrap(data)));
-        }
-
-        public static Filler<DataBuffer> of(short[] data) {
-            return ((tgt, env) -> {
-                FillBuffer buf = env.fillbuf(tgt);
-                buf.push().asShortBuffer().put(data);
-                return (buf);
-            });
-        }
-
-        ;
-
-        public static Filler<DataBuffer> of(int[] data) {
-            return ((tgt, env) -> {
-                FillBuffer buf = env.fillbuf(tgt);
-                buf.push().asIntBuffer().put(data);
-                return (buf);
-            });
-        }
-
-        ;
-
-        public static Filler<DataBuffer> of(float[] data) {
-            return ((tgt, env) -> {
-                FillBuffer buf = env.fillbuf(tgt);
-                buf.push().asFloatBuffer().put(data);
-                return (buf);
-            });
-        }
-
-        ;
-
-        public static Filler<DataBuffer> zero() {
-            return ((tgt, env) -> {
-                FillBuffer buf = env.fillbuf(tgt);
-                ByteBuffer data = buf.push();
-                for (int i = 0; i < buf.size(); i++)
-                    data.put(i, (byte) 0);
-                return (buf);
-            });
-        }
+	public static Filler<DataBuffer> zero() {
+	    return((tgt, env) -> {
+		    FillBuffer buf = env.fillbuf(tgt);
+		    ByteBuffer data = buf.push();
+		    for(int i = 0; i < buf.size(); i++)
+			data.put(i, (byte)0);
+		    return(buf);
+		});
+	}
     }
 
     public interface PartFiller<T extends DataBuffer> extends Filler<T> {
-        public FillBuffer fill(T buf, Environment env, int from, int to);
+	public FillBuffer fill(T buf, Environment env, int from, int to);
 
-        public default FillBuffer fill(T buf, Environment env) {
-            return (fill(buf, env, 0, buf.size()));
-        }
+	public default FillBuffer fill(T buf, Environment env) {
+	    return(fill(buf, env, 0, buf.size()));
+	}
     }
 }

@@ -33,32 +33,32 @@ public class CountingInputStream extends InputStream {
     public long pos = 0;
 
     public CountingInputStream(InputStream bk) {
-        this.bk = bk;
+	this.bk = bk;
     }
 
     protected void update(long num) {
-        this.pos += num;
+	this.pos += num;
     }
 
     public long skip(long len) throws IOException {
-        long rv = bk.skip(len);
-        update(rv);
-        return (rv);
+	long rv = bk.skip(len);
+	update(rv);
+	return(rv);
     }
 
     public int read(byte[] buf, int off, int len) throws IOException {
-        int rv = bk.read(buf, off, len);
-        update(rv);
-        return (rv);
+	int rv = bk.read(buf, off, len);
+	update(rv);
+	return(rv);
     }
 
     public int read() throws IOException {
-        int rv = bk.read();
-        update(1);
-        return (rv);
+	int rv = bk.read();
+	update(1);
+	return(rv);
     }
 
     public void close() throws IOException {
-        bk.close();
+	bk.close();
     }
 }

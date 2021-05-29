@@ -35,30 +35,30 @@ public class Fence implements BGL.Request {
     }
 
     public void run(GL3 gl) {
-        synchronized (this) {
-            state = 1;
-            notifyAll();
-        }
+	synchronized(this) {
+	    state = 1;
+	    notifyAll();
+	}
     }
 
     public void abort() {
-        synchronized (this) {
-            state = 2;
-            notifyAll();
-        }
+	synchronized(this) {
+	    state = 2;
+	    notifyAll();
+	}
     }
 
     public boolean waitfor() throws InterruptedException {
-        synchronized (this) {
-            while (state == 0)
-                wait();
-            return (state == 1);
-        }
+	synchronized(this) {
+	    while(state == 0)
+		wait();
+	    return(state == 1);
+	}
     }
 
     public static Fence make(BGL gl) {
-        Fence ret = new Fence();
-        gl.bglSubmit(ret);
-        return (ret);
+	Fence ret = new Fence();
+	gl.bglSubmit(ret);
+	return(ret);
     }
 }

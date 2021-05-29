@@ -27,7 +27,6 @@
 package haven.render.gl;
 
 import java.util.function.*;
-
 import com.jogamp.opengl.*;
 
 public class GLFence extends GLQuery {
@@ -35,25 +34,25 @@ public class GLFence extends GLQuery {
     protected long id;
 
     public GLFence(GLEnvironment env, Consumer<GL3> callback) {
-        super(env);
-        this.callback = callback;
+	super(env);
+	this.callback = callback;
     }
 
     public void create(GL3 gl) {
-        id = gl.glFenceSync(GL3.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-        env.queries.add(this);
+	id = gl.glFenceSync(GL3.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	env.queries.add(this);
     }
 
     public boolean check(GL3 gl) {
-        int[] vbuf = {0};
-        gl.glGetSynciv(id, GL3.GL_SYNC_STATUS, 1, null, 0, vbuf, 0);
-        if (vbuf[0] != GL3.GL_SIGNALED)
-            return (false);
-        callback.accept(gl);
-        return (true);
+	int[] vbuf = {0};
+	gl.glGetSynciv(id, GL3.GL_SYNC_STATUS, 1, null, 0, vbuf, 0);
+	if(vbuf[0] != GL3.GL_SIGNALED)
+	    return(false);
+	callback.accept(gl);
+	return(true);
     }
 
     public void delete(GL3 gl) {
-        gl.glDeleteSync(id);
+	gl.glDeleteSync(id);
     }
 }

@@ -27,48 +27,46 @@
 package haven;
 
 import java.util.*;
-
 import haven.error.ErrorHandler;
 
 public class Warning extends Throwable {
     public Warning(Throwable cause, String message) {
-        super(message, cause);
+	super(message, cause);
     }
 
     public Warning(String message) {
-        super(message);
+	super(message);
     }
 
     public Warning(String message, Object... args) {
-        this(String.format(message, args));
+	this(String.format(message, args));
     }
 
     public Warning(Throwable cause) {
-        super(cause);
+	super(cause);
     }
 
     private static final int LOGSIZE = 10;
     private static LinkedList<Warning> log = null;
-
     public void issue() {
-        System.err.printf("hafen: warning: %s\n", (getClass() == Warning.class) ? getMessage() : toString());
-        if (getCause() != null)
-            getCause().printStackTrace(System.err);
-        synchronized (Warning.class) {
-            if (log == null) {
-                ErrorHandler errh = ErrorHandler.find();
-                if (errh != null)
-                    errh.lsetprop("warnings", log = new LinkedList<>());
-            }
-            if (log != null) {
-                log.add(this);
-                while (log.size() > LOGSIZE)
-                    log.removeFirst();
-            }
-        }
+	System.err.printf("hafen: warning: %s\n", (getClass() == Warning.class) ? getMessage() : toString());
+	if(getCause() != null)
+	    getCause().printStackTrace(System.err);
+	synchronized(Warning.class) {
+	    if(log == null) {
+		ErrorHandler errh = ErrorHandler.find();
+		if(errh != null)
+		    errh.lsetprop("warnings", log = new LinkedList<>());
+	    }
+	    if(log != null) {
+		log.add(this);
+		while(log.size() > LOGSIZE)
+		    log.removeFirst();
+	    }
+	}
     }
 
     public static void warn(String fmt, Object... args) {
-        new Warning(fmt, args).issue();
+	new Warning(fmt, args).issue();
     }
 }

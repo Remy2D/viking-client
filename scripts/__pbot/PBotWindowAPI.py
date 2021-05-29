@@ -6,6 +6,7 @@ class PBotWindowAPI(object):
     def __init__(self, session):
         self.__session = session
 
+
     ## Get a window with a specific name
     # @param name Name of the window
     # @param timeout Timeout in milliseconds to wait for the window to appear

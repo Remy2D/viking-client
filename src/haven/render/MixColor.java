@@ -27,10 +27,8 @@
 package haven.render;
 
 import java.awt.Color;
-
 import haven.*;
 import haven.render.sl.*;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Type.*;
 
@@ -40,35 +38,30 @@ public class MixColor extends State {
     public final FColor color;
 
     public MixColor(FColor color) {
-        this.color = color;
+	this.color = color;
     }
 
     public MixColor(float r, float g, float b, float a) {
-        this(new FColor(r, g, b, a));
+	this(new FColor(r, g, b, a));
     }
 
     public MixColor(Color color) {
-        this(new FColor(color));
+	this(new FColor(color));
     }
 
     public MixColor(int r, int g, int b, int a) {
-        this(new Color(r, g, b, a));
+	this(new Color(r, g, b, a));
     }
 
     public Color color() {
-        return (new Color((int) Math.round(color.r), (int) Math.round(color.g),
-                (int) Math.round(color.b), (int) Math.round(color.a)));
+	return(new Color((int)Math.round(color.r), (int)Math.round(color.g),
+			 (int)Math.round(color.b), (int)Math.round(color.a)));
     }
 
     private static final ShaderMacro shader = prog -> {
-        FragColor.fragcol(prog.fctx).mod(in -> MiscLib.colblend.call(in, u_color.ref()), 0);
+	FragColor.fragcol(prog.fctx).mod(in -> MiscLib.colblend.call(in, u_color.ref()), 0);
     };
+    public ShaderMacro shader() {return(shader);}
 
-    public ShaderMacro shader() {
-        return (shader);
-    }
-
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
+    public void apply(Pipe p) {p.put(slot, this);}
 }

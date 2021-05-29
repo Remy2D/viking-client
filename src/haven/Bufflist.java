@@ -34,7 +34,7 @@ public class Bufflist extends Widget {
     public static final int num = 5;
 
     public interface Managed {
-        public void move(Coord c, double off);
+	public void move(Coord c, double off);
     }
 
     public Bufflist() {
@@ -42,53 +42,53 @@ public class Bufflist extends Widget {
     }
 
     private void arrange(Widget imm) {
-        int i = 0, rn = 0, x = 0, y = 0, maxh = 0;
-        Coord br = new Coord();
-        Collection<Pair<Managed, Coord>> mv = new ArrayList<>();
-        for (Widget wdg = child; wdg != null; wdg = wdg.next) {
-            if (!(wdg instanceof Managed))
-                continue;
-            Managed ch = (Managed) wdg;
-            Coord c = new Coord(x, y);
-            if (ch == imm)
-                wdg.c = c;
-            else
-                mv.add(new Pair<>(ch, c));
-            i++;
-            x += wdg.sz.x + margin;
-            maxh = Math.max(maxh, wdg.sz.y);
-            if (++rn >= num) {
-                x = 0;
-                y += maxh + margin;
-                maxh = 0;
-                rn = 0;
-            }
-            if (c.x + wdg.sz.x > br.x) br.x = c.x + wdg.sz.x;
-            if (c.y + wdg.sz.y > br.y) br.y = c.y + wdg.sz.y;
-        }
-        resize(br);
-        double off = 1.0 / mv.size(), coff = 0.0;
-        for (Pair<Managed, Coord> p : mv) {
-            p.a.move(p.b, coff);
-            coff += off;
-        }
+	int i = 0, rn = 0, x = 0, y = 0, maxh = 0;
+	Coord br = new Coord();
+	Collection<Pair<Managed, Coord>> mv = new ArrayList<>();
+	for(Widget wdg = child; wdg != null; wdg = wdg.next) {
+	    if(!(wdg instanceof Managed))
+		continue;
+	    Managed ch = (Managed)wdg;
+	    Coord c = new Coord(x, y);
+	    if(ch == imm)
+		wdg.c = c;
+	    else
+		mv.add(new Pair<>(ch, c));
+	    i++;
+	    x += wdg.sz.x + margin;
+	    maxh = Math.max(maxh, wdg.sz.y);
+	    if(++rn >= num) {
+		x = 0;
+		y += maxh + margin;
+		maxh = 0;
+		rn = 0;
+	    }
+	    if(c.x + wdg.sz.x > br.x) br.x = c.x + wdg.sz.x;
+	    if(c.y + wdg.sz.y > br.y) br.y = c.y + wdg.sz.y;
+	}
+	resize(br);
+	double off = 1.0 / mv.size(), coff = 0.0;
+	for(Pair<Managed, Coord> p : mv) {
+	    p.a.move(p.b, coff);
+	    coff += off;
+	}
     }
 
     public void addchild(Widget child, Object... args) {
-        add(child);
-        arrange(child);
+	add(child);
+	arrange(child);
     }
 
     public void cdestroy(Widget ch) {
-        arrange(null);
+	arrange(null);
     }
 
     public void draw(GOut g) {
-        for (Widget wdg = child, next; wdg != null; wdg = next) {
-            next = wdg.next;
-            if (!wdg.visible || !(wdg instanceof Managed))
-                continue;
-            wdg.draw(g.reclipl(xlate(wdg.c, true), wdg.sz));
-        }
+	for(Widget wdg = child, next; wdg != null; wdg = next) {
+	    next = wdg.next;
+	    if(!wdg.visible || !(wdg instanceof Managed))
+		continue;
+	    wdg.draw(g.reclipl(xlate(wdg.c, true), wdg.sz));
+	}
     }
 }

@@ -27,10 +27,8 @@
 package haven;
 
 import java.awt.Color;
-
 import haven.render.*;
 import haven.render.sl.*;
-
 import static haven.render.sl.Type.*;
 
 public class ColorMask extends State {
@@ -39,22 +37,20 @@ public class ColorMask extends State {
     private final FColor col;
 
     private static final ShaderMacro sh = prog -> {
-        FragColor.fragcol(prog.fctx).mod(in -> MiscLib.colblend.call(in, ccol.ref()), 100);
+	FragColor.fragcol(prog.fctx).mod(in -> MiscLib.colblend.call(in, ccol.ref()), 100);
     };
 
     public ColorMask(FColor col) {
-        this.col = col;
+	this.col = col;
     }
 
     public ColorMask(Color col) {
-        this(new FColor(col));
+	this(new FColor(col));
     }
 
-    public ShaderMacro shader() {
-        return (sh);
-    }
+    public ShaderMacro shader() {return(sh);}
 
     public void apply(Pipe buf) {
-        buf.put(slot, this);
+	buf.put(slot, this);
     }
 }

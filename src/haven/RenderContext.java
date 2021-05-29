@@ -27,7 +27,6 @@
 package haven;
 
 import java.util.*;
-
 import haven.render.*;
 import haven.render.sl.ShaderMacro;
 import haven.render.Texture2D.Sampler2D;
@@ -37,37 +36,23 @@ public abstract class RenderContext extends State implements OwnerContext {
     private final Collection<PostProcessor> post = new ArrayList<>();
 
     public static abstract class PostProcessor implements Disposable {
-        public Sampler2D buf = null;
+	public Sampler2D buf = null;
 
-        public abstract void run(GOut g, Sampler2D in);
+	public abstract void run(GOut g, Sampler2D in);
 
-        public void dispose() {
-            if (buf != null)
-                buf.dispose();
-        }
+	public void dispose() {
+	    if(buf != null)
+		buf.dispose();
+	}
     }
 
-    public Collection<PostProcessor> postproc() {
-        return (post);
-    }
-
-    public void add(PostProcessor post) {
-        this.post.add(post);
-    }
-
-    public void remove(PostProcessor post) {
-        this.post.remove(post);
-    }
+    public Collection<PostProcessor> postproc() {return(post);}
+    public void add(PostProcessor post) {this.post.add(post);}
+    public void remove(PostProcessor post) {this.post.remove(post);}
 
     public abstract Pipe.Op basic(Object id);
-
     public abstract void basic(Object id, Pipe.Op state);
 
-    public ShaderMacro shader() {
-        return (null);
-    }
-
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
+    public ShaderMacro shader() {return(null);}
+    public void apply(Pipe p) {p.put(slot, this);}
 }

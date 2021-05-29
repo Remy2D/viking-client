@@ -27,22 +27,21 @@
 package haven;
 
 import java.awt.Color;
-
 import haven.render.*;
 
 public class GobHealth extends GAttrib implements Gob.SetupMod {
     public final float hp;
     public final MixColor fx;
-
+    
     public GobHealth(Gob g, float hp) {
-        super(g);
-        this.hp = hp;
-        this.fx = new MixColor(255, 0, 0, 128 - Math.round(hp * 128));
+	super(g);
+	this.hp = hp;
+	this.fx = new MixColor(255, 0, 0, 128 - Math.round(hp * 128));
     }
-
+    
     public Pipe.Op gobstate() {
-        if (hp >= 1)
-            return (null);
-        return (fx);
+	if(hp >= 1)
+	    return(null);
+	return(fx);
     }
 }

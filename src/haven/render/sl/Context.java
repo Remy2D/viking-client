@@ -38,25 +38,25 @@ public class Context {
     public Set<String> exts = new HashSet<String>();
 
     public void walk(Walker w) {
-        for (Toplevel el : vardefs)
-            w.el(el);
-        for (Toplevel el : fundefs)
-            w.el(el);
+	for(Toplevel el : vardefs)
+	    w.el(el);
+	for(Toplevel el : fundefs)
+	    w.el(el);
     }
 
     public void output(Output out) {
-        out.write("#version 140\n\n");
-        for (String ext : exts)
-            out.write("#extension " + ext + ": require\n");
-        for (Toplevel tl : typedefs)
-            tl.output(out);
-        if (!typedefs.isEmpty())
-            out.write("\n");
-        for (Toplevel tl : vardefs)
-            tl.output(out);
-        if (!vardefs.isEmpty())
-            out.write("\n");
-        for (Toplevel tl : fundefs)
-            tl.output(out);
+	out.write("#version 140\n\n");
+	for(String ext : exts)
+	    out.write("#extension " + ext + ": require\n");
+	for(Toplevel tl : typedefs)
+	    tl.output(out);
+	if(!typedefs.isEmpty())
+	    out.write("\n");
+	for(Toplevel tl : vardefs)
+	    tl.output(out);
+	if(!vardefs.isEmpty())
+	    out.write("\n");
+	for(Toplevel tl : fundefs)
+	    tl.output(out);
     }
 }

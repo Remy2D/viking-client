@@ -31,33 +31,33 @@ public class Array extends Type {
     public final int sz;
 
     public Array(Type el, int sz) {
-        this.el = el;
-        this.sz = sz;
+	this.el = el;
+	this.sz = sz;
     }
 
     public Array(Type el) {
-        this(el, 0);
+	this(el, 0);
     }
 
     public String name(Context ctx) {
-        if (sz > 0)
-            return (el.name(ctx) + "[" + sz + "]");
-        else
-            return (el.name(ctx) + "[]");
+	if(sz > 0)
+	    return(el.name(ctx) + "[" + sz + "]");
+	else
+	    return(el.name(ctx) + "[]");
     }
 
     public void use(Context ctx) {
-        el.use(ctx);
+	el.use(ctx);
     }
 
     public int hashCode() {
-        return (el.hashCode() + sz);
+	return(el.hashCode() + sz);
     }
 
     public boolean equals(Object o) {
-        if (!(o instanceof Array))
-            return (false);
-        Array that = (Array) o;
-        return (this.el.equals(that.el) && (this.sz == that.sz));
+	if(!(o instanceof Array))
+	    return(false);
+	Array that = (Array)o;
+	return(this.el.equals(that.el) && (this.sz == that.sz));
     }
 }

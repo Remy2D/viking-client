@@ -32,32 +32,25 @@ import haven.render.sl.*;
 public class FrameInfo extends State {
     public static final Slot<FrameInfo> slot = new Slot<>(Slot.Type.SYS, FrameInfo.class);
     public static final Uniform u_time = new Uniform(Type.FLOAT, "time", p -> {
-        FrameInfo inf = p.get(slot);
-        return ((inf == null) ? 0.0f : (float) (inf.time % 3000.0));
-    }, slot);
+	    FrameInfo inf = p.get(slot);
+	    return((inf == null) ? 0.0f : (float)(inf.time % 3000.0));
+	}, slot);
     public final double time;
 
     public FrameInfo(double time) {
-        this.time = time;
+	this.time = time;
     }
 
     public FrameInfo() {
-        this(Utils.rtime());
+	this(Utils.rtime());
     }
 
-    public ShaderMacro shader() {
-        return (null);
-    }
-
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
+    public ShaderMacro shader() {return(null);}
+    public void apply(Pipe p) {p.put(slot, this);}
 
     public static Expression time() {
-        return (u_time.ref());
+	return(u_time.ref());
     }
 
-    public String toString() {
-        return (String.format("#<frameinfo @%fs>", time));
-    }
+    public String toString() {return(String.format("#<frameinfo @%fs>", time));}
 }

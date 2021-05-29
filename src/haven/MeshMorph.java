@@ -27,11 +27,9 @@
 package haven;
 
 import java.util.*;
-
 import haven.render.*;
 import haven.render.sl.*;
 import haven.render.sl.ValBlock.Value;
-
 import static haven.render.sl.Type.*;
 import static haven.render.sl.Cons.*;
 
@@ -41,47 +39,47 @@ public class MeshMorph {
     private final Collection<Attrib> morphed = new ArrayList<>();
 
     public static enum MorphType {
-        NONE, POS, DIR
+	NONE, POS, DIR
     }
 
     public static interface Morpher {
-        public void morph(Value val, MorphType type, VertexContext vctx);
+	public void morph(Value val, MorphType type, VertexContext vctx);
     }
 
     private static class Attrib {
-        final Value va;
-        final MorphType type;
+	final Value va;
+	final MorphType type;
 
-        Attrib(Value va, MorphType type) {
-            this.va = va;
-            this.type = type;
-        }
+	Attrib(Value va, MorphType type) {
+	    this.va = va;
+	    this.type = type;
+	}
     }
 
     private MeshMorph(VertexContext vctx) {
-        this.vctx = vctx;
-        vctx.prog.module(this);
-        Homo3D homo = Homo3D.get(vctx.prog);
-        add(homo.objv, MorphType.POS);
-        add(homo.objn, MorphType.DIR);
+	this.vctx = vctx;
+	vctx.prog.module(this);
+	Homo3D homo = Homo3D.get(vctx.prog);
+	add(homo.objv, MorphType.POS);
+	add(homo.objn, MorphType.DIR);
     }
 
     public void add(Morpher morph) {
-        morphs.add(morph);
-        for (Attrib attr : morphed)
-            morph.morph(attr.va, attr.type, this.vctx);
+	morphs.add(morph);
+	for(Attrib attr : morphed)
+	    morph.morph(attr.va, attr.type, this.vctx);
     }
 
     public void add(Value va, MorphType type) {
-        morphed.add(new Attrib(va, type));
-        for (Morpher morph : morphs)
-            morph.morph(va, type, this.vctx);
+	morphed.add(new Attrib(va, type));
+	for(Morpher morph : morphs)
+	    morph.morph(va, type, this.vctx);
     }
 
     public static MeshMorph get(VertexContext vctx) {
-        MeshMorph ret = vctx.prog.getmod(MeshMorph.class);
-        if (ret == null)
-            ret = new MeshMorph(vctx);
-        return (ret);
+	MeshMorph ret = vctx.prog.getmod(MeshMorph.class);
+	if(ret == null)
+	    ret = new MeshMorph(vctx);
+	return(ret);
     }
 }

@@ -25,7 +25,6 @@
  */
 
 package haven.render.sl;
-
 import java.util.*;
 
 public class Struct extends Type {
@@ -33,83 +32,82 @@ public class Struct extends Type {
     public final List<Field> fields;
 
     public static class Field {
-        public final Type type;
-        public final String name;
+	public final Type type;
+	public final String name;
 
-        public Field(Type type, String name) {
-            this.type = type;
-            this.name = name;
-        }
+	public Field(Type type, String name) {
+	    this.type = type;
+	    this.name = name;
+	}
     }
 
     private Struct(Symbol name, List<Field> fields) {
-        this.name = name;
-        this.fields = fields;
+	this.name = name;
+	this.fields = fields;
     }
 
     public Struct(Symbol name, Field... fields) {
-        this(name, Arrays.asList(fields));
+	this(name, Arrays.asList(fields));
     }
 
     public Struct(Symbol name) {
-        this(name, new LinkedList<Field>());
+	this(name, new LinkedList<Field>());
     }
 
     public static Struct make(Symbol name, Object... args) {
-        Field[] fs = new Field[args.length / 2];
-        for (int f = 0, a = 0; a < args.length; ) {
-            Type ft = (Type) args[a++];
-            String fn = (String) args[a++];
-            fs[f++] = new Field(ft, fn);
-        }
-        return (new Struct(name, fs));
+	Field[] fs = new Field[args.length / 2];
+	for(int f = 0, a = 0; a < args.length;) {
+	    Type ft = (Type)args[a++];
+	    String fn = (String)args[a++];
+	    fs[f++] = new Field(ft, fn);
+	}
+	return(new Struct(name, fs));
     }
 
     public String name(Context ctx) {
-        return (name.name(ctx));
+	return(name.name(ctx));
     }
 
     public int hashCode() {
-        return (fields.hashCode());
+	return(fields.hashCode());
     }
 
     public boolean equals(Object o) {
-        return ((o instanceof Struct) && Objects.equals(fields, ((Struct) o).fields));
+	return((o instanceof Struct) && Objects.equals(fields, ((Struct)o).fields));
     }
 
     public class Definition extends Toplevel {
-        public void walk(Walker w) {
-        }
+	public void walk(Walker w) {}
 
-        public void output(Output out) {
-            out.write("struct ");
-            out.write(name);
-            out.write(" {\n");
-            for (Field f : fields) {
-                out.write("    ");
-                out.write(f.type.name(out.ctx));
-                out.write(" ");
-                out.write(f.name);
-                out.write(";\n");
-            }
-            out.write("};\n");
-        }
+	public void output(Output out) {
+	    out.write("struct ");
+	    out.write(name);
+	    out.write(" {\n");
+	    for(Field f : fields) {
+		out.write("    ");
+		out.write(f.type.name(out.ctx));
+		out.write(" ");
+		out.write(f.name);
+		out.write(";\n");
+	    }
+	    out.write("};\n");
+	}
 
-        public Struct type() {
-            return (Struct.this);
-        }
+	public Struct type() {
+	    return(Struct.this);
+	}
     }
 
     public boolean defined(Context ctx) {
-        for (Toplevel tl : ctx.typedefs) {
-            if ((tl instanceof Definition) && (((Definition) tl).type() == this))
-                return (true);
-        }
-        return (false);
+	for(Toplevel tl : ctx.typedefs) {
+	    if((tl instanceof Definition) && (((Definition)tl).type() == this))
+		return(true);
+	}
+	return(false);
     }
 
     public void use(Context ctx) {
-        if (!defined(ctx))
-            ctx.typedefs.add(new Definition());
+	if(!defined(ctx))
+	    ctx.typedefs.add(new Definition());
     }
 }

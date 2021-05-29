@@ -27,7 +27,6 @@
 package haven;
 
 import java.awt.*;
-
 import haven.render.*;
 
 public class Speaking extends GAttrib implements RenderTree.Node, PView.Render2D {
@@ -36,33 +35,33 @@ public class Speaking extends GAttrib implements RenderTree.Node, PView.Render2D
     public static final int sx = UI.scale(5);
     public float zo;
     public Text text;
-
+	
     public Speaking(Gob gob, float zo, String text) {
-        super(gob);
-        this.zo = zo;
-        this.text = Text.render(text, Color.BLACK);
+	super(gob);
+	this.zo = zo;
+	this.text = Text.render(text, Color.BLACK);
     }
-
+	
     public void update(String text) {
-        this.text = Text.render(text, Color.BLACK);
+	this.text = Text.render(text, Color.BLACK);
     }
-
+	
     public void draw(GOut g, Coord c) {
-        Coord sz = text.sz();
-        sz.x = Math.max(sz.x, UI.scale(15));
-        Coord tl = c.sub(sx, sb.cisz().y + sz.y + svans.sz().y - sb.bb.sz().y);
-        Coord ftl = tl.add(sb.btloff());
-        g.chcolor(Color.WHITE);
-        g.frect(ftl, sz);
-        sb.draw(g, tl, sz.add(sb.cisz()));
-        g.chcolor(Color.BLACK);
-        g.image(text.tex(), ftl);
-        g.chcolor(Color.WHITE);
-        g.image(svans, c.add(0, -svans.sz().y));
+	Coord sz = text.sz();
+	sz.x = Math.max(sz.x, UI.scale(15));
+	Coord tl = c.sub(sx, sb.cisz().y + sz.y + svans.sz().y - sb.bb.sz().y);
+	Coord ftl = tl.add(sb.btloff());
+	g.chcolor(Color.WHITE);
+	g.frect(ftl, sz);
+	sb.draw(g, tl, sz.add(sb.cisz()));
+	g.chcolor(Color.BLACK);
+	g.image(text.tex(), ftl);
+	g.chcolor(Color.WHITE);
+	g.image(svans, c.add(0, -svans.sz().y));
     }
 
     public void draw(GOut g, Pipe state) {
-        Coord sc = Homo3D.obj2view(new Coord3f(0, 0, zo), state, Area.sized(g.sz())).round2();
-        draw(g, sc.add(sx, 0));
+	Coord sc = Homo3D.obj2view(new Coord3f(0, 0, zo), state, Area.sized(g.sz())).round2();
+	draw(g, sc.add(sx, 0));
     }
 }

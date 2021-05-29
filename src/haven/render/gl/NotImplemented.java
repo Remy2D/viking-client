@@ -28,14 +28,14 @@ package haven.render.gl;
 
 public class NotImplemented extends RuntimeException {
     public NotImplemented(String message, Throwable cause) {
-        super(message, cause);
+	super(message, cause);
     }
 
     public NotImplemented(String message) {
-        super(message);
+	super(message);
     }
 
     public NotImplemented() {
-        super("not implemented");
+	super("not implemented");
     }
 }

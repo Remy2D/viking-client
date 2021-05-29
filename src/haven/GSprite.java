@@ -33,76 +33,69 @@ import java.lang.reflect.Constructor;
 public abstract class GSprite implements Drawn {
     public final Owner owner;
     public static final List<Factory> factories;
-
     static {
-        factories = Arrays.asList(new Factory[]{
-                StaticGSprite.fact,
-        });
+	factories = Arrays.asList(new Factory[] {
+		StaticGSprite.fact,
+	    });
     }
 
     public interface Owner extends OwnerContext {
-        public Random mkrandoom();
-
-        public Resource getres();
-
-        @Deprecated
-        public default Glob glob() {
-            return (context(Glob.class));
-        }
+	public Random mkrandoom();
+	public Resource getres();
+	@Deprecated
+	public default Glob glob() {return(context(Glob.class));}
     }
 
     public interface ImageSprite {
-        public BufferedImage image();
+	public BufferedImage image();
     }
 
     public GSprite(Owner owner) {
-        this.owner = owner;
+	this.owner = owner;
     }
 
     public static class FactMaker implements Resource.PublishedCode.Instancer {
-        private static Factory dynfact(Class<? extends GSprite> cl) {
-            try {
-                final Constructor<? extends GSprite> cons = cl.getConstructor(Owner.class, Resource.class, Message.class);
-                return (new Factory() {
-                    public GSprite create(Owner owner, Resource res, Message sdt) {
-                        return (Utils.construct(cons, owner, res, sdt));
-                    }
-                });
-            } catch (NoSuchMethodException e) {
-            }
-            throw (new RuntimeException("Could not find any suitable constructor for dynamic sprite"));
-        }
+	private static Factory dynfact(Class<? extends GSprite> cl) {
+	    try {
+		final Constructor<? extends GSprite> cons = cl.getConstructor(Owner.class, Resource.class, Message.class);
+		return(new Factory() {
+			public GSprite create(Owner owner, Resource res, Message sdt) {
+			    return(Utils.construct(cons, owner, res, sdt));
+			}
+		    });
+	    } catch(NoSuchMethodException e) {}
+	    throw(new RuntimeException("Could not find any suitable constructor for dynamic sprite"));
+	}
 
-        public Factory make(Class<?> cl, Resource ires, Object... argv) {
-            if (Factory.class.isAssignableFrom(cl))
-                return (Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Factory.class), ires, argv));
-            if (GSprite.class.isAssignableFrom(cl))
-                return (dynfact(cl.asSubclass(GSprite.class)));
-            throw (new RuntimeException("Could not find construct sprite factory for dynamic sprite class " + cl));
-        }
+	public Factory make(Class<?> cl, Resource ires, Object... argv) {
+	    if(Factory.class.isAssignableFrom(cl))
+		return(Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Factory.class), ires, argv));
+	    if(GSprite.class.isAssignableFrom(cl))
+		return(dynfact(cl.asSubclass(GSprite.class)));
+	    throw(new RuntimeException("Could not find construct sprite factory for dynamic sprite class " + cl));
+	}
     }
 
     @Resource.PublishedCode(name = "ispr", instancer = FactMaker.class)
     public interface Factory {
-        public GSprite create(Owner owner, Resource res, Message sdt);
+	public GSprite create(Owner owner, Resource res, Message sdt);
     }
 
     public static GSprite create(Owner owner, Resource res, Message sdt) {
-        {
-            Factory f = res.getcode(Factory.class, false);
-            if (f != null)
-                return (f.create(owner, res, sdt));
-        }
-        for (Factory f : factories) {
-            GSprite ret = f.create(owner, res, sdt);
-            if (ret != null)
-                return (ret);
-        }
-        throw (new Sprite.ResourceException("Does not know how to draw resource " + res.name, res));
+	{
+	    Factory f = res.getcode(Factory.class, false);
+	    if(f != null)
+		return(f.create(owner, res, sdt));
+	}
+	for(Factory f : factories) {
+	    GSprite ret = f.create(owner, res, sdt);
+	    if(ret != null)
+		return(ret);
+	}
+	throw(new Sprite.ResourceException("Does not know how to draw resource " + res.name, res));
     }
 
     public abstract void draw(GOut g);
-
     public abstract Coord sz();
 
     public void tick(double dt) {

@@ -27,62 +27,57 @@
 package haven.render.sl;
 
 import java.util.*;
-
 import haven.*;
 
 public interface ShaderMacro {
     public void modify(ProgramContext prog);
 
     public static final ShaderMacro nil = new ShaderMacro() {
-        public void modify(ProgramContext prog) {
-        }
-
-        public String toString() {
-            return ("nil");
-        }
-    };
+	    public void modify(ProgramContext prog) {}
+	    public String toString() {return("nil");}
+	};
 
     public static class Composed implements ShaderMacro {
-        private static final WeakHashedSet<ShaderMacro> composed = new WeakHashedSet<>(Hash.eq);
-        public final Collection<ShaderMacro> smacs;
+	private static final WeakHashedSet<ShaderMacro> composed = new WeakHashedSet<>(Hash.eq);
+	public final Collection<ShaderMacro> smacs;
 
-        public Composed(Collection<ShaderMacro> smacs) {
-            this.smacs = smacs;
-        }
+	public Composed(Collection<ShaderMacro> smacs) {
+	    this.smacs = smacs;
+	}
 
-        public void modify(ProgramContext prog) {
-            for (ShaderMacro smac : smacs)
-                smac.modify(prog);
-        }
+	public void modify(ProgramContext prog) {
+	    for(ShaderMacro smac : smacs)
+		smac.modify(prog);
+	}
 
-        public String toString() {
-            return (smacs.toString());
-        }
+	public String toString() {
+	    return(smacs.toString());
+	}
 
-        public boolean equals(Object that) {
-            return ((that instanceof Composed) && (((Composed) that).smacs.equals(this.smacs)));
-        }
+	public boolean equals(Object that) {
+	    return((that instanceof Composed) && (((Composed)that).smacs.equals(this.smacs)));
+	}
 
-        public int hashCode() {
-            return (smacs.hashCode());
-        }
+	public int hashCode() {
+	    return(smacs.hashCode());
+	}
     }
 
     public static ShaderMacro compose(Collection<ShaderMacro> smacs) {
-        if (smacs.isEmpty())
-            return (nil);
-        synchronized (Composed.composed) {
-            return (Composed.composed.intern(new Composed(smacs)));
-        }
+	if(smacs.isEmpty())
+	    return(nil);
+	synchronized(Composed.composed) {
+	    return(Composed.composed.intern(new Composed(smacs)));
+	}
     }
 
     public static ShaderMacro compose(ShaderMacro... smacs) {
-        return (compose(Arrays.asList(smacs)));
+	return(compose(Arrays.asList(smacs)));
     }
 
     public static final ShaderMacro dump = new ShaderMacro() {
-        public void modify(ProgramContext prog) {
-            prog.dump = true;
-        }
-    };
+	    public void modify(ProgramContext prog) {
+		prog.dump = true;
+	    }
+	};
 }

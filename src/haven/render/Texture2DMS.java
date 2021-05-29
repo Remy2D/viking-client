@@ -27,7 +27,6 @@
 package haven.render;
 
 import haven.*;
-
 import java.util.*;
 
 public class Texture2DMS extends Texture {
@@ -35,60 +34,53 @@ public class Texture2DMS extends Texture {
     public final boolean fixed;
 
     public Texture2DMS(int w, int h, int s, boolean fixed, VectorFormat ifmt) {
-        super(DataBuffer.Usage.STATIC, ifmt, ifmt, null);
-        if ((w < 0) || (h < 0))
-            throw (new IllegalArgumentException(String.format("Texture sizes must be non-negative, not (%d, %d)", w, h)));
-        this.w = w;
-        this.h = h;
-        this.s = s;
-        this.fixed = fixed;
+	super(DataBuffer.Usage.STATIC, ifmt, ifmt, null);
+	if((w < 0) || (h < 0))
+	    throw(new IllegalArgumentException(String.format("Texture sizes must be non-negative, not (%d, %d)", w, h)));
+	this.w = w;
+	this.h = h;
+	this.s = s;
+	this.fixed = fixed;
     }
 
     public Texture2DMS(Coord dim, int s, boolean fixed, VectorFormat ifmt) {
-        this(dim.x, dim.y, s, fixed, ifmt);
+	this(dim.x, dim.y, s, fixed, ifmt);
     }
-
     public Texture2DMS(Coord dim, int s, VectorFormat ifmt) {
-        this(dim, s, false, ifmt);
+	this(dim, s, false, ifmt);
     }
 
     public Coord sz() {
-        return (new Coord(w, h));
+	return(new Coord(w, h));
     }
 
     public Image<Texture2DMS> image() {
-        return (new Image<>(this, w, h, 1, 0));
+	return(new Image<>(this, w, h, 1, 0));
     }
 
     public Collection<Image<Texture2DMS>> images() {
-        return (new AbstractCollection<Image<Texture2DMS>>() {
-            public int size() {
-                return (1);
-            }
+	return(new AbstractCollection<Image<Texture2DMS>>() {
+		public int size() {
+		    return(1);
+		}
 
-            public Iterator<Image<Texture2DMS>> iterator() {
-                return (new Iterator<Image<Texture2DMS>>() {
-                    boolean f = true;
-
-                    public boolean hasNext() {
-                        return (f);
-                    }
-
-                    public Image<Texture2DMS> next() {
-                        return (image());
-                    }
-                });
-            }
-        });
+		public Iterator<Image<Texture2DMS>> iterator() {
+		    return(new Iterator<Image<Texture2DMS>>() {
+			    boolean f = true;
+			    public boolean hasNext() {return(f);}
+			    public Image<Texture2DMS> next() {return(image());}
+			});
+		}
+	    });
     }
 
     public static class Sampler2DMS extends Sampler<Texture2DMS> {
-        public Sampler2DMS(Texture2DMS tex) {
-            super(tex);
-        }
+	public Sampler2DMS(Texture2DMS tex) {
+	    super(tex);
+	}
     }
 
     public String toString() {
-        return (String.format("#<tex2d-ms %sx%d %dx%d %d %s samples>", ifmt.cf, ifmt.nc, w, h, s, fixed ? "fixed" : "non-fixed"));
+	return(String.format("#<tex2d-ms %sx%d %dx%d %d %s samples>", ifmt.cf, ifmt.nc, w, h, s, fixed ? "fixed" : "non-fixed"));
     }
 }

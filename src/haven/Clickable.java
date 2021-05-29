@@ -31,21 +31,19 @@ import haven.render.sl.ShaderMacro;
 
 public class Clickable extends State {
     public static final Slot<Clickable> slot = new Slot<Clickable>(Slot.Type.DRAW, Clickable.class)
-            .instanced(Instancable.dummy());
+	.instanced(Instancable.dummy());
 
     public Object[] clickargs(ClickData cd) {
-        return (new Object[0]);
+	return(new Object[0]);
     }
 
-    public ShaderMacro shader() {
-        return (null);
-    }
+    public ShaderMacro shader() {return(null);}
 
     public void apply(Pipe p) {
-        p.put(slot, this);
+	p.put(slot, this);
     }
 
     public String toString() {
-        return (String.format("#<clickable>"));
+	return(String.format("#<clickable>"));
     }
 }

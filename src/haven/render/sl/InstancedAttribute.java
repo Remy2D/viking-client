@@ -27,27 +27,14 @@
 package haven.render.sl;
 
 import haven.render.*;
-
 import java.nio.ByteBuffer;
 
 public abstract class InstancedAttribute extends Attribute {
-    public InstancedAttribute(Type type, Symbol name) {
-        super(type, name);
-    }
-
-    public InstancedAttribute(Type type, String infix) {
-        super(type, infix);
-    }
-
-    public InstancedAttribute(Type type) {
-        super(type);
-    }
+    public InstancedAttribute(Type type, Symbol name) {super(type, name);}
+    public InstancedAttribute(Type type, String infix) {super(type, infix);}
+    public InstancedAttribute(Type type) {super(type);}
 
     public abstract VectorFormat attrfmt();
-
-    public int attrsize() {
-        return (attrfmt().size());
-    }
-
+    public int attrsize() {return(attrfmt().size());}
     public abstract void attrfill(ByteBuffer buf, int offset, Pipe state);
 }

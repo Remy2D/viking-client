@@ -33,33 +33,32 @@ public class HelpWnd extends BetterWindow {
     public Indir<Resource> res;
     private Indir<Resource> showing = null;
     private final RichTextBox text;
-
+    
     static {
-        /* XXX: This should use the shown resource's respool. */
-        fnd = new RichText.Foundry(Resource.remote());
-        fnd.aa = true;
+	/* XXX: This should use the shown resource's respool. */
+	fnd = new RichText.Foundry(Resource.remote());
+	fnd.aa = true;
     }
-
+    
     public HelpWnd(Indir<Resource> res) {
-        super(Coord.z, "Help!", true);
-        this.res = res;
-        this.text = add(new RichTextBox(UI.scale(300, 400), "", fnd), Coord.z);
-        add(new Button(UI.scale(100), "Dismiss") {
-            public void click() {
-                HelpWnd.this.wdgmsg("close");
-            }
-        }, UI.scale(100, 410));
-        pack();
+	super(Coord.z, "Help!", true);
+	this.res = res;
+	this.text = add(new RichTextBox(UI.scale(300, 400), "", fnd), Coord.z);
+	add(new Button(UI.scale(100), "Dismiss") {
+		public void click() {
+		    HelpWnd.this.wdgmsg("close");
+		}
+	    }, UI.scale(100, 410));
+	pack();
     }
-
+    
     public void tick(double dt) {
-        super.tick(dt);
-        if (res != showing) {
-            try {
-                text.settext(res.get().layer(Resource.pagina).text);
-                showing = res;
-            } catch (Loading e) {
-            }
-        }
+	super.tick(dt);
+	if(res != showing) {
+	    try {
+		text.settext(res.get().layer(Resource.pagina).text);
+		showing = res;
+	    } catch(Loading e) {}
+	}
     }
 }

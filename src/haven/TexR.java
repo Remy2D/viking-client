@@ -31,10 +31,8 @@ import java.awt.Graphics;
 import java.awt.image.*;
 import java.io.*;
 import java.security.*;
-
 import haven.Defer.Future;
 import haven.render.*;
-
 import static haven.render.Texture.Filter.*;
 
 @Resource.LayerName("tex")
@@ -45,118 +43,117 @@ public class TexR extends Resource.Layer implements Resource.IDLayer<Integer> {
     public final int id;
 
     public TexR(Resource res, Message buf) {
-        res.super();
-        this.id = buf.int16();
-        this.off = new Coord(buf.uint16(), buf.uint16());
-        this.sz = new Coord(buf.uint16(), buf.uint16());
-        this.tex = new Real();
-        Texture.Filter minfilter = null, magfilter = null, mipfilter = null;
-        while (!buf.eom()) {
-            int t = buf.uint8();
-            switch (t) {
-                case 0:
-                    this.img = buf.bytes(buf.int32());
-                    break;
-                case 1:
-                    int ma = buf.uint8();
-                    tex.mipmap(new Mipmapper[]{
-                            Mipmapper.avg, // Default
-                            Mipmapper.avg, // Specific
-                            Mipmapper.rnd,
-                            Mipmapper.cnt,
-                            Mipmapper.dav,
-                    }[ma]);
-                    break;
-                case 2:
-                    int magf = buf.uint8();
-                    magfilter = new Texture.Filter[]{NEAREST, LINEAR}[magf];
-                    break;
-                case 3:
-                    int minf = buf.uint8();
-                    minfilter = new Texture.Filter[]{NEAREST, LINEAR,
-                            NEAREST, NEAREST,
-                            LINEAR, LINEAR,
-                    }[minf];
-                    mipfilter = new Texture.Filter[]{null, null,
-                            NEAREST, LINEAR,
-                            NEAREST, LINEAR,
-                    }[minf];
-                    break;
-                case 4:
-                    this.mask = buf.bytes(buf.int32());
-                    break;
-                case 5:
-                    /* Linear color values, not relevant right now */
-                    break;
-                default:
-                    throw (new Resource.LoadException("Unknown texture data part " + t + " in " + res.name, getres()));
-            }
-        }
-        if (magfilter == null)
-            magfilter = LINEAR;
-        if (minfilter == null) {
-            minfilter = LINEAR;
-            mipfilter = (tex.mipmap == null) ? null : LINEAR;
-        }
-        if (res.name.startsWith("dyn/"))
-            tex.mipmap(Mipmapper.lanczos);
-        tex.img.magfilter(magfilter).minfilter(minfilter).mipfilter(mipfilter);
+	res.super();
+	this.id = buf.int16();
+	this.off = new Coord(buf.uint16(), buf.uint16());
+	this.sz = new Coord(buf.uint16(), buf.uint16());
+	this.tex = new Real();
+	Texture.Filter minfilter = null, magfilter = null, mipfilter = null;
+	while(!buf.eom()) {
+	    int t = buf.uint8();
+	    switch(t) {
+	    case 0:
+		this.img = buf.bytes(buf.int32());
+		break;
+	    case 1:
+		int ma = buf.uint8();
+		tex.mipmap(new Mipmapper[] {
+			Mipmapper.avg, // Default
+			Mipmapper.avg, // Specific
+			Mipmapper.rnd,
+			Mipmapper.cnt,
+			Mipmapper.dav,
+		    }[ma]);
+		break;
+	    case 2:
+		int magf = buf.uint8();
+		magfilter = new Texture.Filter[]{NEAREST, LINEAR}[magf];
+		break;
+	    case 3:
+		int minf = buf.uint8();
+		minfilter = new Texture.Filter[] {NEAREST, LINEAR,
+						  NEAREST, NEAREST,
+						  LINEAR, LINEAR,
+		}[minf];
+		mipfilter = new Texture.Filter[] {null, null,
+						  NEAREST, LINEAR,
+						  NEAREST, LINEAR,
+		}[minf];
+		break;
+	    case 4:
+		this.mask = buf.bytes(buf.int32());
+		break;
+	    case 5:
+		/* Linear color values, not relevant right now */
+		break;
+	    default:
+		throw(new Resource.LoadException("Unknown texture data part " + t + " in " + res.name, getres()));
+	    }
+	}
+	if(magfilter == null)
+	    magfilter = LINEAR;
+	if(minfilter == null) {
+	    minfilter = LINEAR;
+	    mipfilter = (tex.mipmap == null) ? null : LINEAR;
+	}
+	if(res.name.startsWith("dyn/"))
+		tex.mipmap(Mipmapper.lanczos);
+	tex.img.magfilter(magfilter).minfilter(minfilter).mipfilter(mipfilter);
     }
 
     private class Real extends TexL {
-        private Real() {
-            super(sz);
-        }
+	private Real() {
+	    super(sz);
+	}
 
-        private BufferedImage rd(final byte[] data) {
-            try {
-                return (Resource.readimage(new ByteArrayInputStream(data)));
-            } catch (IOException e) {
-                throw (new RuntimeException("Invalid image data in " + getres().name, e));
-            }
-        }
+	private BufferedImage rd(final byte[] data) {
+	    try {
+		return(Resource.readimage(new ByteArrayInputStream(data)));
+	    } catch(IOException e) {
+		throw(new RuntimeException("Invalid image data in " + getres().name, e));
+	    }
+	}
 
-        public BufferedImage fill() {
-            if (mask == null) {
-                return (rd(TexR.this.img));
-            } else {
-                BufferedImage col = rd(TexR.this.img);
-                BufferedImage mask = rd(TexR.this.mask);
-                Coord sz = Utils.imgsz(mask);
-                BufferedImage ret = TexI.mkbuf(sz);
-                Graphics g = ret.createGraphics();
-                g.drawImage(col, 0, 0, sz.x, sz.y, null);
-                Raster mr = mask.getRaster();
-                if (mr.getNumBands() != 1)
-                    throw (new RuntimeException("Invalid separated alpha data in " + getres().name));
-                WritableRaster rr = ret.getRaster();
-                for (int y = 0; y < sz.y; y++) {
-                    for (int x = 0; x < sz.x; x++) {
-                        rr.setSample(x, y, 3, mr.getSample(x, y, 0));
-                    }
-                }
-                g.dispose();
-                return (ret);
-            }
-        }
+	public BufferedImage fill() {
+	    if(mask == null) {
+		return(rd(TexR.this.img));
+	    } else {
+		BufferedImage col = rd(TexR.this.img);
+		BufferedImage mask = rd(TexR.this.mask);
+		Coord sz = Utils.imgsz(mask);
+		BufferedImage ret = TexI.mkbuf(sz);
+		Graphics g = ret.createGraphics();
+		g.drawImage(col, 0, 0, sz.x, sz.y, null);
+		Raster mr = mask.getRaster();
+		if(mr.getNumBands() != 1)
+		    throw(new RuntimeException("Invalid separated alpha data in " + getres().name));
+		WritableRaster rr = ret.getRaster();
+		for(int y = 0; y < sz.y; y++) {
+		    for(int x = 0; x < sz.x; x++) {
+			rr.setSample(x, y, 3, mr.getSample(x, y, 0));
+		    }
+		}
+		g.dispose();
+		return(ret);
+	    }
+	}
 
-        public String toString() {
-            return ("#<texr " + getres().name + "(" + id + ")>");
-        }
+	public String toString() {
+	    return("#<texr " + getres().name + "(" + id + ")>");
+	}
 
-        public String loadname() {
-            return ("texture in " + getres().name);
-        }
+	public String loadname() {
+	    return("texture in " + getres().name);
+	}
     }
 
     public TexL tex() {
-        return (tex);
+	return(tex);
     }
 
     public Integer layerid() {
-        return (id);
+	return(id);
     }
 
-    public void init() {
-    }
+    public void init() {}
 }

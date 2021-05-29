@@ -32,66 +32,70 @@ import java.nio.channels.*;
 
 public class FileCache implements ResCache {
     private final Path base;
-
+    
     public FileCache(Path base) {
-        this.base = base;
+	this.base = base;
     }
-
+    
     public static FileCache foruser() {
-        try {
-            String path = System.getProperty("user.home", null);
-            if (path == null)
-                return (null);
-            Path home = Utils.path(path);
-            if (!Files.exists(home) || !Files.isDirectory(home) || !Files.isReadable(home) || !Files.isWritable(home))
-                return (null);
-            Path base = Utils.pj(home, ".haven", "hafen", "cache");
-            if (!Files.exists(base)) {
-                try {
-                    Files.createDirectories(base);
-                } catch (IOException e) {
-                    return (null);
-                }
-            }
-            return (new FileCache(base));
-        } catch (SecurityException e) {
-            return (null);
-        }
+	try {
+	    String path = System.getProperty("user.home", null);
+	    if(path == null)
+		return(null);
+	    Path home = Utils.path(path);
+	    if(!Files.exists(home) || !Files.isDirectory(home) || !Files.isReadable(home) || !Files.isWritable(home))
+		return(null);
+	    Path base = Utils.pj(home, ".haven", "hafen", "cache");
+	    if(!Files.exists(base)) {
+		try {
+		    Files.createDirectories(base);
+		} catch(IOException e) {
+		    return(null);
+		}
+	    }
+	    return(new FileCache(base));
+	} catch(SecurityException e) {
+	    return(null);
+	}
     }
-
+    
     private Path forres(String nm) {
-        Path res = base;
-        String[] comp = nm.split("/");
-        for (int i = 0; i < comp.length - 1; i++)
-            res = res.resolve(comp[i]);
-        return (res.resolve(comp[comp.length - 1] + ".cached"));
+	Path res = base;
+	String[] comp = nm.split("/");
+	for(int i = 0; i < comp.length - 1; i++)
+	    res = res.resolve(comp[i]);
+	return(res.resolve(comp[comp.length - 1] + ".cached"));
     }
 
     public OutputStream store(String name) throws IOException {
-        Path nm = forres(name);
-        Path dir = nm.getParent();
-        if (!Files.exists(dir))
-            Files.createDirectories(dir);
-        Path tmp = dir.resolve(nm.getFileName().toString() + ".new");
-        Files.deleteIfExists(tmp);
-        OutputStream ret = new FilterOutputStream(Files.newOutputStream(tmp)) {
-            public void close() throws IOException {
-                super.close();
-                try {
-                    Files.move(tmp, nm, StandardCopyOption.ATOMIC_MOVE);
-                } catch (AtomicMoveNotSupportedException e) {
-                    Files.move(tmp, nm, StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        };
-        return (ret);
+	Path nm = forres(name);
+	Path dir = nm.getParent();
+	if(!Files.exists(dir))
+	    Files.createDirectories(dir);
+	Path tmp = dir.resolve(nm.getFileName().toString() + ".new");
+	Files.deleteIfExists(tmp);
+	OutputStream ret = new FilterOutputStream(Files.newOutputStream(tmp)) {
+		public void close() throws IOException {
+		    super.close();
+		    try  {
+			Files.move(tmp, nm, StandardCopyOption.ATOMIC_MOVE);
+		    } catch(AtomicMoveNotSupportedException e) {
+			Files.move(tmp, nm, StandardCopyOption.REPLACE_EXISTING);
+		    }
+		}
+	    };
+	return(ret);
     }
-
+    
     public InputStream fetch(String name) throws IOException {
-        return (Files.newInputStream(forres(name)));
+	try {
+	    return(Files.newInputStream(forres(name)));
+	} catch(NoSuchFileException e) {
+	    throw((FileNotFoundException)new FileNotFoundException(name).initCause(e));
+	}
     }
-
+    
     public String toString() {
-        return ("FileCache(" + base + ")");
+	return("FileCache(" + base + ")");
     }
 }

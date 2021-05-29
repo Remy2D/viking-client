@@ -27,7 +27,6 @@
 package haven;
 
 import java.awt.Color;
-
 import haven.render.*;
 
 public class PosLight extends Light {
@@ -35,37 +34,37 @@ public class PosLight extends Light {
     public float ac = 1.0f, al = 0.0f, aq = 0.0f;
 
     public PosLight(FColor col, Coord3f pos) {
-        super(col);
-        this.pos = pos.to4a(1);
+	super(col);
+	this.pos = pos.to4a(1);
     }
 
     public PosLight(Color col, Coord3f pos) {
-        super(col);
-        this.pos = pos.to4a(1);
+	super(col);
+	this.pos = pos.to4a(1);
     }
 
     public PosLight(FColor amb, FColor dif, FColor spc, Coord3f pos) {
-        super(amb, dif, spc);
-        this.pos = pos.to4a(1);
+	super(amb, dif, spc);
+	this.pos = pos.to4a(1);
     }
 
     public PosLight(Color amb, Color dif, Color spc, Coord3f pos) {
-        super(amb, dif, spc);
-        this.pos = pos.to4a(1);
+	super(amb, dif, spc);
+	this.pos = pos.to4a(1);
     }
 
     public void move(Coord3f pos) {
-        this.pos = pos.to4a(1);
+	this.pos = pos.to4a(1);
     }
 
     public void att(float c, float l, float q) {
-        ac = c;
-        al = l;
-        aq = q;
+	ac = c;
+	al = l;
+	aq = q;
     }
 
     public Object[] params(GroupPipe state) {
-        float[] pos = Homo3D.camxf(state).mul(Homo3D.locxf(state)).mul4(this.pos);
-        return (new Object[]{amb, dif, spc, pos, ac, al, aq});
+	float[] pos = Homo3D.camxf(state).mul(Homo3D.locxf(state)).mul4(this.pos);
+	return(new Object[] {amb, dif, spc, pos, ac, al, aq});
     }
 }

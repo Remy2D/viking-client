@@ -2,7 +2,6 @@ from typing import Optional, List
 
 from .PBotItem import PBotItem
 
-
 class PBotCharacterAPI(object):
     def __init__(self, session):
         self.__session = session
@@ -15,7 +14,7 @@ class PBotCharacterAPI(object):
     ## Returns the player energy
     # @return Player energy between 0-100
     def get_energy(self) -> float:
-        return float(self.__session.PBotCharacterAPI().getEnegry())
+        return float(self.__session.PBotCharacterAPI().getEnergy())
 
     ## Returns the player hp
     # @return Player hp between 0-100
@@ -64,8 +63,7 @@ class PBotCharacterAPI(object):
     ## Returns content of each slot in players equipment menu
     # @return list with each slot containing None or PBotItem
     def get_equipment(self) -> List[Optional[PBotItem]]:
-        return [PBotItem(x) if x is not None else None for x in
-                self.__session.PBotCharacterAPI().getEquipment()]
+        return [PBotItem(x) if x is not None else None for x in self.__session.PBotCharacterAPI().getEquipment()]
 
     ## Equip item from hand to the given slot
     # @param slot equipment slot to equip item to

@@ -27,7 +27,6 @@
 package haven.render;
 
 import java.util.*;
-
 import haven.*;
 import haven.render.sl.ShaderMacro;
 
@@ -35,66 +34,51 @@ public interface Rendered {
     public void draw(Pipe context, Render out);
 
     public static interface Instancable extends Rendered {
-        public default Object instanceid() {
-            return (this);
-        }
-
-        public Instanced instancify(InstanceBatch batch);
+	public default Object instanceid() {return(this);}
+	public Instanced instancify(InstanceBatch batch);
     }
 
     public static interface Instanced extends Rendered, InstanceBatch.Client, Disposable {
     }
 
     public static final State.Slot<Order> order = new State.Slot<>(State.Slot.Type.GEOM, Order.class);
-
     public abstract static class Order<C extends Order> extends State {
-        public abstract int mainorder();
+	public abstract int mainorder();
+	public abstract Comparator<? super C> comparator();
 
-        public abstract Comparator<? super C> comparator();
+	public ShaderMacro shader() {return(null);}
+	public void apply(Pipe p) {p.put(order, this);}
 
-        public ShaderMacro shader() {
-            return (null);
-        }
+	public static class Default extends Order<Order> {
+	    private final int z;
 
-        public void apply(Pipe p) {
-            p.put(order, this);
-        }
+	    public Default(int z) {
+		this.z = z;
+	    }
 
-        public static class Default extends Order<Order> {
-            private final int z;
+	    public int mainorder() {
+		return(z);
+	    }
 
-            public Default(int z) {
-                this.z = z;
-            }
+	    private static final Comparator<Order> cmp = new Comparator<Order>() {
+		    public int compare(Order a, Order b) {
+			return(0);
+		    }
+		};
+	    public Comparator<Order> comparator() {return(cmp);}
 
-            public int mainorder() {
-                return (z);
-            }
+	    public String toString() {return(String.format("#<order flat %s>", z));}
+	}
 
-            private static final Comparator<Order> cmp = new Comparator<Order>() {
-                public int compare(Order a, Order b) {
-                    return (0);
-                }
-            };
-
-            public Comparator<Order> comparator() {
-                return (cmp);
-            }
-
-            public String toString() {
-                return (String.format("#<order flat %s>", z));
-            }
-        }
-
-        public static final Comparator<Order> cmp = new Comparator<Order>() {
-            @SuppressWarnings("unchecked")
-            public int compare(Order a, Order b) {
-                int c;
-                if ((c = (a.mainorder() - b.mainorder())) != 0)
-                    return (c);
-                return (a.comparator().compare(a, b));
-            }
-        };
+	public static final Comparator<Order> cmp = new Comparator<Order>() {
+		@SuppressWarnings("unchecked")
+		public int compare(Order a, Order b) {
+		    int c;
+		    if((c = (a.mainorder() - b.mainorder())) != 0)
+			return(c);
+		    return(a.comparator().compare(a, b));
+		}
+	    };
     }
 
     public final static Order deflt = new Order.Default(0);
@@ -107,35 +91,35 @@ public interface Rendered {
     public final static Pipe.Op eeyesort = new Order.Default(4500); // XXXRENDER
 
     public static class ScreenQuad implements Rendered, RenderTree.Node {
-        public static final Model data =
-                new Model(Model.Mode.TRIANGLE_STRIP,
-                        new VertexArray(new VertexArray.Layout(new VertexArray.Layout.Input(Ortho2D.pos, new VectorFormat(2, NumberFormat.SNORM8), 0, 0, 4),
-                                new VertexArray.Layout.Input(Tex2D.texc, new VectorFormat(2, NumberFormat.SNORM8), 0, 2, 4)),
-                                new VertexArray.Buffer(16, DataBuffer.Usage.STATIC, DataBuffer.Filler.of(new byte[]{
-                                        -127, -127, 0, 0,
-                                        127, -127, 127, 0,
-                                        -127, 127, 0, 127,
-                                        127, 127, 127, 127,
-                                }))),
-                        null, 0, 4);
-        public final Pipe.Op state;
+	public static final Model data =
+	    new Model(Model.Mode.TRIANGLE_STRIP,
+		      new VertexArray(new VertexArray.Layout(new VertexArray.Layout.Input(Ortho2D.pos, new VectorFormat(2, NumberFormat.SNORM8), 0, 0, 4),
+							     new VertexArray.Layout.Input(Tex2D.texc, new VectorFormat(2, NumberFormat.SNORM8), 0, 2, 4)),
+				      new VertexArray.Buffer(16, DataBuffer.Usage.STATIC, DataBuffer.Filler.of(new byte[] {
+						  -127, -127,   0,   0,
+						   127, -127, 127,   0,
+						  -127,  127,   0, 127,
+						   127,  127, 127, 127,
+					      }))),
+		      null, 0, 4);
+	public final Pipe.Op state;
 
-        public ScreenQuad(boolean invert) {
-            Pipe.Op vxf;
-            if (invert)
-                vxf = new Ortho2D(-1, -1, 1, 1);
-            else
-                vxf = new Ortho2D(-1, 1, 1, -1);
-            state = Pipe.Op.compose(States.maskdepth, States.Depthtest.none, new States.Facecull(States.Facecull.Mode.NONE),
-                    vxf);
-        }
+	public ScreenQuad(boolean invert) {
+	    Pipe.Op vxf;
+	    if(invert)
+		vxf = new Ortho2D(-1, -1,  1,  1);
+	    else
+		vxf = new Ortho2D(-1,  1,  1, -1);
+	    state = Pipe.Op.compose(States.maskdepth, States.Depthtest.none, new States.Facecull(States.Facecull.Mode.NONE),
+				    vxf);
+	}
 
-        public void draw(Pipe state, Render out) {
-            out.draw(state, data);
-        }
+	public void draw(Pipe state, Render out) {
+	    out.draw(state, data);
+	}
 
-        public void added(RenderTree.Slot slot) {
-            slot.ostate(state);
-        }
+	public void added(RenderTree.Slot slot) {
+	    slot.ostate(state);
+	}
     }
 }

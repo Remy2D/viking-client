@@ -32,71 +32,63 @@ public abstract class Transform extends State {
     private static final Pair<Matrix4f, Matrix4f> NONE = new Pair<>(null, null);
     private Matrix4f xf;
     private Pair<Matrix4f, Matrix4f> last = NONE;
-
+    
     public Transform(Matrix4f xf) {
-        this.xf = xf;
+	this.xf = xf;
     }
-
-    public haven.render.sl.ShaderMacro shader() {
-        return (null);
-    }
+    
+    public haven.render.sl.ShaderMacro shader() {return(null);}
 
     public void update(Matrix4f xf) {
-        this.xf = xf;
+	this.xf = xf;
     }
-
+    
     public Matrix4f fin(Matrix4f p) {
-        if (p == Matrix4f.id)
-            return (xf);
-        Pair<Matrix4f, Matrix4f> last = this.last;
-        if (p != last.a)
-            this.last = last = new Pair<>(p, p.mul(xf));
-        return (last.b);
+	if(p == Matrix4f.id)
+	    return(xf);
+	Pair<Matrix4f, Matrix4f> last = this.last;
+	if(p != last.a)
+	    this.last = last = new Pair<>(p, p.mul(xf));
+	return(last.b);
     }
 
     public boolean equals(Object o) {
-        return ((o instanceof Transform) && ((Transform) o).xf.equals(this.xf));
+	return((o instanceof Transform) && ((Transform)o).xf.equals(this.xf));
     }
 
     public int hashCode() {
-        return (xf.hashCode());
+	return(xf.hashCode());
     }
-
+    
     public static Matrix4f makexlate(Matrix4f d, Coord3f c) {
-        d.m[0] = d.m[5] = d.m[10] = d.m[15] = 1.0f;
-        d.m[1] = d.m[2] = d.m[3] =
-                d.m[4] = d.m[6] = d.m[7] =
-                        d.m[8] = d.m[9] = d.m[11] = 0.0f;
-        d.m[12] = c.x;
-        d.m[13] = c.y;
-        d.m[14] = c.z;
-        return (d);
+	d.m[ 0] = d.m[ 5] = d.m[10] = d.m[15] = 1.0f;
+	d.m[ 1] = d.m[ 2] = d.m[ 3] =
+	d.m[ 4] = d.m[ 6] = d.m[ 7] =
+	d.m[ 8] = d.m[ 9] = d.m[11] = 0.0f;
+	d.m[12] = c.x;
+	d.m[13] = c.y;
+	d.m[14] = c.z;
+	return(d);
     }
 
     public static Matrix4f makerot(Matrix4f d, Coord3f axis, float angle) {
-        float c = (float) Math.cos(angle), s = (float) Math.sin(angle), C = 1.0f - c;
-        float x = axis.x, y = axis.y, z = axis.z;
-        d.m[3] = d.m[7] = d.m[11] = d.m[12] = d.m[13] = d.m[14] = 0.0f;
-        d.m[15] = 1.0f;
-        d.m[0] = (x * x * C) + c;
-        d.m[4] = (y * x * C) - (z * s);
-        d.m[8] = (z * x * C) + (y * s);
-        d.m[1] = (x * y * C) + (z * s);
-        d.m[5] = (y * y * C) + c;
-        d.m[9] = (z * y * C) - (x * s);
-        d.m[2] = (x * z * C) - (y * s);
-        d.m[6] = (y * z * C) + (x * s);
-        d.m[10] = (z * z * C) + c;
-        return (d);
+	float c = (float)Math.cos(angle), s = (float)Math.sin(angle), C = 1.0f - c;
+	float x = axis.x, y = axis.y, z = axis.z;
+	d.m[ 3] = d.m[ 7] = d.m[11] = d.m[12] = d.m[13] = d.m[14] = 0.0f;
+	d.m[15] = 1.0f;
+	d.m[ 0] = (x * x * C) + c;       d.m[ 4] = (y * x * C) - (z * s); d.m[ 8] = (z * x * C) + (y * s);
+	d.m[ 1] = (x * y * C) + (z * s); d.m[ 5] = (y * y * C) + c;       d.m[ 9] = (z * y * C) - (x * s);
+	d.m[ 2] = (x * z * C) - (y * s); d.m[ 6] = (y * z * C) + (x * s); d.m[10] = (z * z * C) + c;
+	return(d);
     }
-
+    
     public static Matrix4f rxinvert(Matrix4f m) {
-        /* This assumes that m is merely a composition of rotations
-         * and translations. */
-        return (m.trim3(1).transpose().mul1(makexlate(new Matrix4f(), new Coord3f(-m.m[12], -m.m[13], -m.m[14]))));
+	/* This assumes that m is merely a composition of rotations
+	 * and translations. */
+	return(m.trim3(1).transpose().mul1(makexlate(new Matrix4f(), new Coord3f(-m.m[12], -m.m[13], -m.m[14]))));
     }
 
     public String toString() {
-        return (this.getClass().getName() + "(" + xf + ")");
+	return(this.getClass().getName() + "(" + xf + ")");
     }
 }

@@ -33,71 +33,71 @@ public class LockDebugList<E> extends AbstractList<E> {
     private Object monitor = null;
 
     public LockDebugList(List<E> back) {
-        this.back = back;
+	this.back = back;
     }
 
     public void check() {
-        if ((monitor != null) && !Thread.holdsLock(monitor))
-            throw (new RuntimeException("lock check failed"));
+	if((monitor != null) && !Thread.holdsLock(monitor))
+	    throw(new RuntimeException("lock check failed"));
     }
 
     public LockDebugList<E> monitor(Object monitor) {
-        this.monitor = monitor;
-        return (this);
+	this.monitor = monitor;
+	return(this);
     }
 
     public E get(int i) {
-        check();
-        return (back.get(i));
+	check();
+	return(back.get(i));
     }
 
     public int size() {
-        check();
-        return (back.size());
+	check();
+	return(back.size());
     }
 
     public Iterator<E> iterator() {
-        check();
-        return (back.iterator());
+	check();
+	return(back.iterator());
     }
 
     public ListIterator<E> listIterator() {
-        check();
-        return (back.listIterator());
+	check();
+	return(back.listIterator());
     }
 
     public ListIterator<E> listIterator(int i) {
-        check();
-        return (back.listIterator(i));
+	check();
+	return(back.listIterator(i));
     }
 
     public boolean add(E el) {
-        check();
-        return (back.add(el));
+	check();
+	return(back.add(el));
     }
 
     public void add(int i, E el) {
-        check();
-        back.add(i, el);
+	check();
+	back.add(i, el);
     }
 
     public E set(int i, E el) {
-        check();
-        return (back.set(i, el));
+	check();
+	return(back.set(i, el));
     }
 
     public void clear() {
-        check();
-        back.clear();
+	check();
+	back.clear();
     }
 
     public E remove(int i) {
-        check();
-        return (back.remove(i));
+	check();
+	return(back.remove(i));
     }
 
     public boolean remove(Object el) {
-        check();
-        return (back.remove(el));
+	check();
+	return(back.remove(el));
     }
 }

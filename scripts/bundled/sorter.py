@@ -1,10 +1,8 @@
 # Sort 1x1 items by name, quality in Cupboards, Chests, Crates, Woodboxes and Baskets
 import sys, os
-
 sys.path.insert(0, os.path.abspath('..'))
 
 from __pbot.PBotSession import PBotSession
-
 
 class Script:
     def run(self, sess: PBotSession):
@@ -15,7 +13,7 @@ class Script:
             for inv in wnd.get_inventories():
                 inv_grid = [[False for _ in range(inv.size()[1])] for __ in range(inv.size()[0])]
                 for itm in inv.get_inventory_items():
-                    if itm.get_size() == (1, 1,):
+                    if itm.get_size() == (1,1,):
                         continue
                     loc = itm.get_inv_loc()
                     sz = itm.get_size()
@@ -23,8 +21,8 @@ class Script:
                         for y in range(sz[1]):
                             inv_grid[loc[0] + x][loc[1] + y] = True
 
-                itms = sorted(filter(lambda x: x.get_size() == (1, 1,), inv.get_inventory_items()),
-                              key=lambda x: (x.get_name(), -x.get_quality(),))
+
+                itms = sorted(filter(lambda x: x.get_size() == (1,1,), inv.get_inventory_items()), key=lambda x: (x.get_name(), -x.get_quality(),))
                 itms = list(map(lambda x: [x, x.get_inv_loc()], itms))
                 cur_x = -1
                 cur_y = 0

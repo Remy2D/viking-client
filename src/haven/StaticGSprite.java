@@ -32,28 +32,28 @@ public class StaticGSprite extends GSprite implements GSprite.ImageSprite {
     public final Resource.Image img;
 
     public static final Factory fact = new Factory() {
-        public GSprite create(Owner owner, Resource res, Message sdt) {
-            Resource.Image img = res.layer(Resource.imgc);
-            if (img != null)
-                return (new StaticGSprite(owner, img));
-            return (null);
-        }
-    };
+	    public GSprite create(Owner owner, Resource res, Message sdt) {
+		Resource.Image img = res.layer(Resource.imgc);
+		if(img != null)
+		    return(new StaticGSprite(owner, img));
+		return(null);
+	    }
+	};
 
     public StaticGSprite(Owner owner, Resource.Image img) {
-        super(owner);
-        this.img = img;
+	super(owner);
+	this.img = img;
     }
 
     public void draw(GOut g) {
-        g.image(img, Coord.z);
+	g.image(img, Coord.z);
     }
 
     public Coord sz() {
-        return (img.ssz);
+	return(img.ssz);
     }
 
     public BufferedImage image() {
-        return (img.img);
+	return(img.img);
     }
 }

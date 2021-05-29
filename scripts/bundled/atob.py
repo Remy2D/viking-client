@@ -1,6 +1,5 @@
 ## Transfer items from inventory to closest gob, like drying frame oven etc.
 import sys, os
-
 sys.path.insert(0, os.path.abspath('..'))
 
 from __pbot.PBotSession import PBotSession
@@ -15,7 +14,7 @@ class Script:
         if wnd_name is None:
             return
         gob.do_click(3)
-        wnd = sess.PBotWindowAPI.get_window(wnd_name, 1000 * 5)
+        wnd = sess.PBotWindowAPI.get_window(wnd_name, 1000*5)
         if wnd is None:
             return
         invs = wnd.get_inventories()

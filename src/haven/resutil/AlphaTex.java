@@ -27,13 +27,11 @@
 package haven.resutil;
 
 import java.util.*;
-
 import haven.*;
 import haven.render.*;
 import haven.render.sl.*;
 import haven.render.Texture2D.Sampler2D;
 import haven.render.sl.ValBlock.Value;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Function.PDir.*;
 import static haven.render.sl.Type.*;
@@ -48,53 +46,46 @@ public class AlphaTex extends State {
     public final float cthr;
 
     public AlphaTex(Sampler2D tex, float clip) {
-        this.tex = tex;
-        this.cthr = clip;
+	this.tex = tex;
+	this.cthr = clip;
     }
 
     public AlphaTex(Sampler2D tex) {
-        this(tex, 0);
+	this(tex, 0);
     }
 
     private static final AutoVarying fc = new AutoVarying(VEC2) {
-        {
-            ipol = Interpol.CENTROID;
-        }
-
-        protected Expression root(VertexContext vctx) {
-            return (clipc.ref());
-        }
-    };
-
+	    {ipol = Interpol.CENTROID;}
+	    protected Expression root(VertexContext vctx) {
+		return(clipc.ref());
+	    }
+	};
     private static Value value(FragmentContext fctx) {
-        return (fctx.uniform.ext(ctex, () -> fctx.uniform.new Value(VEC4) {
-            public Expression root() {
-                return (texture2D(ctex.ref(), fc.ref()));
-            }
-        }));
+	return(fctx.uniform.ext(ctex, () -> fctx.uniform.new Value(VEC4) {
+		public Expression root() {
+		    return(texture2D(ctex.ref(), fc.ref()));
+		}
+	    }));
     }
-
     private static final ShaderMacro main = prog -> {
-        final Value val = value(prog.fctx);
-        val.force();
-        FragColor.fragcol(prog.fctx).mod(in -> mul(in, val.ref()), 100);
+	final Value val = value(prog.fctx);
+	val.force();
+	FragColor.fragcol(prog.fctx).mod(in -> mul(in, val.ref()), 100);
     };
     private static final ShaderMacro clip = prog -> {
-        final Value val = value(prog.fctx);
-        val.force();
-        prog.fctx.mainmod(blk -> blk.add(new If(lt(pick(val.ref(), "a"), cclip.ref()),
-                        new Discard())),
-                -100);
+	final Value val = value(prog.fctx);
+	val.force();
+	prog.fctx.mainmod(blk -> blk.add(new If(lt(pick(val.ref(), "a"), cclip.ref()),
+						new Discard())),
+			  -100);
     };
 
     private static final ShaderMacro shnc = main;
     private static final ShaderMacro shwc = ShaderMacro.compose(main, clip);
 
-    public ShaderMacro shader() {
-        return ((cthr > 0) ? shwc : shnc);
-    }
+    public ShaderMacro shader() {return((cthr > 0)?shwc:shnc);}
 
     public void apply(Pipe buf) {
-        buf.put(slot, this);
+	buf.put(slot, this);
     }
 }

@@ -30,107 +30,107 @@ import java.util.*;
 
 public interface DefaultCollection<E> extends Collection<E> {
     public default int size() {
-        int n = 0;
-        for (E el : this)
-            n++;
-        return (n);
+	int n = 0;
+	for(E el : this)
+	    n++;
+	return(n);
     }
 
     public default boolean isEmpty() {
-        return (!iterator().hasNext());
+	return(!iterator().hasNext());
     }
 
     public default void clear() {
-        for (Iterator<E> i = iterator(); i.hasNext(); ) {
-            i.next();
-            i.remove();
-        }
+	for(Iterator<E> i = iterator(); i.hasNext();) {
+	    i.next();
+	    i.remove();
+	}
     }
 
     public default boolean remove(Object el) {
-        for (Iterator<E> i = iterator(); i.hasNext(); ) {
-            if (Objects.equals(i, el)) {
-                i.remove();
-                return (true);
-            }
-        }
-        return (false);
+	for(Iterator<E> i = iterator(); i.hasNext();) {
+	    if(Objects.equals(i, el)) {
+		i.remove();
+		return(true);
+	    }
+	}
+	return(false);
     }
 
     public default boolean add(E el) {
-        throw (new UnsupportedOperationException());
+	throw(new UnsupportedOperationException());
     }
 
     public default boolean contains(Object o) {
-        for (E el : this) {
-            if (Objects.equals(o, el))
-                return (true);
-        }
-        return (false);
+	for(E el : this) {
+	    if(Objects.equals(o, el))
+		return(true);
+	}
+	return(false);
     }
 
     public default boolean retainAll(Collection<?> c) {
-        boolean ret = false;
-        for (Iterator<E> i = iterator(); i.hasNext(); ) {
-            if (!c.contains(i.next())) {
-                i.remove();
-                ret = true;
-            }
-        }
-        return (ret);
+	boolean ret = false;
+	for(Iterator<E> i = iterator(); i.hasNext();) {
+	    if(!c.contains(i.next())) {
+		i.remove();
+		ret = true;
+	    }
+	}
+	return(ret);
     }
 
     public default boolean removeAll(Collection<?> c) {
-        boolean ret = false;
-        for (Iterator<E> i = iterator(); i.hasNext(); ) {
-            if (c.contains(i.next())) {
-                i.remove();
-                ret = true;
-            }
-        }
-        return (ret);
+	boolean ret = false;
+	for(Iterator<E> i = iterator(); i.hasNext();) {
+	    if(c.contains(i.next())) {
+		i.remove();
+		ret = true;
+	    }
+	}
+	return(ret);
     }
 
     public default boolean addAll(Collection<? extends E> c) {
-        boolean ret = false;
-        for (E el : c) {
-            if (add(el))
-                ret = true;
-        }
-        return (ret);
+	boolean ret = false;
+	for(E el : c) {
+	    if(add(el))
+		ret = true;
+	}
+	return(ret);
     }
 
     public default boolean containsAll(Collection<?> c) {
-        for (Object el : c) {
-            if (!contains(el))
-                return (false);
-        }
-        return (true);
+	for(Object el : c) {
+	    if(!contains(el))
+		return(false);
+	}
+	return(true);
     }
 
     @SuppressWarnings("unchecked")
     public default <T> T[] toArray(T[] buf) {
-        int sz = size();
-        T[] ret;
-        if (sz < buf.length)
-            ret = buf;
-        else
-            ret = (T[]) java.lang.reflect.Array.newInstance(buf.getClass().getComponentType(), sz);
-        Iterator<E> i = iterator();
-        for (int n = 0; n < ret.length; n++) {
-            if (!i.hasNext()) {
-                if (ret == buf)
-                    ret[n] = null;
-                else if (n < ret.length)
-                    return (Arrays.copyOf(ret, n));
-                return (ret);
-            }
-            ret[n] = (T) i.next();
-        }
-        return (ret);
+	int sz = size();
+	T[] ret;
+	if(sz < buf.length)
+	    ret = buf;
+	else
+	    ret = (T[])java.lang.reflect.Array.newInstance(buf.getClass().getComponentType(), sz);
+	Iterator<E> i = iterator();
+	for(int n = 0; n < ret.length; n++) {
+	    if(!i.hasNext()) {
+		if(ret == buf)
+		    ret[n] = null;
+		else if(n < ret.length)
+		    return(Arrays.copyOf(ret, n));
+		return(ret);
+	    }
+	    ret[n] = (T)i.next();
+	}
+	return(ret);
     }
 
     public default Object[] toArray() {
-        return (toArray(new Object[0]));
+	return(toArray(new Object[0]));
     }
 }

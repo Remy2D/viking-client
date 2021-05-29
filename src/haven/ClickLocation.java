@@ -27,11 +27,9 @@
 package haven;
 
 import java.nio.FloatBuffer;
-
 import haven.render.*;
 import haven.render.sl.*;
 import haven.render.sl.ValBlock.Value;
-
 import static haven.render.sl.Type.*;
 
 public class ClickLocation<T extends Texture.Image> extends State {
@@ -41,40 +39,37 @@ public class ClickLocation<T extends Texture.Image> extends State {
     public final T image;
 
     public ClickLocation(T image) {
-        this.image = image;
+	this.image = image;
     }
 
-    public void apply(Pipe p) {
-        p.put(tex, this);
-    }
+    public void apply(Pipe p) {p.put(tex, this);}
 
     public static final AutoVarying vertloc = new AutoVarying(VEC2) {
-        protected Expression root(VertexContext vctx) {
-            return (vertex.ref());
-        }
-    };
+	    protected Expression root(VertexContext vctx) {
+		return(vertex.ref());
+	    }
+	};
 
     public static Value fragloc(FragmentContext fctx) {
-        return (fctx.mainvals.ext(fragloc, () -> fctx.mainvals.new Value(VEC2) {
-            public Expression root() {
-                return (vertloc.ref());
-            }
+	return(fctx.mainvals.ext(fragloc, () -> fctx.mainvals.new Value(VEC2) {
+		public Expression root() {
+		    return(vertloc.ref());
+		}
 
-            protected void cons2(Block blk) {
-                blk.add(new LBinOp.Assign(fragloc.ref(), init));
-            }
-        }));
+		protected void cons2(Block blk) {
+		    blk.add(new LBinOp.Assign(fragloc.ref(), init));
+		}
+	    }));
     }
 
     private static final ShaderMacro shader = prog -> fragloc(prog.fctx).force();
-
     public ShaderMacro shader() {
-        return (shader);
+	return(shader);
     }
 
     public static class LocData extends VertexBuf.FloatData {
-        public LocData(FloatBuffer data) {
-            super(vertex, 2, data);
-        }
+	public LocData(FloatBuffer data) {
+	    super(vertex, 2, data);
+	}
     }
 }

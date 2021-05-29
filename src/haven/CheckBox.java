@@ -37,44 +37,41 @@ public class CheckBox extends ACheckBox {
 
     @RName("chk")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            CheckBox ret = new CheckBox((String) args[0]);
-            ret.canactivate = true;
-            return (ret);
-        }
+	public Widget create(UI ui, Object[] args) {
+	    CheckBox ret = new CheckBox((String)args[0]);
+	    ret.canactivate = true;
+	    return(ret);
+	}
     }
 
     public CheckBox(String lbl, boolean lg) {
-        this.lbl = Text.std.render(lbl, java.awt.Color.WHITE);
-        if (lg) {
-            box = lbox;
-            mark = lmark;
-            loff = new Coord(0, this.lbl.sz().y / 2);
-        } else {
-            box = sbox;
-            mark = smark;
-            loff = UI.scale(new Coord(5, 0));
-        }
-        sz = new Coord(box.sz().x + UI.scale(5) + this.lbl.sz().x, Math.max(box.sz().y, this.lbl.sz().y));
+	this.lbl = Text.std.render(lbl, java.awt.Color.WHITE);
+	if(lg) {
+	    box = lbox; mark = lmark;
+	    loff = new Coord(0, this.lbl.sz().y / 2);
+	} else {
+	    box = sbox; mark = smark;
+	    loff = UI.scale(new Coord(5, 0));
+	}
+	sz = new Coord(box.sz().x + UI.scale(5) + this.lbl.sz().x, Math.max(box.sz().y, this.lbl.sz().y));
     }
 
     public CheckBox(String lbl) {
-        this(lbl, false);
+	this(lbl, false);
     }
 
     public void draw(GOut g) {
         g.image(lbl.tex(), loff.add(box.sz().x, (sz.y - lbl.sz().y) / 2));
         g.image(box, Coord.z.add(0, (sz.y - box.sz().y) / 2));
-        if (state())
+        if(state())
             g.image(mark, Coord.z.add(0, (sz.y - mark.sz().y) / 2));
         super.draw(g);
     }
-
     public boolean mousedown(Coord c, int button) {
-        if (button == 1) {
-            click();
-            return (true);
-        }
-        return (super.mousedown(c, button));
+	if(button == 1) {
+	    click();
+	    return(true);
+	}
+	return(super.mousedown(c, button));
     }
 }

@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple
 from .PBotItem import PBotItem
 
-
 class PBotInventory(object):
     def __init__(self, inv):
         self.__inv = inv
@@ -51,7 +50,6 @@ class PBotInventory(object):
     def size(self) -> Tuple[int, int]:
         sz = self.__inv.size()
         return sz.x, sz.y,
-
 
 ## Inventory where the item is located in
 # @return inventory or None if not found

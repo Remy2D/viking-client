@@ -27,72 +27,62 @@
 package haven.render;
 
 import haven.*;
-
 import java.util.*;
 
 public interface RenderList<R> {
     public interface Slot<R> {
-        public GroupPipe state();
+	public GroupPipe state();
+	public R obj();
 
-        public R obj();
-
-        @SuppressWarnings("unchecked")
-        public default <T> Slot<T> cast(Class<T> cl) {
-            Object obj = obj();
-            if ((obj != null) && !cl.isInstance(obj()))
-                throw (new ClassCastException(obj.getClass().toString() + " => " + cl.toString()));
-            return ((Slot<T>) this);
-        }
+	@SuppressWarnings("unchecked")
+	public default <T> Slot<T> cast(Class<T> cl) {
+	    Object obj = obj();
+	    if((obj != null) && !cl.isInstance(obj()))
+		throw(new ClassCastException(obj.getClass().toString() + " => " + cl.toString()));
+	    return((Slot<T>)this);
+	}
     }
 
     public interface Adapter {
-        public Locked lock();
+	public Locked lock();
+	public Iterable<? extends Slot<?>> slots();
+	public <R> void add(RenderList<R> list, Class<? extends R> type);
+	public void remove(RenderList<?> list);
 
-        public Iterable<? extends Slot<?>> slots();
-
-        public <R> void add(RenderList<R> list, Class<? extends R> type);
-
-        public void remove(RenderList<?> list);
-
-        public default String stats() {
-            return ("N/A");
-        }
+	public default String stats() {return("N/A");}
     }
 
     public void add(Slot<? extends R> slot);
-
     public void remove(Slot<? extends R> slot);
-
     public void update(Slot<? extends R> slot);
-
     public void update(Pipe group, int[] statemask);
 
     public default void syncadd(Adapter tree, Class<? extends R> type) {
-        Collection<Slot<?>> initial;
-        try (Locked lk = tree.lock()) {
-            for (Slot<?> slot : tree.slots()) {
-                if (type.isInstance(slot.obj())) {
-                    while (true) {
-                        try {
-                            this.add(slot.cast(type));
-                            break;
-                        } catch (Loading l) {
-                            try {
-                                l.waitfor();
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-            tree.add(this, type);
-        }
+	Collection<Slot<?>> initial;
+	try(Locked lk = tree.lock()) {
+	    for(Slot<?> slot : tree.slots()) {
+		if(type.isInstance(slot.obj())) {
+		    while(true) {
+			try {
+			    this.add(slot.cast(type));
+			    break;
+			} catch(Loading l) {
+			    try {
+				l.waitfor();
+			    } catch(InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return;
+			    }
+			}
+		    }
+		}
+	    }
+	    tree.add(this, type);
+	}
     }
 
     public default void asyncadd(Adapter tree, Class<? extends R> type) {
-        syncadd(tree, type);
+	syncadd(tree, type);
 	/* XXX Does not preserve proper sequencing.
 	Collection<Slot<?>> initial;
 	try(Locked lk = tree.lock()) {

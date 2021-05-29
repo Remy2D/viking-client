@@ -29,83 +29,83 @@ package haven;
 import java.awt.Color;
 
 public class FColor {
-    public static final FColor BLACK = new FColor(0, 0, 0);
-    public static final FColor WHITE = new FColor(1, 1, 1);
-    public static final FColor RED = new FColor(1, 0, 0);
-    public static final FColor GREEN = new FColor(0, 1, 0);
-    public static final FColor BLUE = new FColor(0, 0, 1);
-    public static final FColor YELLOW = new FColor(1, 1, 0);
+    public static final FColor BLACK   = new FColor(0, 0, 0);
+    public static final FColor WHITE   = new FColor(1, 1, 1);
+    public static final FColor RED     = new FColor(1, 0, 0);
+    public static final FColor GREEN   = new FColor(0, 1, 0);
+    public static final FColor BLUE    = new FColor(0, 0, 1);
+    public static final FColor YELLOW  = new FColor(1, 1, 0);
     public static final FColor MAGENTA = new FColor(1, 0, 1);
-    public static final FColor CYAN = new FColor(0, 1, 1);
+    public static final FColor CYAN    = new FColor(0, 1, 1);
     public static final FColor BLACK_T = new FColor(0, 0, 0, 0);
     public static final FColor WHITE_T = new FColor(1, 1, 1, 0);
     public final float r, g, b, a;
 
     public FColor(float r, float g, float b, float a) {
-        this.r = r;
-        this.g = g;
-        this.b = b;
-        this.a = a;
+	this.r = r;
+	this.g = g;
+	this.b = b;
+	this.a = a;
     }
 
     public FColor(float r, float g, float b) {
-        this(r, g, b, 1);
+	this(r, g, b, 1);
     }
 
     public FColor(Color c, float f) {
-        this(f * c.getRed() / 255.0f,
-                f * c.getGreen() / 255.0f,
-                f * c.getBlue() / 255.0f,
-                c.getAlpha() / 255.0f);
+	this(f * c.getRed()   / 255.0f,
+	     f * c.getGreen() / 255.0f,
+	     f * c.getBlue()  / 255.0f,
+	     c.getAlpha() / 255.0f);
     }
 
     public FColor(Color c) {
-        this(c, 1);
+	this(c, 1);
     }
 
     public float[] to3a() {
-        return (new float[]{r, g, b});
+	return(new float[] {r, g, b});
     }
 
     public float[] to4a() {
-        return (new float[]{r, g, b, a});
+	return(new float[] {r, g, b, a});
     }
 
     public FColor mul(FColor that) {
-        return (new FColor(this.r * that.r, this.g * that.g, this.b * that.b, this.a * that.a));
+	return(new FColor(this.r * that.r, this.g * that.g, this.b * that.b, this.a * that.a));
     }
 
     public FColor blend(FColor that) {
-        float B = that.a, A = 1.0f - B;
-        return (new FColor((this.r * A) + (that.r * B),
-                (this.g * A) + (that.g * B),
-                (this.b * A) + (that.b * B),
-                this.a));
+	float B = that.a, A = 1.0f - B;
+	return(new FColor((this.r * A) + (that.r * B),
+			  (this.g * A) + (that.g * B),
+			  (this.b * A) + (that.b * B),
+			  this.a));
     }
 
     public FColor blend(FColor that, float B) {
-        float A = 1.0f - B;
-        return (new FColor((this.r * A) + (that.r * B),
-                (this.g * A) + (that.g * B),
-                (this.b * A) + (that.b * B),
-                (this.a * A) + (that.a * B)));
+	float A = 1.0f - B;
+	return(new FColor((this.r * A) + (that.r * B),
+			  (this.g * A) + (that.g * B),
+			  (this.b * A) + (that.b * B),
+			  (this.a * A) + (that.a * B)));
     }
 
     public int hashCode() {
-        return (((((((Float.floatToIntBits(r)) * 31) +
-                Float.floatToIntBits(g)) * 31) +
-                Float.floatToIntBits(b)) * 31) +
-                Float.floatToIntBits(a));
+	return(((((((Float.floatToIntBits(r)) * 31) +
+		   Float.floatToIntBits(g)) * 31) +
+		 Float.floatToIntBits(b)) * 31) +
+	       Float.floatToIntBits(a));
     }
 
     public boolean equals(Object o) {
-        if (!(o instanceof FColor))
-            return (false);
-        FColor that = (FColor) o;
-        return ((this.r == that.r) && (this.g == that.g) && (this.b == that.b) && (this.a == that.a));
+	if(!(o instanceof FColor))
+	    return(false);
+	FColor that = (FColor)o;
+	return((this.r == that.r) && (this.g == that.g) && (this.b == that.b) && (this.a == that.a));
     }
 
     public String toString() {
-        return (String.format("color(%f, %f, %f, %f)", r, g, b, a));
+	return(String.format("color(%f, %f, %f, %f)", r, g, b, a));
     }
 }

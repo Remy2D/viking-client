@@ -33,24 +33,24 @@ public class SinglePipe<T extends State> implements Pipe {
     public final T value;
 
     public SinglePipe(Slot<T> slot, T value) {
-        this.slot = slot;
-        this.value = value;
+	this.slot = slot;
+	this.value = value;
     }
 
     @SuppressWarnings("unchecked")
     public <G extends State> G get(Slot<G> slot) {
-        if (slot == this.slot)
-            return ((G) value);
-        return (null);
+	if(slot == this.slot)
+	    return((G)value);
+	return(null);
     }
 
     public Pipe copy() {
-        return (this);
+	return(this);
     }
 
     public State[] states() {
-        State[] ret = new State[slot.id + 1];
-        ret[slot.id] = value;
-        return (ret);
+	State[] ret = new State[slot.id + 1];
+	ret[slot.id] = value;
+	return(ret);
     }
 }

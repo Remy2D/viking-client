@@ -38,120 +38,119 @@ public class Speedget extends Widget {
     public int SpeedToSet = -1;
 
     static {
-        String[] names = {"crawl", "walk", "run", "sprint"};
-        String[] vars = {"dis", "off", "on"};
-        imgs = new Tex[names.length][vars.length];
-        int w = 0;
-        for (int i = 0; i < names.length; i++) {
-            for (int o = 0; o < vars.length; o++)
-                imgs[i][o] = Resource.loadtex("gfx/hud/meter/rmeter/" + names[i] + "-" + vars[o]);
-            w += imgs[i][0].sz().x;
-        }
-        tsz = new Coord(w, imgs[0][0].sz().y);
-        tips = new String[names.length];
-        for (int i = 0; i < names.length; i++) {
-            tips[i] = Resource.local().loadwait("gfx/hud/meter/rmeter/" + names[i] + "-on").layer(Resource.tooltip).t;
-        }
+	String[] names = {"crawl", "walk", "run", "sprint"};
+	String[] vars = {"dis", "off", "on"};
+	imgs = new Tex[names.length][vars.length];
+	int w = 0;
+	for(int i = 0; i < names.length; i++) {
+	    for(int o = 0; o < vars.length; o++)
+		imgs[i][o] = Resource.loadtex("gfx/hud/meter/rmeter/" + names[i] + "-" + vars[o]);
+	    w += imgs[i][0].sz().x;
+	}
+	tsz = new Coord(w, imgs[0][0].sz().y);
+	tips = new String[names.length];
+	for(int i = 0; i < names.length; i++) {
+	    tips[i] = Resource.local().loadwait("gfx/hud/meter/rmeter/" + names[i] + "-on").layer(Resource.tooltip).t;
+	}
     }
 
     @RName("speedget")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            int cur = (Integer) args[0];
-            int max = (Integer) args[1];
-            return (new Speedget(cur, max));
-        }
+	public Widget create(UI ui, Object[] args) {
+	    int cur = (Integer)args[0];
+	    int max = (Integer)args[1];
+	    return(new Speedget(cur, max));
+	}
     }
 
     public Speedget(int cur, int max) {
-        super(tsz);
-        this.cur = cur;
-        this.max = max;
-        SpeedToSet = Config.speedOnLogin.val;
+	super(tsz);
+	this.cur = cur;
+	this.max = max;
+	SpeedToSet = Config.speedOnLogin.val;
     }
 
     public void draw(GOut g) {
-        if (SpeedToSet > -1) {
-            set(SpeedToSet);
-            SpeedToSet = -1;
-        }
+    	if(SpeedToSet > -1) {
+    		set(SpeedToSet);
+    		SpeedToSet = -1;
+		}
 
-        int x = 0;
-        for (int i = 0; i < 4; i++) {
-            Tex t;
-            if (i == cur)
-                t = imgs[i][2];
-            else if (i > max)
-                t = imgs[i][0];
-            else
-                t = imgs[i][1];
-            g.image(t, new Coord(x, 0));
-            x += t.sz().x;
-        }
+		int x = 0;
+	for(int i = 0; i < 4; i++) {
+	    Tex t;
+	    if(i == cur)
+		t = imgs[i][2];
+	    else if(i > max)
+		t = imgs[i][0];
+	    else
+		t = imgs[i][1];
+	    g.image(t, new Coord(x, 0));
+	    x += t.sz().x;
+	}
     }
 
     public void uimsg(String msg, Object... args) {
-        if (msg == "cur")
-            cur = (Integer) args[0];
-        else if (msg == "max")
-            max = (Integer) args[0];
+	if(msg == "cur")
+	    cur = (Integer)args[0];
+	else if(msg == "max")
+	    max = (Integer)args[0];
     }
 
     public void set(int s) {
-        wdgmsg("set", s);
+	wdgmsg("set", s);
     }
 
     public boolean mousedown(Coord c, int button) {
-        int x = 0;
-        for (int i = 0; i < 4; i++) {
-            x += imgs[i][0].sz().x;
-            if (c.x < x) {
-                set(i);
-                break;
-            }
-        }
-        return (true);
+	int x = 0;
+	for(int i = 0; i < 4; i++) {
+	    x += imgs[i][0].sz().x;
+	    if(c.x < x) {
+		set(i);
+		break;
+	    }
+	}
+	return(true);
     }
 
     public boolean mousewheel(Coord c, int amount) {
-        if (max >= 0)
-            set(Utils.clip(cur + amount, 0, max));
-        return (true);
+	if(max >= 0)
+	    set(Utils.clip(cur + amount, 0, max));
+	return(true);
     }
 
     public Object tooltip(Coord c, Widget prev) {
-        if ((cur >= 0) && (cur < tips.length))
-            return (String.format("Selected speed: " + tips[cur]));
-        return (null);
+	if((cur >= 0) && (cur < tips.length))
+	    return(String.format("Selected speed: " + tips[cur]));
+	return(null);
     }
 
     public static final KeyBinding kb_speedup = KeyBinding.get("speed-up", KeyMatch.forchar('R', KeyMatch.S | KeyMatch.C | KeyMatch.M, KeyMatch.C));
     public static final KeyBinding kb_speeddn = KeyBinding.get("speed-down", KeyMatch.forchar('R', KeyMatch.S | KeyMatch.C | KeyMatch.M, KeyMatch.S | KeyMatch.C));
     public static final KeyBinding[] kb_speeds = {
-            KeyBinding.get("speed-set/0", KeyMatch.nil),
-            KeyBinding.get("speed-set/1", KeyMatch.nil),
-            KeyBinding.get("speed-set/2", KeyMatch.nil),
-            KeyBinding.get("speed-set/3", KeyMatch.nil),
+	KeyBinding.get("speed-set/0", KeyMatch.nil),
+	KeyBinding.get("speed-set/1", KeyMatch.nil),
+	KeyBinding.get("speed-set/2", KeyMatch.nil),
+	KeyBinding.get("speed-set/3", KeyMatch.nil),
     };
-
     public boolean globtype(char key, KeyEvent ev) {
-        int dir = 0;
-        if (kb_speedup.key().match(ev))
-            dir = 1;
-        else if (kb_speeddn.key().match(ev))
-            dir = -1;
-        if (dir != 0) {
-            if (max >= 0) {
-                set(Utils.clip(cur + dir, 0, max));
-            }
-            return (true);
-        }
-        for (int i = 0; i < kb_speeds.length; i++) {
-            if (kb_speeds[i].key().match(ev)) {
-                set(i);
-                return (true);
-            }
-        }
-        return (super.globtype(key, ev));
+	int dir = 0;
+	if(kb_speedup.key().match(ev))
+	    dir = 1;
+	else if(kb_speeddn.key().match(ev))
+	    dir = -1;
+	if(dir != 0) {
+	    if(max >= 0) {
+		set(Utils.clip(cur + dir, 0, max));
+	    }
+	    return(true);
+	}
+	for(int i = 0; i < kb_speeds.length; i++) {
+	    if(kb_speeds[i].key().match(ev)) {
+		set(i);
+		return(true);
+	    }
+	}
+	return(super.globtype(key, ev));
     }
 }

@@ -30,20 +30,19 @@ import java.util.function.*;
 
 public class FragmentContext extends ShaderContext {
     public FragmentContext(ProgramContext prog) {
-        super(prog);
+	super(prog);
     }
 
     public final Function.Def main = new Function.Def(Type.VOID, new Symbol.Fix("main"));
     public final ValBlock mainvals = new ValBlock();
     public final ValBlock uniform = new ValBlock();
     private final OrderList<Consumer<Block>> code = new OrderList<>();
-
     {
-        code.add(mainvals::cons, 0);
-        code.add(blk -> {
-            uniform.cons(blk);
-            main.code.add(new Placeholder("Uniform control up until here."));
-        }, -1000);
+	code.add(mainvals::cons, 0);
+	code.add(blk -> {
+		uniform.cons(blk);
+		main.code.add(new Placeholder("Uniform control up until here."));
+	    }, -1000);
     }
 
     public static final Variable gl_PointCoord = new Variable.Implicit(new Array(Type.VEC4), new Symbol.Fix("gl_PointCoord"));
@@ -51,14 +50,14 @@ public class FragmentContext extends ShaderContext {
     public static final Expression ptc = gl_PointCoord.ref();
 
     public void mainmod(Consumer<Block> macro, int order) {
-        code.add(macro, order);
+	code.add(macro, order);
     }
 
     public void construct(java.io.Writer out) {
-        for (Consumer<Block> macro : code)
-            macro.accept(main.code);
-        main.define(this);
-        PostProc.autoproc(this);
-        output(new Output(out, this));
+	for(Consumer<Block> macro : code)
+	    macro.accept(main.code);
+	main.define(this);
+	PostProc.autoproc(this);
+	output(new Output(out, this));
     }
 }

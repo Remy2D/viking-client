@@ -35,42 +35,40 @@ public class TexRaw implements Tex {
     private final ColorTex st;
 
     public TexRaw(Sampler2D back, boolean invert) {
-        this.back = back;
-        this.invert = invert;
-        this.st = new ColorTex(back);
+	this.back = back;
+	this.invert = invert;
+	this.st = new ColorTex(back);
     }
 
     public TexRaw(Sampler2D back) {
-        this(back, false);
+	this(back, false);
     }
 
-    public Coord sz() {
-        return (back.tex.sz());
-    }
+    public Coord sz() {return(back.tex.sz());}
 
     public void render(GOut g, float[] gc, float[] tc) {
-        Coord tdim = sz();
-        float ix = 1.0f / tdim.x, iy = 1.0f / tdim.y;
-        float[] data;
-        if (!invert) {
-            data = new float[]{
-                    gc[2], gc[3], tc[2] * ix, tc[3] * iy,
-                    gc[4], gc[5], tc[4] * ix, tc[5] * iy,
-                    gc[0], gc[1], tc[0] * ix, tc[1] * iy,
-                    gc[6], gc[7], tc[6] * ix, tc[7] * iy,
-            };
-        } else {
-            int h = back.tex.h;
-            data = new float[]{
-                    gc[2], gc[3], tc[2] * ix, (h - tc[3]) * iy,
-                    gc[4], gc[5], tc[4] * ix, (h - tc[5]) * iy,
-                    gc[0], gc[1], tc[0] * ix, (h - tc[1]) * iy,
-                    gc[6], gc[7], tc[6] * ix, (h - tc[7]) * iy,
-            };
-        }
-        g.usestate(st);
-        g.drawt(Model.Mode.TRIANGLE_STRIP, data);
-        g.usestate(ColorTex.slot);
+	Coord tdim = sz();
+	float ix = 1.0f / tdim.x, iy = 1.0f / tdim.y;
+	float[] data;
+	if(!invert) {
+	    data = new float[] {
+		gc[2], gc[3], tc[2] * ix, tc[3] * iy,
+		gc[4], gc[5], tc[4] * ix, tc[5] * iy,
+		gc[0], gc[1], tc[0] * ix, tc[1] * iy,
+		gc[6], gc[7], tc[6] * ix, tc[7] * iy,
+	    };
+	} else {
+	    int h = back.tex.h;
+	    data = new float[] {
+		gc[2], gc[3], tc[2] * ix, (h - tc[3]) * iy,
+		gc[4], gc[5], tc[4] * ix, (h - tc[5]) * iy,
+		gc[0], gc[1], tc[0] * ix, (h - tc[1]) * iy,
+		gc[6], gc[7], tc[6] * ix, (h - tc[7]) * iy,
+	    };
+	}
+	g.usestate(st);
+	g.drawt(Model.Mode.TRIANGLE_STRIP, data);
+	g.usestate(ColorTex.slot);
     }
 
     public void dispose() {

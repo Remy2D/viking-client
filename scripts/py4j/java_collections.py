@@ -40,7 +40,6 @@ class JavaIterator(JavaObject):
 
     The `JavaIterator` follows the Python iterator protocol and raises a
     `StopIteration` error when the iterator can no longer iterate."""
-
     def __init__(self, target_id, gateway_client):
         JavaObject.__init__(self, target_id, gateway_client)
         self._next_name = "next"
@@ -176,18 +175,18 @@ class JavaArray(JavaObject, Sequence):
 
     def __compute_item(self, key):
         new_key = self.__compute_index(key)
-        command = proto.ARRAY_COMMAND_NAME + \
-                  proto.ARRAY_GET_SUB_COMMAND_NAME + \
-                  self._get_object_id() + "\n"
+        command = proto.ARRAY_COMMAND_NAME +\
+            proto.ARRAY_GET_SUB_COMMAND_NAME +\
+            self._get_object_id() + "\n"
         command += get_command_part(new_key)
         command += proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
         return get_return_value(answer, self._gateway_client)
 
     def __get_slice(self, indices):
-        command = proto.ARRAY_COMMAND_NAME + \
-                  proto.ARRAY_SLICE_SUB_COMMAND_NAME + \
-                  self._get_object_id() + "\n"
+        command = proto.ARRAY_COMMAND_NAME +\
+            proto.ARRAY_SLICE_SUB_COMMAND_NAME +\
+            self._get_object_id() + "\n"
         for index in indices:
             command += get_command_part(index)
         command += proto.END_COMMAND_PART
@@ -212,9 +211,9 @@ class JavaArray(JavaObject, Sequence):
 
     def __set_item(self, key, value):
         new_key = self.__compute_index(key)
-        command = proto.ARRAY_COMMAND_NAME + \
-                  proto.ARRAY_SET_SUB_COMMAND_NAME + \
-                  self._get_object_id() + "\n"
+        command = proto.ARRAY_COMMAND_NAME +\
+            proto.ARRAY_SET_SUB_COMMAND_NAME +\
+            self._get_object_id() + "\n"
         command += get_command_part(new_key)
         command += get_command_part(value)
         command += proto.END_COMMAND_PART
@@ -242,9 +241,9 @@ class JavaArray(JavaObject, Sequence):
                 key.__class__.__name__))
 
     def __len__(self):
-        command = proto.ARRAY_COMMAND_NAME + \
-                  proto.ARRAY_LEN_SUB_COMMAND_NAME + \
-                  self._get_object_id() + "\n"
+        command = proto.ARRAY_COMMAND_NAME +\
+            proto.ARRAY_LEN_SUB_COMMAND_NAME +\
+            self._get_object_id() + "\n"
         command += proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
         return get_return_value(answer, self._gateway_client)
@@ -356,9 +355,9 @@ class JavaList(JavaObject, MutableSequence):
                 key.__class__.__name__))
 
     def __get_slice(self, indices):
-        command = proto.LIST_COMMAND_NAME + \
-                  proto.LIST_SLICE_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n"
+        command = proto.LIST_COMMAND_NAME +\
+            proto.LIST_SLICE_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n"
         for index in indices:
             command += get_command_part(index)
         command += proto.END_COMMAND_PART
@@ -392,10 +391,10 @@ class JavaList(JavaObject, MutableSequence):
         return self.contains(item)
 
     def __add__(self, other):
-        command = proto.LIST_COMMAND_NAME + \
-                  proto.LIST_CONCAT_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n" + other._get_object_id() + \
-                  "\n" + proto.END_COMMAND_PART
+        command = proto.LIST_COMMAND_NAME +\
+            proto.LIST_CONCAT_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n" + other._get_object_id() +\
+            "\n" + proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
         return get_return_value(answer, self._gateway_client)
 
@@ -407,9 +406,9 @@ class JavaList(JavaObject, MutableSequence):
         return self
 
     def __mul__(self, other):
-        command = proto.LIST_COMMAND_NAME + proto.LIST_MULT_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n" + get_command_part(other) + \
-                  proto.END_COMMAND_PART
+        command = proto.LIST_COMMAND_NAME + proto.LIST_MULT_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n" + get_command_part(other) +\
+            proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
         return get_return_value(answer, self._gateway_client)
 
@@ -417,10 +416,10 @@ class JavaList(JavaObject, MutableSequence):
         return self.__mul__(other)
 
     def __imul__(self, other):
-        command = proto.LIST_COMMAND_NAME + \
-                  proto.LIST_IMULT_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n" + get_command_part(other) + \
-                  proto.END_COMMAND_PART
+        command = proto.LIST_COMMAND_NAME +\
+            proto.LIST_IMULT_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n" + get_command_part(other) +\
+            proto.END_COMMAND_PART
         self._gateway_client.send_command(command)
         return self
 
@@ -449,22 +448,22 @@ class JavaList(JavaObject, MutableSequence):
         return self.indexOf(value)
 
     def count(self, value):
-        command = proto.LIST_COMMAND_NAME + \
-                  proto.LIST_COUNT_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n" + get_command_part(value) + \
-                  proto.END_COMMAND_PART
+        command = proto.LIST_COMMAND_NAME +\
+            proto.LIST_COUNT_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n" + get_command_part(value) +\
+            proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
         return get_return_value(answer, self._gateway_client)
 
     def sort(self):
-        command = proto.LIST_COMMAND_NAME + proto.LIST_SORT_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n" + proto.END_COMMAND_PART
+        command = proto.LIST_COMMAND_NAME + proto.LIST_SORT_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n" + proto.END_COMMAND_PART
         self._gateway_client.send_command(command)
 
     def reverse(self):
-        command = proto.LIST_COMMAND_NAME + \
-                  proto.LIST_REVERSE_SUBCOMMAND_NAME + \
-                  self._get_object_id() + "\n" + proto.END_COMMAND_PART
+        command = proto.LIST_COMMAND_NAME +\
+            proto.LIST_REVERSE_SUBCOMMAND_NAME +\
+            self._get_object_id() + "\n" + proto.END_COMMAND_PART
         self._gateway_client.send_command(command)
 
     def remove(self, value):
@@ -502,8 +501,8 @@ class ListConverter(object):
     def can_convert(self, object):
         # Check for iterator protocol and should not be an instance of byte
         # array (taken care of by protocol)
-        return hasattr2(object, "__iter__") and not isbytearray(object) and \
-               not ispython3bytestr(object) and not isinstance(object, basestring)
+        return hasattr2(object, "__iter__") and not isbytearray(object) and\
+            not ispython3bytestr(object) and not isinstance(object, basestring)
 
     def convert(self, object, gateway_client):
         ArrayList = JavaClass("java.util.ArrayList", gateway_client)

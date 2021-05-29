@@ -36,6 +36,6 @@ public enum NumberFormat {
     public final int size;
 
     NumberFormat(int size) {
-        this.size = size;
+	this.size = size;
     }
 }

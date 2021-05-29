@@ -34,99 +34,83 @@ public class GLException extends RuntimeException {
     private static com.jogamp.opengl.glu.GLU glu = new com.jogamp.opengl.glu.GLU();
 
     public GLException(int code) {
-        super("GL Error: " + code + " (" + glu.gluErrorString(code) + ")");
-        this.code = code;
-        this.str = glu.gluErrorString(code);
+	super("GL Error: " + code + " (" + glu.gluErrorString(code) + ")");
+	this.code = code;
+	this.str = glu.gluErrorString(code);
     }
 
     public static String constname(Class<?> cl, int val) {
-        String ret = null;
-        for (java.lang.reflect.Field f : cl.getFields()) {
-            if (((f.getModifiers() & java.lang.reflect.Modifier.STATIC) != 0) &&
-                    ((f.getModifiers() & java.lang.reflect.Modifier.PUBLIC) != 0) &&
-                    (f.getType() == Integer.TYPE)) {
-                int v;
-                try {
-                    v = f.getInt(null);
-                } catch (IllegalAccessException e) {
-                    continue;
-                }
-                if (v == val) {
-                    if (ret == null)
-                        ret = f.getName();
-                    else
-                        ret = ret + " or " + f.getName();
-                }
-            }
-        }
-        if (ret == null)
-            return (Integer.toString(val));
-        return (ret);
+	String ret = null;
+	for(java.lang.reflect.Field f : cl.getFields()) {
+	    if(((f.getModifiers() & java.lang.reflect.Modifier.STATIC) != 0) &&
+	       ((f.getModifiers() & java.lang.reflect.Modifier.PUBLIC) != 0) &&
+	       (f.getType() == Integer.TYPE)) {
+		int v;
+		try {
+		    v = f.getInt(null);
+		} catch(IllegalAccessException e) {
+		    continue;
+		}
+		if(v == val) {
+		    if(ret == null)
+			ret = f.getName();
+		    else
+			ret = ret + " or " + f.getName();
+		}
+	    }
+	}
+	if(ret == null)
+	    return(Integer.toString(val));
+	return(ret);
     }
 
     public static String constname(int val) {
-        return (constname(GL3.class, val));
+	return(constname(GL3.class, val));
     }
 
     public static class GLInvalidEnumException extends GLException {
-        public GLInvalidEnumException() {
-            super(GL.GL_INVALID_ENUM);
-        }
+	public GLInvalidEnumException() {super(GL.GL_INVALID_ENUM);}
     }
-
     public static class GLInvalidValueException extends GLException {
-        public GLInvalidValueException() {
-            super(GL.GL_INVALID_VALUE);
-        }
+	public GLInvalidValueException() {super(GL.GL_INVALID_VALUE);}
     }
-
     public static class GLInvalidOperationException extends GLException {
-        public GLInvalidOperationException() {
-            super(GL.GL_INVALID_OPERATION);
-        }
+	public GLInvalidOperationException() {super(GL.GL_INVALID_OPERATION);}
     }
-
     public static class GLOutOfMemoryException extends GLException {
-        public String memstats = null;
+	public String memstats = null;
 
-        public GLOutOfMemoryException() {
-            super(GL.GL_OUT_OF_MEMORY);
-        }
+	public GLOutOfMemoryException() {super(GL.GL_OUT_OF_MEMORY);}
 
-        public void initenv(GLEnvironment env) {
-            super.initenv(env);
-            memstats = env.memstats();
-        }
+	public void initenv(GLEnvironment env) {
+	    super.initenv(env);
+	    memstats = env.memstats();
+	}
     }
 
     public static GLException glexcfor(int code) {
-        switch (code) {
-            case GL.GL_INVALID_ENUM:
-                return (new GLInvalidEnumException());
-            case GL.GL_INVALID_VALUE:
-                return (new GLInvalidValueException());
-            case GL.GL_INVALID_OPERATION:
-                return (new GLInvalidOperationException());
-            case GL.GL_OUT_OF_MEMORY:
-                return (new GLOutOfMemoryException());
-            default:
-                return (new GLException(code));
-        }
+	switch(code) {
+	case GL.GL_INVALID_ENUM:      return(new GLInvalidEnumException());
+	case GL.GL_INVALID_VALUE:     return(new GLInvalidValueException());
+	case GL.GL_INVALID_OPERATION: return(new GLInvalidOperationException());
+	case GL.GL_OUT_OF_MEMORY:     return(new GLOutOfMemoryException());
+	default: return(new GLException(code));
+	}
     }
 
     public static void checkfor(GL gl, Throwable cause, GLEnvironment env) {
-        int err = gl.glGetError();
-        if (err != 0) {
-            GLException exc = glexcfor(err);
-            exc.initCause(cause);
-            if (env != null)
-                exc.initenv(env);
-            throw (exc);
-        }
+	int err = gl.glGetError();
+	if(err != 0) {
+	    GLException exc = glexcfor(err);
+	    exc.initCause(cause);
+	    if(env != null)
+		exc.initenv(env);
+	    throw(exc);
+	}
     }
 
     public static void checkfor(GL gl, GLEnvironment env) {
-        checkfor(gl, null, env);
+	checkfor(gl, null, env);
     }
 
     public void initenv(GLEnvironment env) {

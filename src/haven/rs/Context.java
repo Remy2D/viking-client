@@ -33,6 +33,6 @@ public interface Context extends Disposable {
     public Environment env();
 
     public static Context getdefault() {
-        return (GLOffscreen.get());
+	return(GLOffscreen.get());
     }
 }

@@ -30,11 +30,8 @@ import java.nio.*;
 
 public interface FillBuffer extends haven.Disposable {
     public int size();
-
     public boolean compatible(Environment env);
-
     public ByteBuffer push();
-
     /* pull() requires the data in buf to not change after submission. */
     public void pull(ByteBuffer buf);
 }

@@ -3,13 +3,11 @@
 import sys, zipfile, fnmatch
 from classfile import file
 
-classpath = ["build/jogl.jar"]
+classpath=["build/jogl.jar"]
 roots = ["com/jogamp/opengl/GL4bc"]
-
 
 class notfound(LookupError):
     pass
-
 
 def findclass(name):
     mangled = name + ".class"
@@ -22,10 +20,7 @@ def findclass(name):
             with fp:
                 return file.classfile.load(fp)
 
-
 loaded = {}
-
-
 def loadclass(name):
     if name not in loaded:
         cl = findclass(name)
@@ -35,27 +30,21 @@ def loadclass(name):
         loaded[name] = cl
     return loaded[name]
 
-
 def resolve(roots):
     ret = []
-
     def rec(cl):
         if cl not in ret:
             ret.append(cl)
             try:
                 rec(loadclass(cl.cp[cl.cp[cl.super].nm]))
-            except notfound:
-                pass
+            except notfound: pass
             for iface in cl.ifaces:
                 try:
                     rec(loadclass(cl.cp[cl.cp[iface].nm]))
-                except notfound:
-                    pass
-
+                except notfound: pass
     for nm in roots:
         rec(loadclass(nm))
     return ret
-
 
 classes = resolve(roots)
 

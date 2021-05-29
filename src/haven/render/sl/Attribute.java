@@ -28,33 +28,33 @@ package haven.render.sl;
 
 public class Attribute extends Variable.Global {
     public Attribute(Type type, Symbol name) {
-        super(type, name);
+	super(type, name);
     }
 
     public Attribute(Type type, String infix) {
-        this(type, new Symbol.Shared("s_" + infix));
+	this(type, new Symbol.Shared("s_" + infix));
     }
 
     public Attribute(Type type) {
-        this(type, new Symbol.Shared());
+	this(type, new Symbol.Shared());
     }
 
     private class Def extends Definition {
-        public void output(Output out) {
-            if (out.ctx instanceof VertexContext) {
-                VertexContext vctx = (VertexContext) out.ctx;
-                vctx.prog.attribs.add(Attribute.this);
-                out.write("in ");
-            } else {
-                throw (new RuntimeException("use of attribute variable outside vertex context: " + Attribute.this));
-            }
-            super.output(out);
-        }
+	public void output(Output out) {
+	    if(out.ctx instanceof VertexContext) {
+		VertexContext vctx = (VertexContext)out.ctx;
+		vctx.prog.attribs.add(Attribute.this);
+		out.write("in ");
+	    } else {
+		throw(new RuntimeException("use of attribute variable outside vertex context: " + Attribute.this));
+	    }
+	    super.output(out);
+	}
     }
 
     public void use(Context ctx) {
-        type.use(ctx);
-        if (!defined(ctx))
-            ctx.vardefs.add(new Def());
+	type.use(ctx);
+	if(!defined(ctx))
+	    ctx.vardefs.add(new Def());
     }
 }

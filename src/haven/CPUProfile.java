@@ -30,43 +30,43 @@ import java.util.*;
 
 public class CPUProfile extends Profile {
     public CPUProfile(int hl) {
-        super(hl);
+	super(hl);
     }
 
     public class Frame extends Profile.Frame {
-        private List<Long> pw = new LinkedList<Long>();
-        private List<String> nw = new LinkedList<String>();
-        private long then, last, sub;
+	private List<Long> pw = new LinkedList<Long>();
+	private List<String> nw = new LinkedList<String>();
+	private long then, last, sub;
 
-        public Frame() {
-            last = then = System.nanoTime();
-        }
+	public Frame() {
+	    last = then = System.nanoTime();
+	}
 
-        public void tick(String nm) {
-            long now = System.nanoTime();
-            pw.add(now - last - sub);
-            nw.add(nm);
-            sub = 0;
-            last = now;
-        }
+	public void tick(String nm) {
+	    long now = System.nanoTime();
+	    pw.add(now - last - sub);
+	    nw.add(nm);
+	    sub = 0;
+	    last = now;
+	}
 
-        public void add(String nm, long tm) {
-            pw.add(tm);
-            nw.add(nm);
-            sub += tm;
-        }
+	public void add(String nm, long tm) {
+	    pw.add(tm);
+	    nw.add(nm);
+	    sub += tm;
+	}
 
-        public void fin() {
-            double total = (System.nanoTime() - then) / 1000000000.0;
-            String[] nm = new String[nw.size()];
-            double[] prt = new double[pw.size()];
-            for (int i = 0; i < pw.size(); i++) {
-                nm[i] = nw.get(i);
-                prt[i] = pw.get(i) / 1000000000.0;
-            }
-            fin(total, nm, prt);
-            pw = null;
-            nw = null;
-        }
+	public void fin() {
+	    double total = (System.nanoTime() - then) / 1000000000.0;
+	    String[] nm = new String[nw.size()];
+	    double[] prt = new double[pw.size()];
+	    for(int i = 0; i < pw.size(); i++) {
+		nm[i] = nw.get(i);
+		prt[i] = pw.get(i) / 1000000000.0;
+	    }
+	    fin(total, nm, prt);
+	    pw = null;
+	    nw = null;
+	}
     }
 }

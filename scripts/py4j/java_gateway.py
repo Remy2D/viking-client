@@ -59,6 +59,7 @@ DEFAULT_CALLBACK_SERVER_ACCEPT_TIMEOUT = 5
 PY4J_SKIP_COLLECTIONS = "PY4J_SKIP_COLLECTIONS"
 PY4J_TRUE = {"yes", "y", "t", "true"}
 
+
 server_connection_stopped = Signal()
 """Signal sent when a Python (Callback) Server connection is stopped.
 
@@ -153,11 +154,11 @@ def set_default_callback_accept_timeout(accept_timeout):
 def deprecated(name, last_version, use_instead="", level=logging.DEBUG,
                raise_exc=False):
     if not use_instead:
-        msg = "{0} is deprecated and will be removed in version {1}" \
+        msg = "{0} is deprecated and will be removed in version {1}"\
             .format(name, last_version)
     else:
-        msg = "{0} is deprecated and will be removed in version {1}. " \
-              "Use {2} instead." \
+        msg = "{0} is deprecated and will be removed in version {1}. "\
+            "Use {2} instead."\
             .format(name, last_version, use_instead)
     logger.log(level, msg)
     if raise_exc:
@@ -173,9 +174,9 @@ def java_import(jvm_view, import_str):
                  (e.g., java.io.*) to import
     """
     gateway_client = jvm_view._gateway_client
-    command = proto.JVMVIEW_COMMAND_NAME + proto.JVM_IMPORT_SUB_COMMAND_NAME + \
-              jvm_view._id + "\n" + escape_new_line(import_str) + "\n" + \
-              proto.END_COMMAND_PART
+    command = proto.JVMVIEW_COMMAND_NAME + proto.JVM_IMPORT_SUB_COMMAND_NAME +\
+        jvm_view._id + "\n" + escape_new_line(import_str) + "\n" +\
+        proto.END_COMMAND_PART
     answer = gateway_client.send_command(command)
     return_value = get_return_value(answer, gateway_client, None, None)
     return return_value
@@ -208,7 +209,7 @@ def find_jar_path():
     #     virtualenvpath/lib/pythonX/site-packages/py4j/java_gateway.py
     #   the jar file is here: virtualenvpath/share/py4j/py4j.jar
     paths.append(os.path.join(os.path.dirname(
-        os.path.realpath(__file__)), "../../../../share/py4j/" + jar_file))
+            os.path.realpath(__file__)), "../../../../share/py4j/" + jar_file))
 
     for path in paths:
         if os.path.exists(path):
@@ -311,7 +312,7 @@ def launch_gateway(port=0, jarpath="", classpath="", javaopts=[],
     if redirect_stderr is None:
         stderr = open(os.devnull, "w")
         close_stderr = True
-    elif isinstance(redirect_stderr, Queue) or \
+    elif isinstance(redirect_stderr, Queue) or\
             isinstance(redirect_stderr, deque):
         stderr = PIPE
     else:
@@ -361,7 +362,7 @@ def launch_gateway(port=0, jarpath="", classpath="", javaopts=[],
 
     if return_proc:
         if isinstance(output, tuple):
-            output = output + (proc,)
+            output = output + (proc, )
         else:
             output = (_port, proc)
 
@@ -377,9 +378,9 @@ def get_field(java_object, field_name):
     :param java_object: the instance containing the field
     :param field_name: the name of the field to retrieve
     """
-    command = proto.FIELD_COMMAND_NAME + proto.FIELD_GET_SUBCOMMAND_NAME + \
-              java_object._target_id + "\n" + field_name + "\n" + \
-              proto.END_COMMAND_PART
+    command = proto.FIELD_COMMAND_NAME + proto.FIELD_GET_SUBCOMMAND_NAME +\
+        java_object._target_id + "\n" + field_name + "\n" +\
+        proto.END_COMMAND_PART
     answer = java_object._gateway_client.send_command(command)
     has_error, error_message = get_error_message(answer)
 
@@ -409,9 +410,9 @@ def set_field(java_object, field_name, value):
         value,
         java_object._gateway_client.gateway_property.pool)
 
-    command = proto.FIELD_COMMAND_NAME + proto.FIELD_SET_SUBCOMMAND_NAME + \
-              java_object._target_id + "\n" + field_name + "\n" + \
-              command_part + proto.END_COMMAND_PART
+    command = proto.FIELD_COMMAND_NAME + proto.FIELD_SET_SUBCOMMAND_NAME +\
+        java_object._target_id + "\n" + field_name + "\n" +\
+        command_part + proto.END_COMMAND_PART
 
     answer = java_object._gateway_client.send_command(command)
     has_error, error_message = get_error_message(answer)
@@ -565,20 +566,20 @@ def gateway_help(gateway_client, var, pattern=None, short_name=True,
      returned as a string.
     """
     if hasattr2(var, "_get_object_id"):
-        command = proto.HELP_COMMAND_NAME + \
-                  proto.HELP_OBJECT_SUBCOMMAND_NAME + \
-                  var._get_object_id() + "\n" + \
-                  get_command_part(pattern) + \
-                  get_command_part(short_name) + \
-                  proto.END_COMMAND_PART
+        command = proto.HELP_COMMAND_NAME +\
+            proto.HELP_OBJECT_SUBCOMMAND_NAME +\
+            var._get_object_id() + "\n" +\
+            get_command_part(pattern) +\
+            get_command_part(short_name) +\
+            proto.END_COMMAND_PART
         answer = gateway_client.send_command(command)
     elif hasattr2(var, "_fqn"):
-        command = proto.HELP_COMMAND_NAME + \
-                  proto.HELP_CLASS_SUBCOMMAND_NAME + \
-                  var._fqn + "\n" + \
-                  get_command_part(pattern) + \
-                  get_command_part(short_name) + \
-                  proto.END_COMMAND_PART
+        command = proto.HELP_COMMAND_NAME +\
+            proto.HELP_CLASS_SUBCOMMAND_NAME +\
+            var._fqn + "\n" +\
+            get_command_part(pattern) +\
+            get_command_part(short_name) +\
+            proto.END_COMMAND_PART
         answer = gateway_client.send_command(command)
     elif hasattr2(var, "container") and hasattr2(var, "name"):
         if pattern is not None:
@@ -684,12 +685,12 @@ def _garbage_collect_proxy(pool, proxy_id):
     success = False
     if proxy_id != proto.ENTRY_POINT_OBJECT_ID:
         try:
-            del (pool[proxy_id])
+            del(pool[proxy_id])
             success = True
         except KeyError:
             logger.warning(
                 "Tried to garbage collect non existing python proxy {0}"
-                    .format(proxy_id))
+                .format(proxy_id))
     return success
 
 
@@ -961,8 +962,8 @@ class GatewayClient(object):
         """Tells the Java side that there is no longer a reference to this
         JavaObject on the Python side.
         """
-        if target_id != proto.ENTRY_POINT_OBJECT_ID and \
-                target_id != proto.GATEWAY_SERVER_OBJECT_ID and \
+        if target_id != proto.ENTRY_POINT_OBJECT_ID and\
+                target_id != proto.GATEWAY_SERVER_OBJECT_ID and\
                 self.is_connected:
             try:
                 self.send_command(
@@ -1125,8 +1126,8 @@ class GatewayConnection(object):
             logger.exception("Cannot authenticate with gateway server.")
             raise
         except Exception as e:
-            msg = "An error occurred while trying to connect to the Java " \
-                  "server ({0}:{1})".format(self.address, self.port)
+            msg = "An error occurred while trying to connect to the Java "\
+                "server ({0}:{1})".format(self.address, self.port)
             logger.exception(msg)
             raise Py4JNetworkError(msg, e)
 
@@ -1280,10 +1281,10 @@ class JavaMember(object):
 
         args_command, temp_args = self._build_args(*args)
 
-        command = proto.STREAM_COMMAND_NAME + \
-                  self.command_header + \
-                  args_command + \
-                  proto.END_COMMAND_PART
+        command = proto.STREAM_COMMAND_NAME +\
+            self.command_header +\
+            args_command +\
+            proto.END_COMMAND_PART
         answer, connection = self.gateway_client.send_command(
             command, binary=True)
 
@@ -1299,10 +1300,10 @@ class JavaMember(object):
     def __call__(self, *args):
         args_command, temp_args = self._build_args(*args)
 
-        command = proto.CALL_COMMAND_NAME + \
-                  self.command_header + \
-                  args_command + \
-                  proto.END_COMMAND_PART
+        command = proto.CALL_COMMAND_NAME +\
+            self.command_header +\
+            args_command +\
+            proto.END_COMMAND_PART
 
         answer = self.gateway_client.send_command(command)
         return_value = get_return_value(
@@ -1334,9 +1335,9 @@ class JavaObject(object):
         self._fully_populated = False
         self._gateway_doc = None
 
-        key = smart_decode(self._gateway_client.address) + \
-              smart_decode(self._gateway_client.port) + \
-              self._target_id
+        key = smart_decode(self._gateway_client.address) +\
+            smart_decode(self._gateway_client.port) +\
+            self._target_id
 
         if self._gateway_client.gateway_property.enable_memory_management:
             value = weakref.ref(
@@ -1389,20 +1390,20 @@ class JavaObject(object):
         # cache miss or double overwrite of the same method...
         if not self._fully_populated:
             if self._auto_field:
-                command = proto.DIR_COMMAND_NAME + \
-                          proto.DIR_FIELDS_SUBCOMMAND_NAME + \
-                          self._target_id + "\n" + \
-                          proto.END_COMMAND_PART
+                command = proto.DIR_COMMAND_NAME +\
+                    proto.DIR_FIELDS_SUBCOMMAND_NAME +\
+                    self._target_id + "\n" +\
+                    proto.END_COMMAND_PART
 
                 answer = self._gateway_client.send_command(command)
                 return_value = get_return_value(
                     answer, self._gateway_client, self._target_id, "__dir__")
                 self._field_names.update(return_value.split("\n"))
 
-            command = proto.DIR_COMMAND_NAME + \
-                      proto.DIR_METHODS_SUBCOMMAND_NAME + \
-                      self._target_id + "\n" + \
-                      proto.END_COMMAND_PART
+            command = proto.DIR_COMMAND_NAME +\
+                proto.DIR_METHODS_SUBCOMMAND_NAME +\
+                self._target_id + "\n" +\
+                proto.END_COMMAND_PART
 
             answer = self._gateway_client.send_command(command)
             return_value = get_return_value(
@@ -1416,11 +1417,11 @@ class JavaObject(object):
             self._fully_populated = True
 
     def _get_field(self, name):
-        command = proto.FIELD_COMMAND_NAME + \
-                  proto.FIELD_GET_SUBCOMMAND_NAME + \
-                  self._target_id + "\n" + \
-                  name + "\n" + \
-                  proto.END_COMMAND_PART
+        command = proto.FIELD_COMMAND_NAME +\
+            proto.FIELD_GET_SUBCOMMAND_NAME +\
+            self._target_id + "\n" +\
+            name + "\n" +\
+            proto.END_COMMAND_PART
 
         answer = self._gateway_client.send_command(command)
         if answer == proto.NO_MEMBER_COMMAND or is_error(answer)[0]:
@@ -1457,7 +1458,6 @@ class JavaClass(object):
        they are created while accessing the `jvm` property of a gateway, e.g.,
        `gateway.jvm.java.lang.String`.
     """
-
     def __init__(self, fqn, gateway_client):
         self._fqn = fqn
         self._gateway_client = gateway_client
@@ -1480,10 +1480,10 @@ class JavaClass(object):
         # Theoretically, not thread safe, but the worst case scenario is
         # cache miss or double overwrite of the same method...
         if self._statics is None:
-            command = proto.DIR_COMMAND_NAME + \
-                      proto.DIR_STATIC_SUBCOMMAND_NAME + \
-                      self._fqn + "\n" + \
-                      proto.END_COMMAND_PART
+            command = proto.DIR_COMMAND_NAME +\
+                proto.DIR_STATIC_SUBCOMMAND_NAME +\
+                self._fqn + "\n" +\
+                proto.END_COMMAND_PART
 
             answer = self._gateway_client.send_command(command)
             return_value = get_return_value(
@@ -1496,9 +1496,9 @@ class JavaClass(object):
         """Gets the java.lang.Class of the current JavaClass. This is
         equivalent to calling .class in Java.
         """
-        command = proto.REFLECTION_COMMAND_NAME + \
-                  proto.REFL_GET_JAVA_LANG_CLASS_SUB_COMMAND_NAME + \
-                  self._fqn + "\n" + proto.END_COMMAND_PART
+        command = proto.REFLECTION_COMMAND_NAME +\
+            proto.REFL_GET_JAVA_LANG_CLASS_SUB_COMMAND_NAME +\
+            self._fqn + "\n" + proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
 
         if len(answer) > 1 and answer[0] == proto.SUCCESS:
@@ -1513,11 +1513,11 @@ class JavaClass(object):
             # don't propagate any magic methods to Java
             raise AttributeError
 
-        command = proto.REFLECTION_COMMAND_NAME + \
-                  proto.REFL_GET_MEMBER_SUB_COMMAND_NAME + \
-                  self._fqn + "\n" + \
-                  name + "\n" + \
-                  proto.END_COMMAND_PART
+        command = proto.REFLECTION_COMMAND_NAME +\
+            proto.REFL_GET_MEMBER_SUB_COMMAND_NAME +\
+            self._fqn + "\n" +\
+            name + "\n" +\
+            proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
 
         if len(answer) > 1 and answer[0] == proto.SUCCESS:
@@ -1564,10 +1564,10 @@ class JavaClass(object):
         args_command = "".join(
             [get_command_part(arg, self._pool) for arg in new_args])
 
-        command = proto.CONSTRUCTOR_COMMAND_NAME + \
-                  self._command_header + \
-                  args_command + \
-                  proto.END_COMMAND_PART
+        command = proto.CONSTRUCTOR_COMMAND_NAME +\
+            self._command_header +\
+            args_command +\
+            proto.END_COMMAND_PART
 
         answer = self._gateway_client.send_command(command)
         return_value = get_return_value(
@@ -1612,7 +1612,6 @@ class JavaPackage(object):
        they are created while accessing the `jvm` property of a gateway, e.g.,
        `gateway.jvm.java.lang`.
     """
-
     def __init__(self, fqn, gateway_client, jvm_id=None):
         self._fqn = fqn
         self._gateway_client = gateway_client
@@ -1635,11 +1634,11 @@ class JavaPackage(object):
             raise AttributeError
 
         new_fqn = self._fqn + "." + name
-        command = proto.REFLECTION_COMMAND_NAME + \
-                  proto.REFL_GET_UNKNOWN_SUB_COMMAND_NAME + \
-                  new_fqn + "\n" + \
-                  self._jvm_id + "\n" + \
-                  proto.END_COMMAND_PART
+        command = proto.REFLECTION_COMMAND_NAME +\
+            proto.REFL_GET_UNKNOWN_SUB_COMMAND_NAME +\
+            new_fqn + "\n" +\
+            self._jvm_id + "\n" +\
+            proto.END_COMMAND_PART
         answer = self._gateway_client.send_command(command)
         if answer == proto.SUCCESS_PACKAGE:
             return JavaPackage(new_fqn, self._gateway_client, self._jvm_id)
@@ -1674,11 +1673,11 @@ class JVMView(object):
         self._dir_sequence_and_cache = (None, [])
 
     def __dir__(self):
-        command = proto.DIR_COMMAND_NAME + \
-                  proto.DIR_JVMVIEW_SUBCOMMAND_NAME + \
-                  self._id + "\n" + \
-                  get_command_part(self._dir_sequence_and_cache[0]) + \
-                  proto.END_COMMAND_PART
+        command = proto.DIR_COMMAND_NAME +\
+            proto.DIR_JVMVIEW_SUBCOMMAND_NAME +\
+            self._id + "\n" +\
+            get_command_part(self._dir_sequence_and_cache[0]) +\
+            proto.END_COMMAND_PART
 
         answer = self._gateway_client.send_command(command)
         return_value = get_return_value(
@@ -1714,7 +1713,6 @@ class JVMView(object):
 class GatewayProperty(object):
     """Object shared by callbackserver, gateway, and connections.
     """
-
     def __init__(self, auto_field, pool, enable_memory_management=True):
         self.auto_field = auto_field
         self.pool = pool
@@ -1927,10 +1925,10 @@ class JavaGateway(object):
 
         :rtype: A JVMView instance (same class as the gateway.jvm instance).
         """
-        command = proto.JVMVIEW_COMMAND_NAME + \
-                  proto.JVM_CREATE_VIEW_SUB_COMMAND_NAME + \
-                  get_command_part(name) + \
-                  proto.END_COMMAND_PART
+        command = proto.JVMVIEW_COMMAND_NAME +\
+            proto.JVM_CREATE_VIEW_SUB_COMMAND_NAME +\
+            get_command_part(name) +\
+            proto.END_COMMAND_PART
 
         answer = self._gateway_client.send_command(command)
         java_object = get_return_value(answer, self._gateway_client)
@@ -1953,9 +1951,9 @@ class JavaGateway(object):
         """
         if len(dimensions) == 0:
             raise Py4JError("new arrays must have at least one dimension")
-        command = proto.ARRAY_COMMAND_NAME + \
-                  proto.ARRAY_CREATE_SUB_COMMAND_NAME + \
-                  get_command_part(java_class._fqn)
+        command = proto.ARRAY_COMMAND_NAME +\
+            proto.ARRAY_CREATE_SUB_COMMAND_NAME +\
+            get_command_part(java_class._fqn)
         for dimension in dimensions:
             command += get_command_part(dimension)
         command += proto.END_COMMAND_PART
@@ -2156,7 +2154,7 @@ class JavaGateway(object):
         if enable_auth:
             _port, _auth_token, proc = _ret
         else:
-            _port, proc, _auth_token = _ret + (None,)
+            _port, proc, _auth_token = _ret + (None, )
         gateway = JavaGateway(
             gateway_parameters=GatewayParameters(port=_port,
                                                  auth_token=_auth_token),
@@ -2221,7 +2219,7 @@ class CallbackServer(object):
             self._listening_address = info[0]
             self._listening_port = info[1]
         except Exception as e:
-            msg = "An error occurred while trying to start the callback " \
+            msg = "An error occurred while trying to start the callback "\
                   "server ({0}:{1})".format(self.address, self.port)
             logger.exception(msg)
             raise Py4JNetworkError(msg, e)
@@ -2261,7 +2259,7 @@ class CallbackServer(object):
             self.server_socket.listen(5)
             logger.info(
                 "Socket listening on {0}".
-                    format(smart_decode(self.server_socket.getsockname())))
+                format(smart_decode(self.server_socket.getsockname())))
             server_started.send(
                 self, server=self)
 
@@ -2357,7 +2355,6 @@ class CallbackConnection(Thread):
     """A `CallbackConnection` receives callbacks and garbage collection
        requests from the Java side.
     """
-
     def __init__(
             self, pool, input, socket_instance, gateway_client,
             callback_server_parameters, callback_server):
@@ -2395,7 +2392,7 @@ class CallbackConnection(Thread):
                 obj_id = smart_decode(self.input.readline())[:-1]
                 logger.info(
                     "Received command {0} on object id {1}".
-                        format(command, obj_id))
+                    format(command, obj_id))
                 if obj_id is None or len(obj_id.strip()) == 0:
                     break
                 if command == proto.CALL_PROXY_COMMAND_NAME:
@@ -2445,26 +2442,26 @@ class CallbackConnection(Thread):
 
     def _call_proxy(self, obj_id, input):
         if obj_id not in self.pool:
-            return proto.RETURN_MESSAGE + proto.ERROR + \
-                   get_command_part('Object ID unknown', self.pool)
+            return proto.RETURN_MESSAGE + proto.ERROR +\
+                get_command_part('Object ID unknown', self.pool)
 
         try:
             method = smart_decode(input.readline())[:-1]
             params = self._get_params(input)
             return_value = getattr(self.pool[obj_id], method)(*params)
-            return proto.RETURN_MESSAGE + proto.SUCCESS + \
-                   get_command_part(return_value, self.pool)
+            return proto.RETURN_MESSAGE + proto.SUCCESS +\
+                get_command_part(return_value, self.pool)
         except Exception as e:
             logger.exception("There was an exception while executing the "
                              "Python Proxy on the Python Side.")
-            if self.callback_server_parameters.propagate_java_exceptions and \
-                    isinstance(e, Py4JJavaError):
+            if self.callback_server_parameters.propagate_java_exceptions and\
+               isinstance(e, Py4JJavaError):
                 java_exception = e.java_exception
             else:
                 java_exception = traceback.format_exc()
 
-            return proto.RETURN_MESSAGE + proto.ERROR + \
-                   get_command_part(java_exception, self.pool)
+            return proto.RETURN_MESSAGE + proto.ERROR +\
+                get_command_part(java_exception, self.pool)
 
     def _get_params(self, input):
         params = []
@@ -2490,7 +2487,6 @@ class PythonProxyPool(object):
 
        The `PythonProxyPool` is thread-safe.
     """
-
     def __init__(self):
         self.lock = RLock()
         self.dict = {}
@@ -2517,7 +2513,7 @@ class PythonProxyPool(object):
 
     def __delitem__(self, key):
         with self.lock:
-            del (self.dict[key])
+            del(self.dict[key])
 
     def clear(self):
         with self.lock:
@@ -2537,6 +2533,6 @@ register_output_converter(
     proto.REFERENCE_TYPE,
     lambda target_id, gateway_client: JavaObject(target_id, gateway_client))
 
-if PY4J_SKIP_COLLECTIONS not in os.environ or \
-        os.environ[PY4J_SKIP_COLLECTIONS].lower() not in PY4J_TRUE:
+if PY4J_SKIP_COLLECTIONS not in os.environ or\
+   os.environ[PY4J_SKIP_COLLECTIONS].lower() not in PY4J_TRUE:
     __import__("py4j.java_collections")

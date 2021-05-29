@@ -27,68 +27,67 @@
 package haven;
 
 import java.util.*;
-
 import haven.render.*;
 
 public class GPUProfile extends Profile {
     private Collection<Frame> waiting = new LinkedList<Frame>();
 
     public GPUProfile(int hl) {
-        super(hl);
+	super(hl);
     }
 
     public class Frame extends Profile.Frame {
-        private List<String> nw = new ArrayList<>(16);
-        private List<Long> queries = new ArrayList<>(16);
+	private List<String> nw = new ArrayList<>(16);
+	private List<Long> queries = new ArrayList<>(16);
 
-        public Frame(Render out) {
-            query(out);
-        }
+	public Frame(Render out) {
+	    query(out);
+	}
 
-        private void query(Render out) {
-            queries.add(0l);
-            int idx = queries.size() - 1;
-            out.timestamp(val -> queries.set(idx, val));
-        }
+	private void query(Render out) {
+	    queries.add(0l);
+	    int idx = queries.size() - 1;
+	    out.timestamp(val -> queries.set(idx, val));
+	}
 
-        public void tick(Render out, String nm) {
-            query(out);
-            nw.add(nm);
-        }
+	public void tick(Render out, String nm) {
+	    query(out);
+	    nw.add(nm);
+	}
 
-        public void fin(Render out) {
-            query(out);
-            waiting.add(this);
-            check();
-        }
+	public void fin(Render out) {
+	    query(out);
+	    waiting.add(this);
+	    check();
+	}
 
-        public void fin2() {
-            long[] tms = new long[queries.size()];
-            for (int i = 0; i < tms.length; i++)
-                tms[i] = queries.get(i);
-            int np = tms.length - 2;
-            double total = (tms[tms.length - 1] - tms[0]) / 1000000000.0;
-            String[] nm = new String[np];
-            double[] prt = new double[np];
-            for (int i = 0; i < prt.length; i++) {
-                nm[i] = nw.get(i);
-                prt[i] = (tms[i + 1] - tms[i]) / 1000000000.0;
-            }
-            fin(total, nm, prt);
-            nw = null;
-            queries = null;
-        }
+	public void fin2() {
+	    long[] tms = new long[queries.size()];
+	    for(int i = 0; i < tms.length; i++)
+		tms[i] = queries.get(i);
+	    int np = tms.length - 2;
+	    double total = (tms[tms.length - 1] - tms[0]) / 1000000000.0;
+	    String[] nm = new String[np];
+	    double[] prt = new double[np];
+	    for(int i = 0; i < prt.length; i++) {
+		nm[i] = nw.get(i);
+		prt[i] = (tms[i + 1] - tms[i]) / 1000000000.0;
+	    }
+	    fin(total, nm, prt);
+	    nw = null;
+	    queries = null;
+	}
     }
 
     public void check() {
-        for (Iterator<Frame> i = waiting.iterator(); i.hasNext(); ) {
-            Frame f = i.next();
-            for (long qo : f.queries) {
-                if (qo == 0)
-                    return;
-            }
-            f.fin2();
-            i.remove();
-        }
+	for(Iterator<Frame> i = waiting.iterator(); i.hasNext();) {
+	    Frame f = i.next();
+	    for(long qo : f.queries) {
+		if(qo == 0)
+		    return;
+	    }
+	    f.fin2();
+	    i.remove();
+	}
     }
 }

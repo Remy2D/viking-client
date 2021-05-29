@@ -1,7 +1,6 @@
 ## Changelog
 
 ### 1.4.0
-
 - Added wear bars to items
 - Added dream harvest script
 - Added basic sorting script
@@ -14,7 +13,6 @@
 - Minor fixes and improvements
 
 ### 1.3.0
-
 - Added player columns
 - Display tile on minimap hover
 - Fix horse alarm
@@ -22,15 +20,13 @@
 - Minor PBot update
 
 ### 1.2.0
-
 - Improved pathfinder
-    - Should work when lifting objects
-    - Right clicks to spitroast etc. should now work
-    - Should work from dugouts and boats in water
+  - Should work when lifting objects
+  - Right clicks to spitroast etc. should now work
+  - Should work from dugouts and boats in water
 - Various bugfixes
 
 ### 1.1.0
-
 - Added animal radiuses
 - Added gilding info to equipment window
 - Added toggleable night-light
@@ -38,7 +34,6 @@
 - Various bugfixes
 
 ### 1.0.1
-
 - Various bugfixes
 
 ### 1.0.0
@@ -95,7 +90,7 @@
 - Improved displayment of remaining time on curios etc.
 - Improved item info (quality, numinfo etc.)
 - Improved kin colors
-- Made toggling of item qualities persistent
+- Made toggling  of item qualities persistent
 
 
 - Various other small improvements

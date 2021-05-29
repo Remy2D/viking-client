@@ -35,79 +35,61 @@ public class ItemSpec implements GSprite.Owner, ItemInfo.SpriteOwner {
     public final OwnerContext ctx;
 
     public ItemSpec(OwnerContext ctx, ResData res, Object[] info) {
-        this.res = res;
-        this.ctx = ctx;
-        this.info = info;
+	this.res = res;
+	this.ctx = ctx;
+	this.info = info;
     }
 
-    public <T> T context(Class<T> cl) {
-        return (ctx.context(cl));
-    }
-
+    public <T> T context(Class<T> cl) {return(ctx.context(cl));}
     @Deprecated
-    public Glob glob() {
-        return (context(Glob.class));
-    }
-
-    public Resource getres() {
-        return (res.res.get());
-    }
-
+    public Glob glob() {return(context(Glob.class));}
+    public Resource getres() {return(res.res.get());}
     private Random rnd = null;
-
     public Random mkrandoom() {
-        if (rnd == null)
-            rnd = new Random();
-        return (rnd);
+	if(rnd == null)
+	    rnd = new Random();
+	return(rnd);
     }
-
-    public GSprite sprite() {
-        return (spr());
-    }
-
-    public Resource resource() {
-        return (res.res.get());
-    }
+    public GSprite sprite() {return(spr());}
+    public Resource resource() {return(res.res.get());}
 
     private GSprite spr = null;
-
     public GSprite spr() {
-        if (spr == null)
-            spr = GSprite.create(this, res.res.get(), res.sdt.clone());
-        return (spr);
+	if(spr == null)
+	    spr = GSprite.create(this, res.res.get(), res.sdt.clone());
+	return(spr);
     }
 
     public BufferedImage image() {
-        GSprite spr = spr();
-        if (spr instanceof GSprite.ImageSprite)
-            return (((GSprite.ImageSprite) spr).image());
-        return (null);
+	GSprite spr = spr();
+	if(spr instanceof GSprite.ImageSprite)
+	    return(((GSprite.ImageSprite)spr).image());
+	return(null);
     }
 
     private List<ItemInfo> cinfo = null;
-
     public List<ItemInfo> info() {
-        if (cinfo == null) {
-            Object[] info = this.info;
-            if (info == null) {
-                /* XXX: This is quite dubious indeed, but it is
-                 * currently necessary. Should DynName be lifted out
-                 * of defn? */
-                info = new Object[]{
-                        new Object[]{
-                                res.res.get().pool.load("ui/tt/defn").get(),
-                        },
-                };
-            }
-            cinfo = ItemInfo.buildinfo(this, info);
-        }
-        return (cinfo);
+	if(cinfo == null) {
+	    Object[] info = this.info;
+	    if(info == null) {
+		/* XXX: This is quite dubious indeed, but it is
+		 * currently necessary. Should DynName be lifted out
+		 * of defn? */
+		info = new Object[] {
+		    new Object[] {
+			res.res.get().pool.load("ui/tt/defn").get(),
+		    },
+		};
+	    }
+	    cinfo = ItemInfo.buildinfo(this, info);
+	}
+	return(cinfo);
     }
 
     public String name() {
-        ItemInfo.Name nm = ItemInfo.find(ItemInfo.Name.class, info());
-        if (nm == null)
-            return (null);
-        return (nm.str.text);
+	ItemInfo.Name nm = ItemInfo.find(ItemInfo.Name.class, info());
+	if(nm == null)
+	    return(null);
+	return(nm.str.text);
     }
 }

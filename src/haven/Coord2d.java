@@ -33,141 +33,145 @@ public class Coord2d implements Comparable<Coord2d>, java.io.Serializable {
     public static final Coord2d z = new Coord2d(0, 0);
 
     public Coord2d(double x, double y) {
-        this.x = x;
-        this.y = y;
+	this.x = x;
+	this.y = y;
     }
 
     public Coord2d(Coord c) {
-        this(c.x, c.y);
+	this(c.x, c.y);
     }
 
     public Coord2d(Coord3f c) {
-        this(c.x, c.y);
+	this(c.x, c.y);
     }
 
     public Coord2d() {
-        this(0, 0);
+	this(0, 0);
     }
 
+    public static Coord2d of(double x, double y) {return(new Coord2d(x, y));}
+    public static Coord2d of(double x) {return(of(x, x));}
+    public static Coord2d of(Coord c) {return(of(c.x, c.y));}
+    public static Coord2d of(Coord3f c) {return(of(c.x, c.y));}
+
     public boolean equals(double X, double Y) {
-        return ((x == X) && (y == Y));
+	return((x == X) && (y == Y));
     }
 
     public boolean equals(Object o) {
-        if (!(o instanceof Coord2d))
-            return (false);
-        Coord2d c = (Coord2d) o;
-        return (equals(c.x, c.y));
+	if(!(o instanceof Coord2d))
+	    return(false);
+	Coord2d c = (Coord2d)o;
+	return(equals(c.x, c.y));
     }
 
     public int hashCode() {
-        long X = Double.doubleToLongBits(x);
-        long Y = Double.doubleToLongBits(y);
-        return ((((int) (X ^ (X >>> 32))) * 31) + ((int) (Y ^ (Y >>> 32))));
+	long X = Double.doubleToLongBits(x);
+	long Y = Double.doubleToLongBits(y);
+	return((((int)(X ^ (X >>> 32))) * 31) + ((int)(Y ^ (Y >>> 32))));
     }
 
     public int compareTo(Coord2d c) {
-        if (c.y < y) return (-1);
-        if (c.y > y) return (1);
-        if (c.x < x) return (-1);
-        if (c.y > y) return (1);
-        return (0);
+	if(c.y < y) return(-1);
+	if(c.y > y) return(1);
+	if(c.x < x) return(-1);
+	if(c.y > y) return(1);
+	return(0);
     }
 
     public Coord2d add(double X, double Y) {
-        return (new Coord2d(x + X, y + Y));
+	return(of(x + X, y + Y));
     }
 
     public Coord2d add(Coord2d b) {
-        return (add(b.x, b.y));
+	return(add(b.x, b.y));
     }
 
     public Coord2d inv() {
-        return (new Coord2d(-x, -y));
+	return(of(-x, -y));
     }
 
     public Coord2d sub(double X, double Y) {
-        return (new Coord2d(x - X, y - Y));
+	return(of(x - X, y - Y));
     }
 
     public Coord2d sub(Coord2d b) {
-        return (sub(b.x, b.y));
+	return(sub(b.x, b.y));
     }
 
     public Coord2d mul(double f) {
-        return (new Coord2d(x * f, y * f));
+	return(of(x * f, y * f));
     }
 
     public Coord2d mul(double X, double Y) {
-        return (new Coord2d(x * X, y * Y));
+	return(of(x * X, y * Y));
     }
 
     public Coord2d mul(Coord2d b) {
-        return (mul(b.x, b.y));
+	return(mul(b.x, b.y));
     }
 
     public Coord2d div(double f) {
-        return (new Coord2d(x / f, y / f));
+	return(of(x / f, y / f));
     }
 
     public Coord2d div(double X, double Y) {
-        return (new Coord2d(x / X, y / Y));
+	return(of(x / X, y / Y));
     }
 
     public Coord2d div(Coord2d b) {
-        return (div(b.x, b.y));
+	return(div(b.x, b.y));
     }
 
     public Coord round() {
-        return (new Coord((int) Math.round(x), (int) Math.round(y)));
+	return(Coord.of((int)Math.round(x), (int)Math.round(y)));
     }
 
     public Coord floor() {
-        return (new Coord((int) Math.floor(x), (int) Math.floor(y)));
+	return(Coord.of((int)Math.floor(x), (int)Math.floor(y)));
     }
 
     public Coord floor(double X, double Y) {
-        return (new Coord((int) Math.floor(x / X), (int) Math.floor(y / Y)));
+	return(Coord.of((int)Math.floor(x / X), (int)Math.floor(y / Y)));
     }
 
     public Coord floor(Coord2d f) {
-        return (floor(f.x, f.y));
+	return(floor(f.x, f.y));
     }
 
     public Coord2d mod() {
-        return (new Coord2d(x - Math.floor(x), y - Math.floor(y)));
+	return(of(x - Math.floor(x), y - Math.floor(y)));
     }
 
     public Coord2d mod(double X, double Y) {
-        return (new Coord2d(x - (Math.floor(x / X) * X), y - (Math.floor(y / Y) * Y)));
+	return(of(x - (Math.floor(x / X) * X), y - (Math.floor(y / Y) * Y)));
     }
 
     public Coord2d mod(Coord2d f) {
-        return (mod(f.x, f.y));
+	return(mod(f.x, f.y));
     }
 
     public double angle(Coord2d o) {
-        return (Math.atan2(o.y - y, o.x - x));
+	return(Math.atan2(o.y - y, o.x - x));
     }
 
     public double dist(Coord2d o) {
-        return (Math.hypot(x - o.x, y - o.y));
+	return(Math.hypot(x - o.x, y - o.y));
     }
 
     public double abs() {
-        return (Math.hypot(x, y));
+	return(Math.hypot(x, y));
     }
 
     public static Coord2d sc(double a, double r) {
-        return (new Coord2d(Math.cos(a) * r, Math.sin(a) * r));
+	return(of(Math.cos(a) * r, Math.sin(a) * r));
     }
 
     public String toString() {
-        return ("(" + x + ", " + y + ")");
+	return("(" + x + ", " + y + ")");
     }
-
-    public Coord2d rotate(double a) {
-        return new Coord2d(this.x * Math.cos(a) - this.y * Math.sin(a), this.x * Math.sin(a) + this.y * Math.cos(a));
-    }
+	public Coord2d rotate(double a) {
+		return new Coord2d(this.x * Math.cos(a) - this.y * Math.sin(a), this.x * Math.sin(a) + this.y * Math.cos(a));
+	}
 
 }

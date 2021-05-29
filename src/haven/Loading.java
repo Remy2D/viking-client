@@ -32,110 +32,110 @@ public class Loading extends RuntimeException implements Waitable {
     public final Loading rec;
 
     public Loading() {
-        super();
-        rec = null;
+	super();
+	rec = null;
     }
 
     public Loading(String msg) {
-        super(msg);
-        rec = null;
+	super(msg);
+	rec = null;
     }
-
+    
     public Loading(Throwable cause) {
-        super(cause);
-        rec = null;
+	super(cause);
+	rec = null;
     }
-
+    
     public Loading(String msg, Throwable cause) {
-        super(msg, cause);
-        rec = null;
+	super(msg, cause);
+	rec = null;
     }
 
     public Loading(Loading rec) {
-        super(rec);
-        this.rec = rec;
+	super(rec);
+	this.rec = rec;
     }
 
     public Loading(String msg, Loading rec) {
-        super(msg, rec);
-        this.rec = rec;
+	super(msg, rec);
+	this.rec = rec;
     }
 
     public String getMessage() {
-        if (rec != null)
-            return (rec.getMessage());
-        return (super.getMessage());
+	if(rec != null)
+	    return(rec.getMessage());
+	return(super.getMessage());
     }
 
     public static class UnwaitableEvent extends RuntimeException {
-        public final Loading event;
+	public final Loading event;
 
-        public UnwaitableEvent(String message, Loading event) {
-            super(message);
-            this.event = event;
-        }
+	public UnwaitableEvent(String message, Loading event) {
+	    super(message);
+	    this.event = event;
+	}
 
-        public UnwaitableEvent(Loading event) {
-            this("Tried to wait for unwaitable event", event);
-        }
+	public UnwaitableEvent(Loading event) {
+	    this("Tried to wait for unwaitable event", event);
+	}
     }
 
     public void waitfor(Runnable callback, Consumer<Waitable.Waiting> reg) {
-        throw (new UnwaitableEvent(this));
+	throw(new UnwaitableEvent(this));
     }
 
     private void queuewait() throws InterruptedException {
-        boolean[] buf = {false};
-        Waitable.Waiting[] wbuf = {null};
-        waitfor(() -> {
-                    synchronized (buf) {
-                        buf[0] = true;
-                        buf.notifyAll();
-                    }
-                },
-                wait -> wbuf[0] = wait);
-        try {
-            synchronized (buf) {
-                while (!buf[0])
-                    buf.wait();
-            }
-        } finally {
-            wbuf[0].cancel();
-        }
+	boolean[] buf = {false};
+	Waitable.Waiting[] wbuf = {null};
+	waitfor(() -> {
+		synchronized(buf) {
+		    buf[0] = true;
+		    buf.notifyAll();
+		}
+	    },
+	    wait -> wbuf[0] = wait);
+	try {
+	    synchronized(buf) {
+		while(!buf[0])
+		    buf.wait();
+	    }
+	} finally {
+	    wbuf[0].cancel();
+	}
     }
 
     public void waitfor() throws InterruptedException {
-        if (rec != null) {
-            rec.waitfor();
-            return;
-        } else {
-            queuewait();
-        }
+	if(rec != null) {
+	    rec.waitfor();
+	    return;
+	} else {
+	    queuewait();
+	}
     }
 
     public static <T> T waitforint(Indir<T> x) throws InterruptedException {
-        while (true) {
-            try {
-                return (x.get());
-            } catch (Loading l) {
-                l.waitfor();
-            }
-        }
+	while(true) {
+	    try {
+		return(x.get());
+	    } catch(Loading l) {
+		l.waitfor();
+	    }
+	}
     }
 
     public static <T> T waitfor(Indir<T> x) {
-        boolean intd = false;
-        try {
-            while (true) {
-                try {
-                    return (waitforint(x));
-                } catch (InterruptedException e) {
-                    intd = true;
-                }
-            }
-        } finally {
-            if (intd)
-                Thread.currentThread().interrupt();
-        }
+	boolean intd = false;
+	try {
+	    while(true) {
+		try {
+		    return(waitforint(x));
+		} catch(InterruptedException e) {
+		    intd = true;
+		}
+	    }
+	} finally {
+	    if(intd)
+		Thread.currentThread().interrupt();
+	}
     }
 }

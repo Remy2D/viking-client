@@ -27,7 +27,6 @@
 package haven;
 
 import java.util.*;
-
 import haven.render.*;
 
 public class ResDrawable extends Drawable {
@@ -37,42 +36,42 @@ public class ResDrawable extends Drawable {
     // private double delay = 0; XXXRENDER
 
     public ResDrawable(Gob gob, Indir<Resource> res, Message sdt) {
-        super(gob);
-        this.res = res;
-        this.sdt = new MessageBuf(sdt);
-        spr = Sprite.create(gob, res.get(), this.sdt.clone());
-        if (gob.type == null) {
-            gob.type = gob.determineType(res.get().name);
-        }
+	super(gob);
+	this.res = res;
+	this.sdt = new MessageBuf(sdt);
+	spr = Sprite.create(gob, res.get(), this.sdt.clone());
+	if(gob.type == null) {
+		gob.type = gob.determineType(res.get().name);
+	}
     }
 
     public ResDrawable(Gob gob, Resource res) {
-        this(gob, res.indir(), MessageBuf.nil);
+	this(gob, res.indir(), MessageBuf.nil);
     }
 
     public void ctick(double dt) {
-        spr.tick(dt);
+	spr.tick(dt);
     }
 
     public void gtick(Render g) {
-        spr.gtick(g);
+	spr.gtick(g);
     }
 
     public void added(RenderTree.Slot slot) {
-        slot.add(spr);
-        super.added(slot);
+	slot.add(spr);
+	super.added(slot);
     }
 
     public void dispose() {
-        if (spr != null)
-            spr.dispose();
+	if(spr != null)
+	    spr.dispose();
     }
 
     public Resource getres() {
-        return (res.get());
+	return(res.get());
     }
 
     public Skeleton.Pose getpose() {
-        return (Skeleton.getpose(spr));
+	return(Skeleton.getpose(spr));
     }
 }

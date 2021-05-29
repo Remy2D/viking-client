@@ -32,58 +32,57 @@ public interface NodeWrap {
     public RenderTree.Node apply(RenderTree.Node node);
 
     public static interface Wrapping {
-        public NodeWrap wrap();
-
-        public RenderTree.Node wrapped();
+	public NodeWrap wrap();
+	public RenderTree.Node wrapped();
     }
 
     public static class Composed implements NodeWrap {
-        private final NodeWrap[] wraps;
+	private final NodeWrap[] wraps;
 
-        public Composed(NodeWrap... wraps) {
-            this.wraps = wraps;
-        }
+	public Composed(NodeWrap... wraps) {
+	    this.wraps = wraps;
+	}
 
-        public RenderTree.Node apply(RenderTree.Node node) {
-            for (int i = wraps.length - 1; i >= 0; i--)
-                node = wraps[i].apply(node);
-            return (node);
-        }
+	public RenderTree.Node apply(RenderTree.Node node) {
+	    for(int i = wraps.length - 1; i >= 0; i--)
+		node = wraps[i].apply(node);
+	    return(node);
+	}
 
-        public boolean equals(Object o) {
-            if (!(o instanceof Composed))
-                return (false);
-            return (Arrays.equals(wraps, ((Composed) o).wraps));
-        }
+	public boolean equals(Object o) {
+	    if(!(o instanceof Composed))
+		return(false);
+	    return(Arrays.equals(wraps, ((Composed)o).wraps));
+	}
 
-        public int hashCode() {
-            return (Arrays.hashCode(wraps));
-        }
+	public int hashCode() {
+	    return(Arrays.hashCode(wraps));
+	}
 
-        public String toString() {
-            return ("#<composed " + Arrays.asList(wraps) + ">");
-        }
+	public String toString() {
+	    return("#<composed " + Arrays.asList(wraps) + ">");
+	}
     }
 
     public static NodeWrap compose(NodeWrap... w) {
-        int n = 0;
-        for (int i = 0; i < w.length; i++) {
-            if (w[i] != null)
-                n++;
-        }
-        if (n != w.length) {
-            NodeWrap[] buf = new NodeWrap[n];
-            for (int i = 0, o = 0; i < w.length; i++) {
-                if (w[i] != null)
-                    buf[o++] = w[i];
-            }
-            w = buf;
-        }
-        if (w.length == 0)
-            return (nil);
-        if (w.length == 1)
-            return (w[0]);
-        return (new Composed(w));
+	int n = 0;
+	for(int i = 0; i < w.length; i++) {
+	    if(w[i] != null)
+		n++;
+	}
+	if(n != w.length) {
+	    NodeWrap[] buf = new NodeWrap[n];
+	    for(int i = 0, o = 0; i < w.length; i++) {
+		if(w[i] != null)
+		    buf[o++] = w[i];
+	    }
+	    w = buf;
+	}
+	if(w.length == 0)
+	    return(nil);
+	if(w.length == 1)
+	    return(w[0]);
+	return(new Composed(w));
     }
 
     public static final NodeWrap nil = n -> n;

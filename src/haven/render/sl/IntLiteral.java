@@ -33,13 +33,12 @@ public class IntLiteral extends Expression {
     public final int val;
 
     public IntLiteral(int val) {
-        this.val = val;
+	this.val = val;
     }
 
-    public void walk(Walker w) {
-    }
+    public void walk(Walker w) {}
 
     public void output(Output out) {
-        out.write(Integer.toString(val));
+	out.write(Integer.toString(val));
     }
 }

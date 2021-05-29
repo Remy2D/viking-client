@@ -29,7 +29,6 @@ package haven;
 import java.util.*;
 import java.util.function.*;
 import java.util.concurrent.atomic.*;
-
 import haven.Waitable.Waiting;
 
 public class Loader {
@@ -41,207 +40,206 @@ public class Loader {
     private final AtomicInteger busy = new AtomicInteger(0);
 
     public class Future<T> {
-        public final Supplier<T> task;
-        private final boolean capex;
-        private final Object runmon = new Object();
-        private T val;
-        private Throwable exc;
-        private Loading curload = null;
-        private Thread running = null;
-        private boolean done = false, cancelled = false, restarted = false;
+	public final Supplier<T> task;
+	private final boolean capex;
+	private final Object runmon = new Object();
+	private T val;
+	private Throwable exc;
+	private Loading curload = null;
+	private Thread running = null;
+	private boolean done = false, cancelled = false, restarted = false;
 
-        private Future(Supplier<T> task, boolean capex) {
-            this.task = task;
-            this.capex = capex;
-        }
+	private Future(Supplier<T> task, boolean capex) {
+	    this.task = task;
+	    this.capex = capex;
+	}
 
-        private void run() {
-            synchronized (runmon) {
-                synchronized (this) {
-                    if (running != null) throw (new AssertionError());
-                    running = Thread.currentThread();
-                }
-                try {
-                    busy.getAndIncrement();
-                    try {
-                        try {
-                            synchronized (this) {
-                                if (cancelled)
-                                    return;
-                            }
-                            T val = task.get();
-                            synchronized (this) {
-                                this.val = val;
-                                done = true;
-                            }
-                        } catch (Loading l) {
-                            curload = l;
-                            l.waitfor(() -> {
-                                        synchronized (queue) {
-                                            if (loading.remove(this) != null) {
-                                                curload = null;
-                                                queue.add(this);
-                                                queue.notify();
-                                            }
-                                        }
-                                        check();
-                                    },
-                                    wait -> {
-                                        boolean ck = false;
-                                        synchronized (queue) {
-                                            if (restarted) {
-                                                curload = null;
-                                                queue.add(this);
-                                                queue.notify();
-                                                ck = true;
-                                                restarted = false;
-                                            } else {
-                                                if (loading.put(this, wait) != null)
-                                                    throw (new AssertionError());
-                                            }
-                                        }
-                                        if (ck)
-                                            check();
-                                    });
-                        }
-                    } catch (Throwable exc) {
-                        synchronized (this) {
-                            this.exc = exc;
-                            done = true;
-                        }
-                        if (!capex)
-                            throw (exc);
-                    }
-                } finally {
-                    synchronized (this) {
-                        running = null;
-                    }
-                    busy.getAndDecrement();
-                }
-            }
-        }
+	private void run() {
+	    synchronized(runmon) {
+		synchronized(this) {
+		    if(running != null) throw(new AssertionError());
+		    running = Thread.currentThread();
+		}
+		try {
+		    busy.getAndIncrement();
+		    try {
+			try {
+			    synchronized(this) {
+				if(cancelled)
+				    return;
+			    }
+			    T val = task.get();
+			    synchronized(this) {
+				this.val = val;
+				done = true;
+			    }
+			} catch(Loading l) {
+			    curload = l;
+			    l.waitfor(() -> {
+				    synchronized(queue) {
+					if(loading.remove(this) != null) {
+					    curload = null;
+					    queue.add(this);
+					    queue.notify();
+					}
+				    }
+				    check();
+				},
+				wait -> {
+				    boolean ck = false;
+				    synchronized(queue) {
+					if(restarted) {
+					    curload = null;
+					    queue.add(this);
+					    queue.notify();
+					    ck = true;
+					    restarted = false;
+					} else {
+					    if(loading.put(this, wait) != null)
+						throw(new AssertionError());
+					}
+				    }
+				    if(ck)
+					check();
+				});
+			}
+		    } catch(Throwable exc) {
+			synchronized(this) {
+			    this.exc = exc;
+			    done = true;
+			}
+			if(!capex)
+			    throw(exc);
+		    }
+		} finally {
+		    synchronized(this) {
+			running = null;
+		    }
+		    busy.getAndDecrement();
+		}
+	    }
+	}
 
-        public boolean cancel() {
-            boolean ret;
-            synchronized (runmon) {
-                synchronized (this) {
-                    cancelled = true;
-                    ret = !done;
-                }
-            }
-            Waiting wait;
-            synchronized (queue) {
-                if ((wait = loading.remove(this)) != null)
-                    curload = null;
-            }
-            if (wait != null)
-                wait.cancel();
-            return (ret);
-        }
+	public boolean cancel() {
+	    boolean ret;
+	    synchronized(runmon) {
+		synchronized(this) {
+		    cancelled = true;
+		    ret = !done;
+		}
+	    }
+	    Waiting wait;
+	    synchronized(queue) {
+		if((wait = loading.remove(this)) != null)
+		    curload = null;
+	    }
+	    if(wait != null)
+		wait.cancel();
+	    return(ret);
+	}
 
-        public void restart() {
-            Waiting wait;
-            synchronized (queue) {
-                wait = loading.remove(this);
-                if (wait != null)
-                    curload = null;
-                else
-                    restarted = true;
-            }
-            if (wait != null) {
-                wait.cancel();
-                synchronized (queue) {
-                    queue.add(this);
-                    queue.notify();
-                }
-                check();
-            }
-        }
+	public void restart() {
+	    Waiting wait;
+	    synchronized(queue) {
+		wait = loading.remove(this);
+		if(wait != null)
+		    curload = null;
+		else
+		    restarted = true;
+	    }
+	    if(wait != null) {
+		wait.cancel();
+		synchronized(queue) {
+		    queue.add(this);
+		    queue.notify();
+		}
+		check();
+	    }
+	}
 
-        public T get() {
-            synchronized (this) {
-                if (done) {
-                    if (exc != null)
-                        throw (new RuntimeException("Deferred error in loader task", exc));
-                    return (val);
-                }
-                if (cancelled)
-                    throw (new IllegalStateException("cancelled future"));
-                throw (new IllegalStateException("not done"));
-            }
-        }
+	public T get() {
+	    synchronized(this) {
+		if(done) {
+		    if(exc != null)
+			throw(new RuntimeException("Deferred error in loader task", exc));
+		    return(val);
+		}
+		if(cancelled)
+		    throw(new IllegalStateException("cancelled future"));
+		throw(new IllegalStateException("not done"));
+	    }
+	}
 
-        public boolean done() {
-            synchronized (this) {
-                return (done || (cancelled && (running != null)));
-            }
-        }
+	public boolean done() {
+	    synchronized(this) {
+		return(done || (cancelled && (running != null)));
+	    }
+	}
     }
 
     private void loop() {
-        try {
-            main:
-            while (true) {
-                Future<?> item;
-                synchronized (queue) {
-                    double start = Utils.rtime(), now = start;
-                    while (true) {
-                        if (Thread.interrupted())
-                            throw (new InterruptedException());
-                        if ((item = queue.poll()) != null)
-                            break;
-                        if ((now - start) >= timeout)
-                            break main;
-                        queue.wait((long) ((timeout - (now - start)) * 1000) + 100);
-                        now = Utils.rtime();
-                    }
-                }
-                item.run();
-            }
-        } catch (InterruptedException e) {
-        } finally {
-            synchronized (queue) {
-                pool.remove(Thread.currentThread());
-            }
-        }
-        check();
+	try {
+	    main: while(true) {
+		Future<?> item;
+		synchronized(queue) {
+		    double start = Utils.rtime(), now = start;
+		    while(true) {
+			if(Thread.interrupted())
+			    throw(new InterruptedException());
+			if((item = queue.poll()) != null)
+			    break;
+			if((now - start) >= timeout)
+			    break main;
+			queue.wait((long)((timeout - (now - start)) * 1000) + 100);
+			now = Utils.rtime();
+		    }
+		}
+		item.run();
+	    }
+	} catch(InterruptedException e) {
+	} finally {
+	    synchronized(queue) {
+		pool.remove(Thread.currentThread());
+	    }
+	}
+	check();
     }
 
     private void check() {
-        synchronized (queue) {
-            if ((queue.size() > pool.size()) && (pool.size() < maxthreads)) {
-                Thread th = new HackThread(this::loop, "Loader thread");
-                th.setDaemon(true);
-                th.start();
-                pool.add(th);
-            }
-        }
+	synchronized(queue) {
+	    if((queue.size() > pool.size()) && (pool.size() < maxthreads)) {
+		Thread th = new HackThread(this::loop, "Loader thread");
+		th.setDaemon(true);
+		th.start();
+		pool.add(th);
+	    }
+	}
     }
 
     public <T> Future<T> defer(Supplier<T> task, boolean capex) {
-        Future<T> ret = new Future<T>(task, capex);
-        synchronized (queue) {
-            queue.add(ret);
-            queue.notify();
-        }
-        check();
-        return (ret);
+	Future<T> ret = new Future<T>(task, capex);
+	synchronized(queue) {
+	    queue.add(ret);
+	    queue.notify();
+	}
+	check();
+	return(ret);
     }
 
     public <T> Future<T> defer(Supplier<T> task) {
-        return (defer(task, true));
+	return(defer(task, true));
     }
 
     public <T> Future<T> defer(Runnable task, T result) {
-        return (defer(() -> {
-            task.run();
-            return (result);
-        }, false));
+	return(defer(() -> {
+		    task.run();
+		    return(result);
+		}, false));
     }
 
     public String stats() {
-        synchronized (queue) {
-            return (String.format("%d+%d %d/%d", queue.size(), loading.size(), busy.get(), pool.size()));
-        }
+	synchronized(queue) {
+	    return(String.format("%d+%d %d/%d", queue.size(), loading.size(), busy.get(), pool.size()));
+	}
     }
 }

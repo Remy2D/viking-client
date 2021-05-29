@@ -38,94 +38,94 @@ public abstract class ConsoleHost extends Widget {
     private int hpos = history.size();
     private String hcurrent;
     private UI.Grab kg;
-
+    
     private class CommandLine extends LineEdit {
-        private CommandLine() {
-            super();
-        }
+	private CommandLine() {
+	    super();
+	}
+	
+	private CommandLine(String line) {
+	    super(line);
+	}
 
-        private CommandLine(String line) {
-            super(line);
-        }
-
-        private void cancel() {
-            cmdline = null;
-            kg.remove();
-        }
-
-        protected void done(String line) {
-            history.add(line);
-            try {
-                ui.cons.run(line);
-            } catch (Exception e) {
-                String msg = e.getMessage();
-                if (msg == null)
-                    msg = e.toString();
-                ui.cons.out.println(msg);
-                error(msg);
-            }
-            cancel();
-        }
-
-        public boolean key(char c, int code, int mod) {
-            if (c == 27) {
-                cancel();
-            } else if ((c == 8) && (mod == 0) && (line.length() == 0) && (point == 0)) {
-                cancel();
-            } else if (code == KeyEvent.VK_UP) {
-                if (hpos > 0) {
-                    if (hpos == history.size())
-                        hcurrent = line;
-                    cmdline = new CommandLine(history.get(--hpos));
-                }
-            } else if (code == KeyEvent.VK_DOWN) {
-                if (hpos < history.size()) {
-                    if (++hpos == history.size())
-                        cmdline = new CommandLine(hcurrent);
-                    else
-                        cmdline = new CommandLine(history.get(hpos));
-                }
-            } else {
-                return (super.key(c, code, mod));
-            }
-            return (true);
-        }
+	private void cancel() {
+	    cmdline = null;
+	    kg.remove();
+	}
+	
+	protected void done(String line) {
+	    history.add(line);
+	    try {
+		ui.cons.run(line);
+	    } catch(Exception e) {
+		String msg = e.getMessage();
+		if(msg == null)
+		    msg = e.toString();
+		ui.cons.out.println(msg);
+		error(msg);
+	    }
+	    cancel();
+	}
+	
+	public boolean key(char c, int code, int mod) {
+	    if(c == 27) {
+		cancel();
+	    } else if((c == 8) && (mod == 0) && (line.length() == 0) && (point == 0)) {
+		cancel();
+	    } else if(code == KeyEvent.VK_UP) {
+		if(hpos > 0) {
+		    if(hpos == history.size())
+			hcurrent = line;
+		    cmdline = new CommandLine(history.get(--hpos));
+		}
+	    } else if(code == KeyEvent.VK_DOWN) {
+		if(hpos < history.size()) {
+		    if(++hpos == history.size())
+			cmdline = new CommandLine(hcurrent);
+		    else
+			cmdline = new CommandLine(history.get(hpos));
+		}
+	    } else {
+		return(super.key(c, code, mod));
+	    }
+	    return(true);
+	}
     }
 
     public ConsoleHost(Coord sz) {
-        super(sz);
+	super(sz);
     }
 
     public ConsoleHost() {
     }
-
+    
     public ConsoleHost(UI ui, Coord c, Coord sz) {
-        super(ui, c, sz);
+	super(ui, c, sz);
     }
-
+    
     public void drawcmd(GOut g, Coord c) {
-        if (cmdline != null) {
-            if ((cmdtext == null) || (cmdtextf != cmdline.line))
-                cmdtext = cmdfoundry.render(":" + (cmdtextf = cmdline.line));
-            g.image(cmdtext.tex(), c);
-            int lx = cmdtext.advance(cmdline.point + 1);
-            g.line(c.add(lx + UI.scale(1), UI.scale(2)), c.add(lx + UI.scale(1), UI.scale(14)), UI.scale(1));
-        }
+	if(cmdline != null) {
+	    if((cmdtext == null) || (cmdtextf != cmdline.line))
+		cmdtext = cmdfoundry.render(":" + (cmdtextf = cmdline.line));
+	    g.image(cmdtext.tex(), c);
+	    int lx = cmdtext.advance(cmdline.point + 1);
+	    g.line(c.add(lx + UI.scale(1), UI.scale(2)), c.add(lx + UI.scale(1), UI.scale(14)), UI.scale(1));
+	}
     }
-
+    
     public void entercmd() {
-        kg = ui.grabkeys(this);
-        hpos = history.size();
-        cmdline = new CommandLine();
+	kg = ui.grabkeys(this);
+	hpos = history.size();
+	cmdline = new CommandLine();
     }
 
     public boolean keydown(KeyEvent ev) {
-        if (cmdline != null) {
-            cmdline.key(ev);
-            return (true);
-        }
-        return (super.keydown(ev));
+	if(cmdline != null) {
+	    cmdline.key(ev);
+	    return(true);
+	}
+	return(super.keydown(ev));
     }
-
+    
     public abstract void error(String msg);
 }

@@ -31,22 +31,22 @@ public class Pair<A, B> {
     public final B b;
 
     public Pair(A a, B b) {
-        this.a = a;
-        this.b = b;
+	this.a = a;
+	this.b = b;
     }
 
     public int hashCode() {
-        return ((((a == null) ? 0 : a.hashCode()) * 31) + ((b == null) ? 0 : b.hashCode()));
+	return((((a == null)?0:a.hashCode()) * 31) + ((b == null)?0:b.hashCode()));
     }
 
     public boolean equals(Object O) {
-        if (!(O instanceof Pair))
-            return (false);
-        Pair o = (Pair<?, ?>) O;
-        return (Utils.eq(a, o.a) && Utils.eq(b, o.b));
+	if(!(O instanceof Pair))
+	    return(false);
+	Pair o = (Pair<?, ?>)O;
+	return(Utils.eq(a, o.a) && Utils.eq(b, o.b));
     }
 
     public String toString() {
-        return (String.format("(%s . %s)", a, b));
+	return(String.format("(%s . %s)", a, b));
     }
 }

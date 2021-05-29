@@ -29,7 +29,9 @@ from py4j.protocol import (
     Py4JError, Py4JNetworkError, smart_decode, get_command_part,
     get_return_value, Py4JAuthenticationError)
 
+
 logger = logging.getLogger("py4j.clientserver")
+
 
 SHUTDOWN_FINALIZER_WORKER = "__shutdown__"
 
@@ -43,7 +45,7 @@ class FinalizerWorker(Thread):
         super(FinalizerWorker, self).__init__()
 
     def run(self):
-        while (True):
+        while(True):
             try:
                 task = self.deque.pop()
                 if task == SHUTDOWN_FINALIZER_WORKER:
@@ -60,7 +62,6 @@ class JavaParameters(GatewayParameters):
     """Wrapper class that contains all parameters that can be passed to
     configure a `ClientServer`.`
     """
-
     def __init__(
             self, address=DEFAULT_ADDRESS, port=DEFAULT_PORT, auto_field=False,
             auto_close=True, auto_convert=False, eager_load=False,
@@ -292,8 +293,8 @@ class JavaClient(GatewayClient):
         # Only retry if Python was driving the communication.
         parent_retry = super(JavaClient, self)._should_retry(
             retry, connection, pne)
-        return parent_retry and retry and connection and \
-               connection.initiated_from_client
+        return parent_retry and retry and connection and\
+            connection.initiated_from_client
 
     def _create_connection_guard(self, connection):
         return ClientServerConnectionGuard(self, connection)
@@ -515,7 +516,7 @@ class ClientServerConnection(object):
         already_closed = self.socket is None
         self.socket = None
         self.stream = None
-        if not self.initiated_from_client and self.python_server and \
+        if not self.initiated_from_client and self.python_server and\
                 not already_closed:
             server_connection_stopped.send(
                 self.python_server, connection=self)
@@ -537,7 +538,7 @@ class ClientServerConnection(object):
                 obj_id = smart_decode(self.stream.readline())[:-1]
                 logger.info(
                     "Received command {0} on object id {1}".
-                        format(command, obj_id))
+                    format(command, obj_id))
                 if obj_id is None or len(obj_id.strip()) == 0:
                     break
                 if command == proto.CALL_PROXY_COMMAND_NAME:
@@ -571,27 +572,27 @@ class ClientServerConnection(object):
 
     def _call_proxy(self, obj_id, input):
         if obj_id not in self.pool:
-            return proto.RETURN_MESSAGE + proto.ERROR + \
-                   get_command_part('Object ID unknown', self.pool)
+            return proto.RETURN_MESSAGE + proto.ERROR +\
+                get_command_part('Object ID unknown', self.pool)
 
         try:
             method = smart_decode(input.readline())[:-1]
             params = self._get_params(input)
             return_value = getattr(self.pool[obj_id], method)(*params)
-            return proto.RETURN_MESSAGE + proto.SUCCESS + \
-                   get_command_part(return_value, self.pool)
+            return proto.RETURN_MESSAGE + proto.SUCCESS +\
+                get_command_part(return_value, self.pool)
         except Exception as e:
             logger.exception("There was an exception while executing the "
                              "Python Proxy on the Python Side.")
 
-            if self.python_parameters.propagate_java_exceptions and \
-                    isinstance(e, proto.Py4JJavaError):
+            if self.python_parameters.propagate_java_exceptions and\
+               isinstance(e, proto.Py4JJavaError):
                 java_exception = e.java_exception
             else:
                 java_exception = traceback.format_exc()
 
-            return proto.RETURN_MESSAGE + proto.ERROR + \
-                   get_command_part(java_exception, self.pool)
+            return proto.RETURN_MESSAGE + proto.ERROR +\
+                get_command_part(java_exception, self.pool)
 
     def _get_params(self, input):
         params = []

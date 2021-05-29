@@ -6,15 +6,15 @@ import haven.render.MixColor;
 import haven.render.Pipe;
 
 public class GobColor extends GAttrib implements Gob.SetupMod {
-    private MixColor color;
+	private MixColor color;
 
-    public GobColor(Gob g, MixColor color) {
-        super(g);
-        this.color = color;
-    }
+	public GobColor(Gob g, MixColor color) {
+		super(g);
+		this.color = color;
+	}
 
-    public Pipe.Op placestate() {
-        return color;
-    }
+	public Pipe.Op placestate() {
+		return color;
+	}
 
 }

@@ -27,60 +27,45 @@
 package haven.render;
 
 import java.util.*;
-
 import haven.render.State.Slot;
-
 import static haven.Utils.eq;
 
 public class ProxyPipe implements Pipe {
     private Pipe bk;
 
     public ProxyPipe(Pipe bk) {
-        this.bk = bk;
+	this.bk = bk;
     }
+    public ProxyPipe() {this(Pipe.nil);}
 
-    public ProxyPipe() {
-        this(Pipe.nil);
-    }
-
-    public <T extends State> T get(Slot<T> slot) {
-        return (bk.get(slot));
-    }
-
-    public State[] states() {
-        return (bk.states());
-    }
-
-    public Pipe copy() {
-        return (bk.copy());
-    }
+    public <T extends State> T get(Slot<T> slot) {return(bk.get(slot));}
+    public State[] states() {return(bk.states());}
+    public Pipe copy() {return(bk.copy());}
 
     public Pipe update(Pipe np) {
-        Pipe ret = this.bk;
-        this.bk = np;
-        return (ret);
+	Pipe ret = this.bk;
+	this.bk = np;
+	return(ret);
     }
 
     public int[] dupdate(Pipe np) {
-        Pipe pp = update(np);
-        State[] ns = np.states(), ps = pp.states(), as, bs;
-        if (ns.length < ps.length) {
-            as = ns;
-            bs = ps;
-        } else {
-            as = ps;
-            bs = ns;
-        }
-        int[] ret = new int[bs.length];
-        int n = 0, i = 0;
-        for (; i < as.length; i++) {
-            if (!eq(as[i], bs[i]))
-                ret[n++] = i;
-        }
-        for (; i < bs.length; i++) {
-            if (bs[i] != null)
-                ret[n++] = i;
-        }
-        return (Arrays.copyOf(ret, n));
+	Pipe pp = update(np);
+	State[] ns = np.states(), ps = pp.states(), as, bs;
+	if(ns.length < ps.length) {
+	    as = ns; bs = ps;
+	} else {
+	    as = ps; bs = ns;
+	}
+	int[] ret = new int[bs.length];
+	int n = 0, i = 0;
+	for(; i < as.length; i++) {
+	    if(!eq(as[i], bs[i]))
+		ret[n++] = i;
+	}
+	for(; i < bs.length; i++) {
+	    if(bs[i] != null)
+		ret[n++] = i;
+	}
+	return(Arrays.copyOf(ret, n));
     }
 }

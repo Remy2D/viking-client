@@ -36,35 +36,33 @@ public class LatentMat extends State {
     public final String id, act;
 
     public LatentMat(Pipe.Op mat, String id) {
-        this.mat = mat;
-        this.id = id;
-        this.act = null;
+	this.mat = mat;
+	this.id = id;
+	this.act = null;
     }
 
     public LatentMat(String act) {
-        this.mat = null;
-        this.id = null;
-        this.act = act;
+	this.mat = null;
+	this.id = null;
+	this.act = act;
     }
 
-    public ShaderMacro shader() {
-        return (null);
-    }
+    public ShaderMacro shader() {return(null);}
 
     public void apply(Pipe buf) {
-        if ((mat != null) && (id != null))
-            buf.put(slot, this);
-        if (act != null) {
-            LatentMat cur = buf.get(slot);
-            if ((cur != null) && (cur.id == act))
-                cur.mat.apply(buf);
-        }
+	if((mat != null) && (id != null))
+	    buf.put(slot, this);
+	if(act != null) {
+	    LatentMat cur = buf.get(slot);
+	    if((cur != null) && (cur.id == act))
+		cur.mat.apply(buf);
+	}
     }
 
     @Material.ResName("latent")
     public static class $latent implements Material.ResCons2 {
-        public Material.Res.Resolver cons(Resource res, Object... args) {
-            return ((buf, dynbuf) -> dynbuf.add(new LatentMat(((String) args[0]).intern())));
-        }
+	public Material.Res.Resolver cons(Resource res, Object... args) {
+	    return((buf, dynbuf) -> dynbuf.add(new LatentMat(((String)args[0]).intern())));
+	}
     }
 }

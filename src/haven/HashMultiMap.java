@@ -37,171 +37,170 @@ public class HashMultiMap<K, V> {
 
     @SuppressWarnings("unchecked")
     public void put(K key, V value) {
-        if (value == null)
-            throw (new NullPointerException("value"));
-        Object prev = bk.get(key);
-        if (prev instanceof TaggedList) {
-            TaggedList<V> ls = (TaggedList<V>) prev;
-            ls.add(value);
-        } else if (prev != null) {
-            TaggedList<V> ls = new TaggedList<>();
-            ls.add((V) prev);
-            ls.add(value);
-            bk.put(key, ls);
-        } else {
-            bk.put(key, value);
-        }
-        size++;
+	if(value == null)
+	    throw(new NullPointerException("value"));
+	Object prev = bk.get(key);
+	if(prev instanceof TaggedList) {
+	    TaggedList<V> ls = (TaggedList<V>)prev;
+	    ls.add(value);
+	} else if(prev != null) {
+	    TaggedList<V> ls = new TaggedList<>();
+	    ls.add((V)prev);
+	    ls.add(value);
+	    bk.put(key, ls);
+	} else {
+	    bk.put(key, value);
+	}
+	size++;
     }
 
     @SuppressWarnings("unchecked")
     public V remove(K key, V value) {
-        if (value == null)
-            throw (new NullPointerException("value"));
-        Object cur = bk.get(key);
-        V ret;
-        if (cur instanceof TaggedList) {
-            TaggedList<V> ls = (TaggedList<V>) cur;
-            ret = ls.remove(value) ? value : null;
-            if (ls.size() == 1)
-                bk.put(key, ls.get(0));
-            size--;
-        } else if (cur != null) {
-            bk.remove(key);
-            ret = (V) cur;
-            size--;
-        } else {
-            ret = null;
-        }
-        return (ret);
+	if(value == null)
+	    throw(new NullPointerException("value"));
+	Object cur = bk.get(key);
+	V ret;
+	if(cur instanceof TaggedList) {
+	    TaggedList<V> ls = (TaggedList<V>)cur;
+	    ret = ls.remove(value) ? value : null;
+	    if(ls.size() == 1)
+		bk.put(key, ls.get(0));
+	    size--;
+	} else if(cur != null) {
+	    bk.remove(key);
+	    ret = (V)cur;
+	    size--;
+	} else {
+	    ret = null;
+	}
+	return(ret);
     }
 
     @SuppressWarnings("unchecked")
     public Collection<V> removeall(K key) {
-        Object prev = bk.remove(key);
-        if (prev instanceof TaggedList) {
-            TaggedList<V> ls = (TaggedList<V>) prev;
-            size -= ls.size();
-            return (ls);
-        } else if (prev != null) {
-            size--;
-            return (Collections.singletonList((V) prev));
-        } else {
-            return (Collections.emptyList());
-        }
+	Object prev = bk.remove(key);
+	if(prev instanceof TaggedList) {
+	    TaggedList<V> ls = (TaggedList<V>)prev;
+	    size -= ls.size();
+	    return(ls);
+	} else if(prev != null) {
+	    size--;
+	    return(Collections.singletonList((V)prev));
+	} else {
+	    return(Collections.emptyList());
+	}
     }
 
     @SuppressWarnings("unchecked")
     public V pop(K key) {
-        Object cur = bk.get(key);
-        V ret;
-        if (cur instanceof TaggedList) {
-            TaggedList<V> ls = (TaggedList<V>) cur;
-            int n = ls.size() - 1;
-            ret = ls.get(n);
-            ls.remove(n);
-            if (n == 1)
-                bk.put(key, ls.get(0));
-            size--;
-        } else if (cur != null) {
-            bk.remove(key);
-            ret = (V) cur;
-            size--;
-        } else {
-            ret = null;
-        }
-        return (ret);
+	Object cur = bk.get(key);
+	V ret;
+	if(cur instanceof TaggedList) {
+	    TaggedList<V> ls = (TaggedList<V>)cur;
+	    int n = ls.size() - 1;
+	    ret = ls.get(n);
+	    ls.remove(n);
+	    if(n == 1)
+		bk.put(key, ls.get(0));
+	    size--;
+	} else if(cur != null) {
+	    bk.remove(key);
+	    ret = (V)cur;
+	    size--;
+	} else {
+	    ret = null;
+	}
+	return(ret);
     }
 
     @SuppressWarnings("unchecked")
     public V get(K key) {
-        Object cur = bk.get(key);
-        if (cur instanceof TaggedList)
-            return (null);
-        return ((V) cur);
+	Object cur = bk.get(key);
+	if(cur instanceof TaggedList)
+	    return(null);
+	return((V)cur);
     }
 
     @SuppressWarnings("unchecked")
     public Collection<V> getall(K key) {
-        Object cur = bk.get(key);
-        if (cur instanceof TaggedList) {
-            return ((TaggedList<V>) cur);
-        } else if (cur != null) {
-            return (Collections.singletonList((V) cur));
-        } else {
-            return (Collections.emptyList());
-        }
+	Object cur = bk.get(key);
+	if(cur instanceof TaggedList) {
+	    return((TaggedList<V>)cur);
+	} else if(cur != null) {
+	    return(Collections.singletonList((V)cur));
+	} else {
+	    return(Collections.emptyList());
+	}
     }
 
     public int size() {
-        return (size);
+	return(size);
     }
 
     private Collection<V> values = null;
-
     public Collection<V> values() {
-        if (values == null) {
-            values = new AbstractCollection<V>() {
-                public int size() {
-                    return (size);
-                }
+	if(values == null) {
+	    values = new AbstractCollection<V>() {
+		    public int size() {
+			return(size);
+		    }
 
-                public Iterator<V> iterator() {
-                    return (new Iterator<V>() {
-                        Iterator<Map.Entry<K, Object>> bki = bk.entrySet().iterator();
-                        Map.Entry<K, Object> ent;
-                        V next, prev;
-                        TaggedList<V> ls;
-                        Iterator<V> lsi;
+		    public Iterator<V> iterator() {
+			return(new Iterator<V>() {
+				Iterator<Map.Entry<K, Object>> bki = bk.entrySet().iterator();
+				Map.Entry<K, Object> ent;
+				V next, prev;
+				TaggedList<V> ls;
+				Iterator<V> lsi;
 
-                        @SuppressWarnings("unchecked")
-                        public boolean hasNext() {
-                            if (next != null)
-                                return (true);
-                            if (lsi != null) {
-                                if (lsi.hasNext()) {
-                                    next = lsi.next();
-                                    return (true);
-                                }
-                                lsi = null;
-                            }
-                            if (!bki.hasNext())
-                                return (false);
-                            this.ent = bki.next();
-                            Object v = this.ent.getValue();
-                            if (v instanceof TaggedList) {
-                                this.ls = (TaggedList<V>) v;
-                                this.lsi = ls.iterator();
-                                this.next = this.lsi.next();
-                            } else {
-                                next = (V) v;
-                            }
-                            return (true);
-                        }
+				@SuppressWarnings("unchecked")
+				public boolean hasNext() {
+				    if(next != null)
+					return(true);
+				    if(lsi != null) {
+					if(lsi.hasNext()) {
+					    next = lsi.next();
+					    return(true);
+					}
+					lsi = null;
+				    }
+				    if(!bki.hasNext())
+					return(false);
+				    this.ent = bki.next();
+				    Object v = this.ent.getValue();
+				    if(v instanceof TaggedList) {
+					this.ls = (TaggedList<V>)v;
+					this.lsi = ls.iterator();
+					this.next = this.lsi.next();
+				    } else {
+					next = (V)v;
+				    }
+				    return(true);
+				}
 
-                        public V next() {
-                            if (!hasNext())
-                                throw (new NoSuchElementException());
-                            this.prev = this.next;
-                            this.next = null;
-                            return (this.prev);
-                        }
+				public V next() {
+				    if(!hasNext())
+					throw(new NoSuchElementException());
+				    this.prev = this.next;
+				    this.next = null;
+				    return(this.prev);
+				}
 
-                        public void remove() {
-                            if (this.prev == null)
-                                throw (new IllegalStateException());
-                            if (this.lsi != null) {
-                                this.lsi.remove();
-                                this.prev = null;
-                            } else {
-                                HashMultiMap.this.remove(this.ent.getKey(), this.prev);
-                                this.prev = null;
-                            }
-                        }
-                    });
-                }
-            };
-        }
-        return (values);
+				public void remove() {
+				    if(this.prev == null)
+					throw(new IllegalStateException());
+				    if(this.lsi != null) {
+					this.lsi.remove();
+					this.prev = null;
+				    } else {
+					HashMultiMap.this.remove(this.ent.getKey(), this.prev);
+					this.prev = null;
+				    }
+				}
+			    });
+		    }
+		};
+	}
+	return(values);
     }
 }

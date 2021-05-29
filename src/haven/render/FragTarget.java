@@ -34,46 +34,41 @@ public class FragTarget {
     public BlendMode blend = null;
 
     public FragTarget(Object buf) {
-        this.buf = buf;
+	this.buf = buf;
     }
 
     public FragTarget blend(BlendMode blend) {
-        this.blend = blend;
-        return (this);
+	this.blend = blend;
+	return(this);
     }
 
     public FragTarget mask(boolean r, boolean g, boolean b, boolean a) {
-        mask[0] = r;
-        mask[1] = g;
-        mask[2] = b;
-        mask[3] = a;
-        return (this);
+	mask[0] = r; mask[1] = g; mask[2] = b; mask[3] = a;
+	return(this);
     }
 
     public FragTarget mask(boolean[] mask) {
-        if (mask.length != 4)
-            throw (new IllegalArgumentException());
-        for (int i = 0; i < 4; i++)
-            this.mask[i] = mask[i];
-        return (this);
+	if(mask.length != 4)
+	    throw(new IllegalArgumentException());
+	for(int i = 0; i < 4; i++)
+	    this.mask[i] = mask[i];
+	return(this);
     }
 
     public int hashCode() {
-        int ret = buf.hashCode();
-        ret = (ret * 31) + (mask[0] ? 8 : 0) + (mask[1] ? 4 : 0) + (mask[2] ? 2 : 0) + (mask[3] ? 1 : 0);
-        ret = (ret * 31) + ((blend == null) ? 0 : blend.hashCode());
-        return (ret);
+	int ret = buf.hashCode();
+	ret = (ret * 31) + (mask[0] ? 8 : 0) + (mask[1] ? 4 : 0) + (mask[2] ? 2 : 0) + (mask[3] ? 1 : 0);
+	ret = (ret * 31) + ((blend == null) ? 0 : blend.hashCode());
+	return(ret);
     }
 
     public boolean equals(FragTarget that) {
-        return ((this.buf == that.buf) && Arrays.equals(this.mask, that.mask) && Objects.equals(this.blend, that.blend));
+	return((this.buf == that.buf) && Arrays.equals(this.mask, that.mask) && Objects.equals(this.blend, that.blend));
     }
 
     public boolean equals(Object o) {
-        return ((o instanceof FragTarget) && this.equals((FragTarget) o));
+	return((o instanceof FragTarget) && this.equals((FragTarget)o));
     }
 
-    public String toString() {
-        return (String.format("#<frag-target %s, %s>", buf, blend));
-    }
+    public String toString() {return(String.format("#<frag-target %s, %s>", buf, blend));}
 }

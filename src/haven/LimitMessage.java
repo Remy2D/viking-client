@@ -32,47 +32,47 @@ public class LimitMessage extends Message {
     private final boolean eoferror;
 
     public LimitMessage(Message bk, int left, boolean eoferror) {
-        this.bk = bk;
-        this.left = left;
-        this.eoferror = eoferror;
+	this.bk = bk;
+	this.left = left;
+	this.eoferror = eoferror;
     }
 
     public LimitMessage(Message bk, int left) {
-        this(bk, left, true);
+	this(bk, left, true);
     }
 
     public boolean underflow(int hint) {
-        if (left < 1)
-            return (false);
-        if (hint + rt - rh <= rbuf.length) {
-            System.arraycopy(rbuf, rh, rbuf, 0, rt - rh);
-        } else {
-            byte[] n = new byte[Math.min(left, Math.max(hint, 32)) + rt - rh];
-            System.arraycopy(rbuf, rh, n, 0, rt - rh);
-            rbuf = n;
-        }
-        rt -= rh;
-        rh = 0;
-        if (bk.rt - bk.rh < 1) {
-            if (!bk.underflow(hint)) {
-                if (eoferror)
-                    throw (new EOF(String.format("Early EOF in sized message with %d bytes left", left)));
-                return (false);
-            }
-        }
-        int len = Math.min(left, Math.min(bk.rt - bk.rh, rbuf.length - rt));
-        System.arraycopy(bk.rbuf, bk.rh, rbuf, rt, len);
-        bk.rh += len;
-        rt += len;
-        left -= len;
-        return (true);
+	if(left < 1)
+	    return(false);
+	if(hint + rt - rh <= rbuf.length) {
+	    System.arraycopy(rbuf, rh, rbuf, 0, rt - rh);
+	} else {
+	    byte[] n = new byte[Math.min(left, Math.max(hint, 32)) + rt - rh];
+	    System.arraycopy(rbuf, rh, n, 0, rt - rh);
+	    rbuf = n;
+	}
+	rt -= rh;
+	rh = 0;
+	if(bk.rt - bk.rh < 1) {
+	    if(!bk.underflow(hint)) {
+		if(eoferror)
+		    throw(new EOF(String.format("Early EOF in sized message with %d bytes left", left)));
+		return(false);
+	    }
+	}
+	int len = Math.min(left, Math.min(bk.rt - bk.rh, rbuf.length - rt));
+	System.arraycopy(bk.rbuf, bk.rh, rbuf, rt, len);
+	bk.rh += len;
+	rt += len;
+	left -= len;
+	return(true);
     }
 
     public void overflow(int min) {
-        throw (new RuntimeException("LimitMessage is not writeable"));
+	throw(new RuntimeException("LimitMessage is not writeable"));
     }
 
     public String toString() {
-        return (String.format("#<limit-message %s, %d+%d left>", bk, left, rt - rh));
+	return(String.format("#<limit-message %s, %d+%d left>", bk, left, rt - rh));
     }
 }

@@ -33,28 +33,28 @@ public class VectorFormat implements java.io.Serializable {
     public final NumberFormat cf;
 
     public VectorFormat(int nc, NumberFormat cf) {
-        if (nc < 0)
-            throw (new IllegalArgumentException(String.format("%d", nc)));
-        this.nc = nc;
-        this.cf = cf;
+	if(nc < 0)
+	    throw(new IllegalArgumentException(String.format("%d", nc)));
+	this.nc = nc;
+	this.cf = cf;
     }
 
     public int size() {
-        return (nc * cf.size);
+	return(nc * cf.size);
     }
 
     public String toString() {
-        return ("#<vector " + cf + "x" + nc + ">");
+	return("#<vector " + cf + "x" + nc + ">");
     }
 
     public boolean equals(Object o) {
-        if (!(o instanceof VectorFormat))
-            return (false);
-        VectorFormat that = (VectorFormat) o;
-        return ((this.nc == that.nc) && (this.cf == that.cf));
+	if(!(o instanceof VectorFormat))
+	    return(false);
+	VectorFormat that = (VectorFormat)o;
+	return((this.nc == that.nc) && (this.cf == that.cf));
     }
 
     public int hashCode() {
-        return ((cf.hashCode() * 31) + nc);
+	return((cf.hashCode() * 31) + nc);
     }
 }

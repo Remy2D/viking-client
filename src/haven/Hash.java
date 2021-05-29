@@ -28,25 +28,14 @@ package haven;
 
 public interface Hash<T> {
     public int hash(T ob);
-
     public boolean equal(T x, T y);
 
     public static final Hash<Object> eq = new Hash<Object>() {
-        public int hash(Object ob) {
-            return ((ob == null) ? 0 : ob.hashCode());
-        }
-
-        public boolean equal(Object x, Object y) {
-            return ((x == null) ? (y == null) : x.equals(y));
-        }
+	public int hash(Object ob) {return((ob == null)?0:ob.hashCode());}
+	public boolean equal(Object x, Object y) {return((x == null)?(y == null):x.equals(y));}
     };
     public static final Hash<Object> id = new Hash<Object>() {
-        public int hash(Object ob) {
-            return (System.identityHashCode(ob));
-        }
-
-        public boolean equal(Object x, Object y) {
-            return (x == y);
-        }
+	public int hash(Object ob) {return(System.identityHashCode(ob));}
+	public boolean equal(Object x, Object y) {return(x == y);}
     };
 }

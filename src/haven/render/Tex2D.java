@@ -28,7 +28,6 @@ package haven.render;
 
 import haven.render.sl.*;
 import haven.render.sl.ValBlock.Value;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Function.PDir.*;
 import static haven.render.sl.Type.*;
@@ -40,64 +39,64 @@ public class Tex2D {
     public Uniform tex2d;
 
     public static final AutoVarying rtexcoord = new AutoVarying(VEC2, "s_tex2d") {
-        protected Expression root(VertexContext vctx) {
-            return (pick(texc.ref(), "st"));
-        }
+	    protected Expression root(VertexContext vctx) {
+		return(pick(texc.ref(), "st"));
+	    }
 
-        protected Interpol ipol(Context ctx) {
-            Tex2D mod;
-            if ((ctx instanceof ShaderContext) && ((mod = ((ShaderContext) ctx).prog.getmod(Tex2D.class)) != null))
-                return (mod.ipol);
-            return (super.ipol(ctx));
-        }
-    };
+	    protected Interpol ipol(Context ctx) {
+		Tex2D mod;
+		if((ctx instanceof ShaderContext) && ((mod = ((ShaderContext)ctx).prog.getmod(Tex2D.class)) != null))
+		    return(mod.ipol);
+		return(super.ipol(ctx));
+	    }
+	};
 
     public Value texcoord() {
-        return (prog.fctx.uniform.ext(rtexcoord, () -> prog.fctx.uniform.new Value(VEC2) {
-            public Expression root() {
-                return (rtexcoord.ref());
-            }
-        }));
+	return(prog.fctx.uniform.ext(rtexcoord, () -> prog.fctx.uniform.new Value(VEC2) {
+		public Expression root() {
+		    return(rtexcoord.ref());
+		}
+	    }));
     }
 
     public Value color() {
-        return (prog.fctx.uniform.ext(Tex2D.class, () -> {
-            texcoord();
-            return (prog.fctx.uniform.new Value(VEC4) {
-                public Expression root() {
-                    return (texture2D(tex2d.ref(), texcoord().depref()));
-                }
-            });
-        }));
+	return(prog.fctx.uniform.ext(Tex2D.class, () -> {
+		    texcoord();
+		    return(prog.fctx.uniform.new Value(VEC4) {
+			    public Expression root() {
+				return(texture2D(tex2d.ref(), texcoord().depref()));
+			    }
+			});
+		}));
     }
 
     public void tex2d(Uniform.Data<Object> data) {
-        this.tex2d = new Uniform(Type.SAMPLER2D, data.value, data.deps);
+	this.tex2d = new Uniform(Type.SAMPLER2D, data.value, data.deps);
     }
 
     public Tex2D(ProgramContext prog) {
-        this.prog = prog;
-        prog.module(this);
+	this.prog = prog;
+	prog.module(this);
     }
 
     public static Tex2D get(ProgramContext prog) {
-        Tex2D t = prog.getmod(Tex2D.class);
-        if (t == null)
-            t = new Tex2D(prog);
-        return (t);
+	Tex2D t = prog.getmod(Tex2D.class);
+	if(t == null)
+	    t = new Tex2D(prog);
+	return(t);
     }
 
     public static final ShaderMacro mod = prog -> {
-        final Value tex2d = get(prog).color();
-        tex2d.force();
-        FragColor.fragcol(prog.fctx).mod(in -> mul(in, tex2d.ref()), 0);
+	final Value tex2d = get(prog).color();
+	tex2d.force();
+	FragColor.fragcol(prog.fctx).mod(in -> mul(in, tex2d.ref()), 0);
     };
 
     public static final ShaderMacro clip = prog -> {
-        final Value tex2d = get(prog).color();
-        tex2d.force();
-        prog.fctx.mainmod(blk -> blk.add(new If(lt(pick(tex2d.ref(), "a"), l(0.5)),
-                        new Discard())),
-                -100);
+	final Value tex2d = get(prog).color();
+	tex2d.force();
+	prog.fctx.mainmod(blk -> blk.add(new If(lt(pick(tex2d.ref(), "a"), l(0.5)),
+						new Discard())),
+			  -100);
     };
 }

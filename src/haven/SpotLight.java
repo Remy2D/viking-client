@@ -35,31 +35,31 @@ public class SpotLight extends PosLight {
     private static final float[] defdir = {0.0f, 0.0f, -1.0f};
 
     public SpotLight(FColor col, Coord3f pos, Coord3f dir, float exp) {
-        super(col, pos);
-        this.dir = dir.to3a();
-        this.exp = exp;
-        this.cut = 90.0f;
+	super(col, pos);
+	this.dir = dir.to3a();
+	this.exp = exp;
+	this.cut = 90.0f;
     }
 
     public SpotLight(Color col, Coord3f pos, Coord3f dir, float exp) {
-        super(col, pos);
-        this.dir = dir.to3a();
-        this.exp = exp;
-        this.cut = 90.0f;
+	super(col, pos);
+	this.dir = dir.to3a();
+	this.exp = exp;
+	this.cut = 90.0f;
     }
 
     public SpotLight(FColor amb, FColor dif, FColor spc, Coord3f pos, Coord3f dir, float exp) {
-        super(amb, dif, spc, pos);
-        this.dir = dir.norm().to3a();
-        this.exp = exp;
-        this.cut = 90.0f;
+	super(amb, dif, spc, pos);
+	this.dir = dir.norm().to3a();
+	this.exp = exp;
+	this.cut = 90.0f;
     }
 
     public SpotLight(Color amb, Color dif, Color spc, Coord3f pos, Coord3f dir, float exp) {
-        super(amb, dif, spc, pos);
-        this.dir = dir.norm().to3a();
-        this.exp = exp;
-        this.cut = 90.0f;
+	super(amb, dif, spc, pos);
+	this.dir = dir.norm().to3a();
+	this.exp = exp;
+	this.cut = 90.0f;
     }
 
     /* XXXRENDER

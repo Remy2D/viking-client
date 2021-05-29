@@ -27,5 +27,5 @@
 package haven.render.sl;
 
 public abstract class Toplevel extends Element {
-
+    
 }

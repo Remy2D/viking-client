@@ -28,7 +28,6 @@ package haven.render;
 
 import haven.*;
 import haven.render.sl.*;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Type.*;
 
@@ -38,19 +37,13 @@ public class ColorTex extends State {
     public final Texture2D.Sampler2D data;
 
     public ColorTex(Texture2D.Sampler2D data) {
-        this.data = data;
+	this.data = data;
     }
 
     private static final ShaderMacro shader = prog -> {
-        Tex2D.get(prog).tex2d(new Uniform.Data<Object>(p -> p.get(slot).data, slot));
-        Tex2D.mod.modify(prog);
+	Tex2D.get(prog).tex2d(new Uniform.Data<Object>(p -> p.get(slot).data, slot));
+	Tex2D.mod.modify(prog);
     };
-
-    public ShaderMacro shader() {
-        return (shader);
-    }
-
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
+    public ShaderMacro shader() {return(shader);}
+    public void apply(Pipe p) {p.put(slot, this);}
 }

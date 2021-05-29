@@ -34,51 +34,51 @@ public class RootWidget extends ConsoleHost {
     public static final Resource defcurs = Resource.local().loadwait("gfx/hud/curs/arw");
     Profile guprof, grprof, ggprof;
     boolean afk = false;
-    public MultiSession.MultiSessionWindow multiSessionWindow;
+	public MultiSession.MultiSessionWindow multiSessionWindow;
 
     public RootWidget(UI ui, Coord sz) {
-        super(ui, new Coord(0, 0), sz);
-        setfocusctl(true);
-        hasfocus = true;
-        cursor = defcurs.indir();
+	super(ui, new Coord(0, 0), sz);
+	setfocusctl(true);
+	hasfocus = true;
+	cursor = defcurs.indir();
     }
-
+	
     public boolean globtype(char key, KeyEvent ev) {
-        if (!super.globtype(key, ev)) {
-            if (key == '`') {
-                GameUI gi = findchild(GameUI.class);
-                if (Config.profile) {
-                    add(new Profwnd(guprof, "UI profile"), UI.scale(100, 100));
-                    add(new Profwnd(grprof, "GL profile"), UI.scale(500, 100));
+	if(!super.globtype(key, ev)) {
+	    if(key == '`') {
+		GameUI gi = findchild(GameUI.class);
+		if(Config.profile) {
+		    add(new Profwnd(guprof, "UI profile"), UI.scale(100, 100));
+		    add(new Profwnd(grprof, "GL profile"), UI.scale(500, 100));
 		    /* XXXRENDER
 		    if((gi != null) && (gi.map != null))
 			add(new Profwnd(gi.map.prof, "Map profile"), UI.scale(100, 250));
 		    */
-                }
-                if (Config.profilegpu) {
-                    add(new Profwnd(ggprof, "GPU profile"), UI.scale(500, 250));
-                }
-            } else if (key == ':') {
-                entercmd();
-            } else if (key != 0) {
-                wdgmsg("gk", (int) key);
-            }
-        }
-        if (MultiSession.kb_nextSession.key().match(ev)) {
-            MultiSession.nextSession(1);
-            return true;
-        } else if (MultiSession.kb_prevSession.key().match(ev)) {
-            MultiSession.nextSession(-1);
-            return true;
-        }
-        return (true);
+		}
+		if(Config.profilegpu) {
+		    add(new Profwnd(ggprof, "GPU profile"), UI.scale(500, 250));
+		}
+	    } else if(key == ':') {
+		entercmd();
+	    } else if(key != 0) {
+		wdgmsg("gk", (int)key);
+	    }
+	}
+		if(MultiSession.kb_nextSession.key().match(ev)) {
+			MultiSession.nextSession(1);
+			return true;
+		} else if(MultiSession.kb_prevSession.key().match(ev)) {
+			MultiSession.nextSession(-1);
+			return true;
+		}
+	return(true);
     }
 
     public void draw(GOut g) {
-        super.draw(g);
-        drawcmd(g, new Coord(UI.scale(20), sz.y - UI.scale(20)));
+	super.draw(g);
+	drawcmd(g, new Coord(UI.scale(20), sz.y - UI.scale(20)));
     }
-
+    
     public void error(String msg) {
     }
 }

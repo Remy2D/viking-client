@@ -27,12 +27,14 @@ from py4j.compat import (
     bytestr, isbytestr, isbytearray, ispython3bytestr,
     bytetoint, bytetostr, strtobyte)
 
+
 JAVA_MAX_INT = 2147483647
 JAVA_MIN_INT = -2147483648
 
 JAVA_INFINITY = "Infinity"
 JAVA_NEGATIVE_INFINITY = "-Infinity"
 JAVA_NAN = "NaN"
+
 
 ESCAPE_CHAR = "\\"
 
@@ -75,6 +77,7 @@ FATAL_ERROR = "z"
 SUCCESS = "y"
 RETURN_MESSAGE = "!"
 
+
 # Shortcuts
 SUCCESS_PACKAGE = SUCCESS + PACKAGE_TYPE
 SUCCESS_CLASS = SUCCESS + CLASS_TYPE
@@ -108,6 +111,7 @@ ARRAY_CREATE_SUB_COMMAND_NAME = "c\n"
 REFL_GET_UNKNOWN_SUB_COMMAND_NAME = "u\n"
 REFL_GET_MEMBER_SUB_COMMAND_NAME = "m\n"
 REFL_GET_JAVA_LANG_CLASS_SUB_COMMAND_NAME = "c\n"
+
 
 # List subcommands
 LIST_SORT_SUBCOMMAND_NAME = "s\n"
@@ -180,7 +184,7 @@ def escape_new_line(original):
     :rtype: an escaped string
     """
     if original:
-        return smart_decode(original).replace("\\", "\\\\"). \
+        return smart_decode(original).replace("\\", "\\\\").\
             replace("\r", "\\r").replace("\n", "\\n")
     else:
         return original
@@ -201,7 +205,7 @@ def unescape_new_line(escaped):
         return ESCAPE_CHAR.join(
             "\n".join(
                 ("\r".join(p.split(ESCAPE_CHAR + "r")))
-                    .split(ESCAPE_CHAR + "n"))
+                .split(ESCAPE_CHAR + "n"))
             for p in escaped.split(ESCAPE_CHAR + ESCAPE_CHAR))
     else:
         return escaped
@@ -273,7 +277,7 @@ def get_command_part(parameter, python_proxy_pool=None):
         command_part = BOOLEAN_TYPE + smart_decode(parameter)
     elif isinstance(parameter, Decimal):
         command_part = DECIMAL_TYPE + smart_decode(parameter)
-    elif isinstance(parameter, int) and parameter <= JAVA_MAX_INT \
+    elif isinstance(parameter, int) and parameter <= JAVA_MAX_INT\
             and parameter >= JAVA_MIN_INT:
         command_part = INTEGER_TYPE + smart_decode(parameter)
     elif isinstance(parameter, long) or isinstance(parameter, int):
@@ -321,15 +325,15 @@ def get_return_value(answer, gateway_client, target_id=None, name=None):
             if answer[1] == REFERENCE_TYPE:
                 raise Py4JJavaError(
                     "An error occurred while calling {0}{1}{2}.\n".
-                        format(target_id, ".", name), value)
+                    format(target_id, ".", name), value)
             else:
                 raise Py4JError(
                     "An error occurred while calling {0}{1}{2}. Trace:\n{3}\n".
-                        format(target_id, ".", name, value))
+                    format(target_id, ".", name, value))
         else:
             raise Py4JError(
                 "An error occurred while calling {0}{1}{2}".
-                    format(target_id, ".", name))
+                format(target_id, ".", name))
     else:
         type = answer[1]
         if type == VOID_TYPE:
@@ -429,7 +433,6 @@ class Py4JError(Exception):
 
 class Py4JAuthenticationError(Py4JError):
     """Exception raised when Py4J cannot authenticate a connection."""
-
     def __init__(self, args=None, cause=None):
         super(Py4JAuthenticationError, self).__init__(args)
         self.cause = cause
@@ -437,7 +440,6 @@ class Py4JAuthenticationError(Py4JError):
 
 class Py4JNetworkError(Py4JError):
     """Exception raised when a network error occurs with Py4J."""
-
     def __init__(self, args=None, cause=None, when=None):
         super(Py4JNetworkError, self).__init__(args)
         self.cause = cause
@@ -462,7 +464,7 @@ class Py4JJavaError(Py4JError):
         self.errmsg = msg
         self.java_exception = java_exception
         self.exception_cmd = EXCEPTION_COMMAND_NAME + REFERENCE_TYPE + \
-                             java_exception._target_id + "\n" + END_COMMAND_PART
+            java_exception._target_id + "\n" + END_COMMAND_PART
 
     def __str__(self):
         gateway_client = self.java_exception._gateway_client

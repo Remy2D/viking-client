@@ -28,7 +28,6 @@ package haven.render;
 
 import haven.*;
 import haven.render.sl.*;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Type.*;
 
@@ -37,24 +36,17 @@ public class ColorVary extends State {
     public static final Attribute color = new Attribute(VEC4, "vcolor");
     public static final ColorVary st = new ColorVary();
 
-    private ColorVary() {
-    }
+    private ColorVary() {}
 
     static final AutoVarying fcolor = new AutoVarying(VEC4) {
-        protected Expression root(VertexContext vctx) {
-            return (color.ref());
-        }
-    };
+	    protected Expression root(VertexContext vctx) {
+		return(color.ref());
+	    }
+	};
 
     static final ShaderMacro shader = prog -> {
-        FragColor.fragcol(prog.fctx).mod(in -> mul(in, fcolor.ref()), 0);
+	FragColor.fragcol(prog.fctx).mod(in -> mul(in, fcolor.ref()), 0);
     };
-
-    public ShaderMacro shader() {
-        return (shader);
-    }
-
-    public void apply(Pipe p) {
-        p.put(slot, this);
-    }
+    public ShaderMacro shader() {return(shader);}
+    public void apply(Pipe p) {p.put(slot, this);}
 }

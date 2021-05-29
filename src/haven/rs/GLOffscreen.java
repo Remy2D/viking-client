@@ -29,7 +29,6 @@ package haven.rs;
 import haven.*;
 import haven.render.*;
 import haven.render.gl.*;
-
 import com.jogamp.opengl.*;
 
 public class GLOffscreen implements Context {
@@ -40,79 +39,76 @@ public class GLOffscreen implements Context {
     private final Environment penv;
 
     public GLOffscreen() {
-        prof = GLProfile.getMaxProgrammableCore(true);
-        GLDrawableFactory df = GLDrawableFactory.getFactory(prof);
-        this.buf = df.createOffscreenAutoDrawable(null, caps(prof), null, 1, 1);
-        buf.addGLEventListener(new GLEventListener() {
-            public void display(GLAutoDrawable d) {
-                redraw(d.getGL().getGL3());
-            }
+	prof = GLProfile.getMaxProgrammableCore(true);
+	GLDrawableFactory df = GLDrawableFactory.getFactory(prof);
+	this.buf = df.createOffscreenAutoDrawable(null, caps(prof), null, 1, 1);
+	buf.addGLEventListener(new GLEventListener() {
+		public void display(GLAutoDrawable d) {
+		    redraw(d.getGL().getGL3());
+		}
 
-            public void init(GLAutoDrawable d) {
-            }
+		public void init(GLAutoDrawable d) {
+		}
 
-            public void reshape(GLAutoDrawable d, int x, int y, int w, int h) {
-            }
+		public void reshape(GLAutoDrawable d, int x, int y, int w, int h) {
+		}
 
-            public void dispose(GLAutoDrawable d) {
-            }
-        });
-        buf.display();
-        if (benv == null)
-            throw (new AssertionError("offscreen display call was not honored"));
-        penv = new ProxyEnv();
+		public void dispose(GLAutoDrawable d) {
+		}
+	    });
+	buf.display();
+	if(benv == null)
+	    throw(new AssertionError("offscreen display call was not honored"));
+	penv = new ProxyEnv();
     }
 
     private class ProxyEnv extends Environment.Proxy {
-        public Environment back() {
-            return (benv);
-        }
+	public Environment back() {return(benv);}
 
-        public void submit(Render r) {
-            super.submit(r);
-            synchronized (dmon) {
-                buf.display();
-            }
-        }
+	public void submit(Render r) {
+	    super.submit(r);
+	    synchronized(dmon) {
+		buf.display();
+	    }
+	}
     }
 
     protected GLCapabilities caps(GLProfile prof) {
-        GLCapabilities ret = new GLCapabilities(prof);
-        ret.setDoubleBuffered(true);
-        ret.setAlphaBits(8);
-        ret.setRedBits(8);
-        ret.setGreenBits(8);
-        ret.setBlueBits(8);
-        return (ret);
+	GLCapabilities ret = new GLCapabilities(prof);
+	ret.setDoubleBuffered(true);
+	ret.setAlphaBits(8);
+	ret.setRedBits(8);
+	ret.setGreenBits(8);
+	ret.setBlueBits(8);
+	return(ret);
     }
 
     private void redraw(GL3 gl) {
-        // gl = new TraceGL3(gl, System.err);
-        GLContext ctx = gl.getContext();
-        if (benv == null)
-            benv = new GLEnvironment(gl, ctx, Area.sized(Coord.z, new Coord(1, 1)));
-        if (benv.ctx != ctx)
-            throw (new AssertionError());
-        benv.process(gl);
-        benv.finish(gl);
+	// gl = new TraceGL3(gl, System.err);
+	GLContext ctx = gl.getContext();
+	if(benv == null)
+	    benv = new GLEnvironment(gl, ctx, Area.sized(Coord.z, new Coord(1, 1)));
+	if(benv.ctx != ctx)
+	    throw(new AssertionError());
+	benv.process(gl);
+	benv.finish(gl);
     }
 
     public Environment env() {
-        return (penv);
+	return(penv);
     }
 
     public void dispose() {
     }
 
     private static GLOffscreen defctx = null;
-
     public static GLOffscreen get() {
-        if (defctx == null) {
-            synchronized (GLOffscreen.class) {
-                if (defctx == null)
-                    defctx = new GLOffscreen();
-            }
-        }
-        return (defctx);
+	if(defctx == null) {
+	    synchronized(GLOffscreen.class) {
+		if(defctx == null)
+		    defctx = new GLOffscreen();
+	    }
+	}
+	return(defctx);
     }
 }

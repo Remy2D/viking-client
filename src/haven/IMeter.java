@@ -35,77 +35,77 @@ public class IMeter extends Widget {
     public static final Coord msz = UI.scale(75, 10);
     public final Indir<Resource> bg;
     public List<Meter> meters;
-    private static final Resource horseAlarm = Resource.local().loadwait("sfx/alarms/horsestamina");
-    private boolean alarmPlayed = false;
-
+	private static final Resource horseAlarm = Resource.local().loadwait("sfx/alarms/horsestamina");
+	private boolean alarmPlayed = false;
+    
     @RName("im")
     public static class $_ implements Factory {
-        public Widget create(UI ui, Object[] args) {
-            Indir<Resource> bg = ui.sess.getres((Integer) args[0]);
-            List<Meter> meters = decmeters(args, 1);
-            return (new IMeter(bg, meters));
-        }
+	public Widget create(UI ui, Object[] args) {
+	    Indir<Resource> bg = ui.sess.getres((Integer)args[0]);
+	    List<Meter> meters = decmeters(args, 1);
+	    return(new IMeter(bg, meters));
+	}
     }
-
+    
     public IMeter(Indir<Resource> bg, List<Meter> meters) {
-        super(fsz);
-        this.bg = bg;
-        this.meters = meters;
+	super(fsz);
+	this.bg = bg;
+	this.meters = meters;
     }
-
+    
     public static class Meter {
-        public final Color c;
-        public final double a;
-
-        public Meter(Color c, double a) {
-            this.c = c;
-            this.a = a;
-        }
+	public final Color c;
+	public final double a;
+	
+	public Meter(Color c, double a) {
+	    this.c = c;
+	    this.a = a;
+	}
     }
-
+    
     public void draw(GOut g) {
-        try {
-            Tex bg = this.bg.get().layer(Resource.imgc).tex();
-            g.chcolor(0, 0, 0, 255);
-            g.frect(off, msz);
-            g.chcolor();
-            for (Meter m : meters) {
-                int w = msz.x;
-                w = (int) Math.ceil(w * m.a);
-                g.chcolor(m.c);
-                g.frect(off, new Coord(w, msz.y));
-            }
-            g.chcolor();
-            g.image(bg, Coord.z);
-        } catch (Loading l) {
-        }
+	try {
+	    Tex bg = this.bg.get().layer(Resource.imgc).tex();
+	    g.chcolor(0, 0, 0, 255);
+	    g.frect(off, msz);
+	    g.chcolor();
+	    for(Meter m : meters) {
+		int w = msz.x;
+		w = (int)Math.ceil(w * m.a);
+		g.chcolor(m.c);
+		g.frect(off, new Coord(w, msz.y));
+	    }
+	    g.chcolor();
+	    g.image(bg, Coord.z);
+	} catch(Loading l) {
+	}
     }
-
+    
     private static List<Meter> decmeters(Object[] args, int s) {
-        ArrayList<Meter> buf = new ArrayList<>();
-        for (int a = s; a < args.length; a += 2)
-            buf.add(new Meter((Color) args[a], ((Number) args[a + 1]).doubleValue() * 0.01));
-        buf.trimToSize();
-        return (buf);
+	ArrayList<Meter> buf = new ArrayList<>();
+	for(int a = s; a < args.length; a += 2)
+	    buf.add(new Meter((Color)args[a], ((Number)args[a + 1]).doubleValue() * 0.01));
+	buf.trimToSize();
+	return(buf);
     }
 
     public void uimsg(String msg, Object... args) {
-        if (msg == "set") {
-            this.meters = decmeters(args, 0);
-            if (!alarmPlayed) {
-                try {
-                    Resource res = bg.get();
-                    if (res != null && res.name.equals("gfx/hud/meter/häst")) {
-                        if (meters.get(0).a <= 0.10) {
-                            Audio.play(horseAlarm);
-                            alarmPlayed = true;
-                        }
-                    }
-                } catch (Loading l) {
-                }
-            }
-        } else {
-            super.uimsg(msg, args);
-        }
+	if(msg == "set") {
+	    this.meters = decmeters(args, 0);
+	    if(!alarmPlayed) {
+			try {
+				Resource res = bg.get();
+				if(res != null && res.name.equals("gfx/hud/meter/häst")) {
+					if(meters.get(0).a <= 0.10) {
+						Audio.play(horseAlarm);
+						alarmPlayed = true;
+					}
+				}
+			} catch(Loading l) {
+			}
+		}
+	} else {
+	    super.uimsg(msg, args);
+	}
     }
 }

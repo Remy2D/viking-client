@@ -1,12 +1,10 @@
-# Color gobs in the selected area
-# used to demonstrate PBot API callbacks
+#Color gobs in the selected area
+#used to demonstrate PBot API callbacks
 import sys, os
-
 sys.path.insert(0, os.path.abspath('..'))
 import random
 
 from __pbot.PBotSession import PBotSession
-
 
 class Script:
     def cb(self, a, b):

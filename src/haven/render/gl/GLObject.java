@@ -27,9 +27,7 @@
 package haven.render.gl;
 
 import haven.Disposable;
-
 import java.util.*;
-
 import com.jogamp.opengl.*;
 
 public abstract class GLObject implements Disposable {
@@ -41,88 +39,85 @@ public abstract class GLObject implements Disposable {
     int dispseq;
 
     public GLObject(GLEnvironment env) {
-        this.env = env;
+	this.env = env;
     }
 
     public abstract void create(GL3 gl);
-
     protected abstract void delete(GL3 gl);
 
     protected void dispose0() {
-        synchronized (env.disposed) {
-            if (del)
-                return;
-            dispseq = env.dispseq();
-            env.disposed.add(this);
-            del = true;
-        }
+	synchronized(env.disposed) {
+	    if(del)
+		return;
+	    dispseq = env.dispseq();
+	    env.disposed.add(this);
+	    del = true;
+	}
     }
 
     protected void finalize() {
-        dispose0();
+	dispose0();
     }
 
     public Throwable disptrace = null;
-
     public void dispose() {
-        synchronized (this) {
-            disp = true;
-            if (disptrace == null)
-                disptrace = new Throwable();
-            if (rc == 0)
-                dispose0();
-        }
+	synchronized(this) {
+	    disp = true;
+	    if(disptrace == null)
+		disptrace = new Throwable();
+	    if(rc == 0)
+		dispose0();
+	}
     }
 
     public static class UseAfterFreeException extends RuntimeException {
-        public UseAfterFreeException(Throwable cause) {
-            super("already disposed", cause);
-        }
+	public UseAfterFreeException(Throwable cause) {
+	    super("already disposed", cause);
+	}
     }
 
     private static final java.util.concurrent.atomic.AtomicInteger ar = new java.util.concurrent.atomic.AtomicInteger(0);
-
     void get() {
-        synchronized (this) {
-            if (disp)
-                throw (new UseAfterFreeException(disptrace));
-            rc++;
-            int na = ar.incrementAndGet();
-            // System.err.printf("%d ", na);
-        }
+	synchronized(this) {
+	    if(disp)
+		throw(new UseAfterFreeException(disptrace));
+	    rc++;
+	    int na = ar.incrementAndGet();
+	    // System.err.printf("%d ", na);
+	}
     }
 
     void put() {
-        synchronized (this) {
-            rc--;
-            if (rc < 0)
-                throw (new AssertionError("rc < 0"));
-            else if ((rc == 0) && disp)
-                dispose0();
-            int na = ar.decrementAndGet();
-            // System.err.printf("%d ", na);
-        }
+	synchronized(this) {
+	    rc--;
+	    if(rc < 0)
+		throw(new AssertionError("rc < 0"));
+	    else if((rc == 0) && disp)
+		dispose0();
+	    int na = ar.decrementAndGet();
+	    // System.err.printf("%d ", na);
+	}
     }
 
     protected void ckstate(int st, int ex) {
-        if (st != ex)
-            throw (new IllegalStateException(String.format("unexpected state %d, expected %d, for %s", st, ex, this)));
+	if(st != ex)
+	    throw(new IllegalStateException(String.format("unexpected state %d, expected %d, for %s", st, ex, this)));
     }
 
     protected void setmem(GLEnvironment.MemStats pool, long mem) {
-        synchronized (env.stats_obj) {
-            if (this.pool != null) {
-                env.stats_obj[this.pool.ordinal()]--;
-                env.stats_mem[this.pool.ordinal()] -= this.mem;
-                this.pool = null;
-                this.mem = 0;
-            }
-            if (pool != null) {
-                env.stats_obj[pool.ordinal()]++;
-                env.stats_mem[pool.ordinal()] += mem;
-                this.pool = pool;
-                this.mem = mem;
-            }
-        }
+	synchronized(env.stats_obj) {
+	    if(this.pool != null) {
+		env.stats_obj[this.pool.ordinal()]--;
+		env.stats_mem[this.pool.ordinal()] -= this.mem;
+		this.pool = null;
+		this.mem = 0;
+	    }
+	    if(pool != null) {
+		env.stats_obj[pool.ordinal()]++;
+		env.stats_mem[pool.ordinal()] += mem;
+		this.pool = pool;
+		this.mem = mem;
+	    }
+	}
     }
 }

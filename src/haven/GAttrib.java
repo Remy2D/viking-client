@@ -28,57 +28,53 @@ package haven;
 
 import java.util.*;
 import java.util.function.*;
-
 import haven.render.*;
 
 public abstract class GAttrib {
     public final Gob gob;
 
     public boolean hide = false;
-
+	
     public GAttrib(Gob gob) {
-        this.gob = gob;
+	this.gob = gob;
     }
-
+	
     public void ctick(double dt) {
     }
-
+    
     public void dispose() {
     }
 
     /* Private to Gob.java */
     Collection<RenderTree.Slot> slots;
-
     public void added(RenderTree.Slot slot) {
-        if (slots == null)
-            slots = new ArrayList<>(1);
-        slots.add(slot);
+	if(slots == null)
+	    slots = new ArrayList<>(1);
+	slots.add(slot);
     }
-
     public void removed(RenderTree.Slot slot) {
-        if (slots != null)
-            slots.remove(slot);
+	if(slots != null)
+	    slots.remove(slot);
     }
 
     public static class ParserMaker implements Resource.PublishedCode.Instancer {
-        public Parser make(Class<?> cl, Resource ires, Object... argv) {
-            if (Parser.class.isAssignableFrom(cl))
-                return (Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Parser.class), ires, argv));
-            try {
-                Function<Object[], Void> parse = Utils.smthfun(cl, "parse", Void.TYPE, Gob.class, Message.class);
-                return (new Parser() {
-                    public void apply(Gob gob, Message sdt) {
-                        parse.apply(new Object[]{gob, sdt});
-                    }
-                });
-            } catch (NoSuchMethodException e) {
-            }
-            return (null);
-        }
+	public Parser make(Class<?> cl, Resource ires, Object... argv) {
+	    if(Parser.class.isAssignableFrom(cl))
+		return(Resource.PublishedCode.Instancer.stdmake(cl.asSubclass(Parser.class), ires, argv));
+	    try {
+		Function<Object[], Void> parse = Utils.smthfun(cl, "parse", Void.TYPE, Gob.class, Message.class);
+		return(new Parser() {
+			public void apply(Gob gob, Message sdt) {
+			    parse.apply(new Object[]{gob, sdt});
+			}
+		    });
+	    } catch(NoSuchMethodException e) {}
+	    return(null);
+	}
     }
 
     @Resource.PublishedCode(name = "objdelta", instancer = ParserMaker.class)
     public static interface Parser {
-        public void apply(Gob gob, Message sdt);
+	public void apply(Gob gob, Message sdt);
     }
 }

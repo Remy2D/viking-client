@@ -29,11 +29,8 @@ package haven.resutil;
 import haven.*;
 import haven.render.*;
 import haven.render.sl.*;
-
 import java.awt.Color;
-
 import haven.render.TextureCube.SamplerCube;
-
 import static haven.render.sl.Cons.*;
 import static haven.render.sl.Function.PDir.*;
 import static haven.render.sl.Type.*;
@@ -46,34 +43,32 @@ public class EnvMap extends State {
     private static final Uniform icam = new Uniform(MAT3, p -> Homo3D.camxf(p).transpose().trim3(), Homo3D.cam);
     private static final SamplerCube sky = WaterTile.sky;
     public final float[] col;
-
+    
     public EnvMap(Color col) {
-        this.col = new float[]{
-                col.getRed() / 255.0f,
-                col.getGreen() / 255.0f,
-                col.getBlue() / 255.0f,
-        };
+	this.col = new float[] {
+	    col.getRed() / 255.0f,
+	    col.getGreen() / 255.0f,
+	    col.getBlue() / 255.0f,
+	};
     }
 
     public EnvMap(Resource res, Object... args) {
-        this((Color) args[0]);
+	this((Color)args[0]);
     }
 
     private static final ShaderMacro shader = prog -> {
-        prog.dump = true;
-        FragColor.fragcol(prog.fctx).mod(in -> {
-            return (add(in, mul(textureCube(csky.ref(), neg(mul(icam.ref(),
-                    reflect(Homo3D.fragedir(prog.fctx).depref(),
-                            Homo3D.frageyen(prog.fctx).depref())))),
-                    vec4(ccol.ref(), l(0.0)))));
-        }, 90);
+	prog.dump = true;
+	FragColor.fragcol(prog.fctx).mod(in -> {
+		return(add(in, mul(textureCube(csky.ref(), neg(mul(icam.ref(),
+								   reflect(Homo3D.fragedir(prog.fctx).depref(),
+									   Homo3D.frageyen(prog.fctx).depref())))),
+				   vec4(ccol.ref(), l(0.0)))));
+	    }, 90);
     };
 
-    public ShaderMacro shader() {
-        return (shader);
-    }
+    public ShaderMacro shader() {return(shader);}
 
     public void apply(Pipe buf) {
-        buf.put(slot, this);
+	buf.put(slot, this);
     }
 }

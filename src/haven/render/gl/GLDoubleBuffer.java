@@ -27,7 +27,6 @@
 package haven.render.gl;
 
 import java.util.*;
-
 import com.jogamp.opengl.*;
 
 public class GLDoubleBuffer {
@@ -35,80 +34,75 @@ public class GLDoubleBuffer {
     private int prevsz = 16;
 
     public class Buffered implements BGL.Request {
-        private BufferBGL cur, next;
+	private BufferBGL cur, next;
 
-        public void run(GL3 gl) {
-            if (cur != null)
-                cur.run(gl);
-        }
+	public void run(GL3 gl) {
+	    if(cur != null)
+		cur.run(gl);
+	}
 
-        public void abort() {
-            cur.abort();
-        }
+	public void abort() {
+	    cur.abort();
+	}
 
-        public void update(BufferBGL gl) {
-            if (gl == null)
-                throw (new NullPointerException());
-            if (this.cur == null) {
-                this.cur = gl;
-            } else {
-                synchronized (GLDoubleBuffer.this) {
-                    if (changed == null) {
-                        this.cur = gl;
-                    } else {
-                        if (this.next == null)
-                            changed.add(this);
-                        this.next = gl;
-                    }
-                }
-            }
-        }
+	public void update(BufferBGL gl) {
+	    if(gl == null)
+		throw(new NullPointerException());
+	    if(this.cur == null) {
+		this.cur = gl;
+	    } else {
+		synchronized(GLDoubleBuffer.this) {
+		    if(changed == null) {
+			this.cur = gl;
+		    } else {
+			if(this.next == null)
+			    changed.add(this);
+			this.next = gl;
+		    }
+		}
+	    }
+	}
     }
 
     public boolean get(long timeout) throws InterruptedException {
-        synchronized (this) {
-            if (timeout == 0) {
-                while (changed != null)
-                    wait();
-            } else {
-                long now = System.currentTimeMillis(), start = now;
-                while (changed != null) {
-                    if (now > start + timeout)
-                        return (false);
-                    wait(start + timeout - now);
-                    now = System.currentTimeMillis();
-                }
-            }
-            changed = new ArrayList<Buffered>(prevsz * 2);
-        }
-        return (true);
+	synchronized(this) {
+	    if(timeout == 0) {
+		while(changed != null)
+		    wait();
+	    } else {
+		long now = System.currentTimeMillis(), start = now;
+		while(changed != null) {
+		    if(now > start + timeout)
+			return(false);
+		    wait(start + timeout - now);
+		    now = System.currentTimeMillis();
+		}
+	    }
+	    changed = new ArrayList<Buffered>(prevsz * 2);
+	}
+	return(true);
     }
 
     public void put() {
-        synchronized (this) {
-            if (changed != null) {
-                for (Buffered req : changed) {
-                    if (req.next != null) {
-                        req.cur = req.next;
-                        req.next = null;
-                    }
-                }
-                prevsz = Math.max(changed.size(), 16);
-                changed = null;
-                notifyAll();
-            }
-        }
+	synchronized(this) {
+	    if(changed != null) {
+		for(Buffered req : changed) {
+		    if(req.next != null) {
+			req.cur = req.next;
+			req.next = null;
+		    }
+		}
+		prevsz = Math.max(changed.size(), 16);
+		changed = null;
+		notifyAll();
+	    }
+	}
     }
 
     public void put(BGL gl) {
-        gl.bglSubmit(new BGL.Request() {
-            public void run(GL3 gl) {
-                put();
-            }
-
-            public void abort() {
-                put();
-            }
-        });
+	gl.bglSubmit(new BGL.Request() {
+		public void run(GL3 gl) {put();}
+		public void abort() {put();}
+	    });
     }
 }

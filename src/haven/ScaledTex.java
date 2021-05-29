@@ -32,39 +32,38 @@ public class ScaledTex<T extends Tex> implements Tex {
 
     public ScaledTex(T impl, Coord sz) {
         this.impl = impl;
-        this.sz = sz;
+	this.sz = sz;
     }
 
     public T impl() {
-        return (impl);
+	return(impl);
     }
 
     public Coord sz() {
-        return (sz);
+	return(sz);
     }
 
     public void render(GOut g, float[] gc, float[] tc) {
-        impl.render(g, gc, tc);
+	impl.render(g, gc, tc);
     }
 
     public void render(GOut g, Coord dul, Coord dbr, Coord tul, Coord tbr) {
-        impl.render(g, dul, dbr, tul, tbr);
+	impl.render(g, dul, dbr, tul, tbr);
     }
 
     public void render(GOut g, Coord c) {
-        impl.render(g, Coord.z, sz(), c, c.add(sz()));
+	impl.render(g, Coord.z, sz(), c, c.add(sz()));
     }
 
     public void crender(GOut g, Coord c, Coord dsz, Coord cul, Coord cbr) {
-        impl.crender(g, c, dsz, cul, cbr);
+	impl.crender(g, c, dsz, cul, cbr);
     }
 
     public void crender(GOut g, Coord c, Coord ul, Coord br) {
-        impl.crender(g, c, sz(), ul, br);
-        ;
+	impl.crender(g, c, sz(), ul, br);;
     }
 
     public void dispose() {
-        impl.dispose();
+	impl.dispose();
     }
 }

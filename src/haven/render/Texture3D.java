@@ -27,7 +27,6 @@
 package haven.render;
 
 import haven.*;
-
 import java.util.*;
 
 public class Texture3D extends Texture {
@@ -35,69 +34,63 @@ public class Texture3D extends Texture {
     private final boolean pot;
 
     public Texture3D(int w, int h, int d, DataBuffer.Usage usage, VectorFormat ifmt, VectorFormat efmt, DataBuffer.Filler<? super Image> init) {
-        super(usage, ifmt, efmt, init);
-        if ((w < 0) || (h < 0) || (d < 0))
-            throw (new IllegalArgumentException(String.format("Texture sizes must be non-negative, not (%d, %d, %d)", w, h, d)));
-        this.w = w;
-        this.h = h;
-        this.d = d;
-        this.pot = ((w & (w - 1)) == 0) && ((h & (h - 1)) == 0) && ((d & (d - 1)) == 0);
+	super(usage, ifmt, efmt, init);
+	if((w < 0) || (h < 0) || (d < 0))
+	    throw(new IllegalArgumentException(String.format("Texture sizes must be non-negative, not (%d, %d, %d)", w, h, d)));
+	this.w = w;
+	this.h = h;
+	this.d = d;
+	this.pot = ((w & (w - 1)) == 0) && ((h & (h - 1)) == 0) && ((d & (d - 1)) == 0);
     }
 
     public Texture3D(int w, int h, int d, DataBuffer.Usage usage, VectorFormat ifmt, DataBuffer.Filler<? super Image> init) {
-        this(w, h, d, usage, ifmt, ifmt, init);
+	this(w, h, d, usage, ifmt, ifmt, init);
     }
 
     public Image<Texture3D> image(int level) {
-        if ((level < 0) || (level >= 32))
-            throw (new IllegalArgumentException(Integer.toString(level)));
-        if (level > 0) {
-            if (!pot)
-                throw (new IllegalArgumentException("Non-power-of-two textures cannot be mipmapped"));
-            if (((w >> level) == 0) && ((h >> level) == 0) && ((d >> level) == 0))
-                throw (new IllegalArgumentException(String.format("Invalid mipmap level %d for (%d, %d, %d) texture", level, w, h, d)));
-        }
-        return (new Image<>(this, Math.max(w >> level, 1), Math.max(h >> level, 1), Math.max(d >> level, 1), level));
+	if((level < 0) || (level >= 32))
+	    throw(new IllegalArgumentException(Integer.toString(level)));
+	if(level > 0) {
+	    if(!pot)
+		throw(new IllegalArgumentException("Non-power-of-two textures cannot be mipmapped"));
+	    if(((w >> level) == 0) && ((h >> level) == 0) && ((d >> level) == 0))
+		throw(new IllegalArgumentException(String.format("Invalid mipmap level %d for (%d, %d, %d) texture", level, w, h, d)));
+	}
+	return(new Image<>(this, Math.max(w >> level, 1), Math.max(h >> level, 1), Math.max(d >> level, 1), level));
     }
 
     public Collection<Image<Texture3D>> images() {
-        return (new AbstractCollection<Image<Texture3D>>() {
-            public int size() {
-                if ((w == 0) || (h == 0) || (d == 0)) {
-                    return (0);
-                } else if (pot) {
-                    return (Math.max(Math.max(Integer.numberOfTrailingZeros(w),
-                            Integer.numberOfTrailingZeros(h)),
-                            Integer.numberOfTrailingZeros(d)) +
-                            1);
-                } else {
-                    return (1);
-                }
-            }
+	return(new AbstractCollection<Image<Texture3D>>() {
+		public int size() {
+		    if((w == 0) || (h == 0) || (d == 0)) {
+			return(0);
+		    } else if(pot) {
+			return(Math.max(Math.max(Integer.numberOfTrailingZeros(w),
+						 Integer.numberOfTrailingZeros(h)),
+					Integer.numberOfTrailingZeros(d)) +
+			       1);
+		    } else {
+			return(1);
+		    }
+		}
 
-            public Iterator<Image<Texture3D>> iterator() {
-                return (new Iterator<Image<Texture3D>>() {
-                    int i = 0, n = size();
-
-                    public boolean hasNext() {
-                        return (i < n);
-                    }
-
-                    public Image<Texture3D> next() {
-                        return (image(i++));
-                    }
-                });
-            }
-        });
+		public Iterator<Image<Texture3D>> iterator() {
+		    return(new Iterator<Image<Texture3D>>() {
+			    int i = 0, n = size();
+			    public boolean hasNext() {return(i < n);}
+			    public Image<Texture3D> next() {return(image(i++));}
+			});
+		}
+	    });
     }
 
     public static class Sampler3D extends Sampler<Texture3D> {
-        public Sampler3D(Texture3D tex) {
-            super(tex);
-        }
+	public Sampler3D(Texture3D tex) {
+	    super(tex);
+	}
     }
 
     public String toString() {
-        return (String.format("#<tex3d %sx%d %dx%dx%d>", ifmt.cf, ifmt.nc, w, h, d));
+	return(String.format("#<tex3d %sx%d %dx%dx%d>", ifmt.cf, ifmt.nc, w, h, d));
     }
 }
