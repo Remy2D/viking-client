@@ -732,7 +732,7 @@ public class Widget {
 
     public void wdgmsg(Widget sender, String msg, Object... args) {
         try {
-            if (msg.equals("click") && args.length >= 5 && ui.sess.glob.oc.getgob((int) args[5]).getres().name.contains("steelcrucible") && (int) args[3] == 1)
+            if (msg.equals("click") && args.length > 5 && ui.sess.glob.oc.getgob((int) args[5]).getres().name.contains("steelcrucible") && (int) args[3] == 1)
                 args[3] = 0;
         } catch (Loading | NullPointerException l) {
         }
