@@ -60,13 +60,13 @@ public class GiveButton extends Widget {
         g.image(bg, Coord.z, sz);
         g.chcolor();
         if ((state & 1) != 0)
-            g.image(ol, Coord.z, sz);
+            g.image(ol, Coord.z, sz); // passive(1)
         else
-            g.image(sl, Coord.z, sz);
+            g.image(sl, Coord.z, sz); //active(0)
         if ((state & 2) != 0)
-            g.image(or, Coord.z, sz);
+            g.image(or, Coord.z, sz); // running/feeing?
         else
-            g.image(sr, Coord.z, sz);
+            g.image(sr, Coord.z, sz); //active(0), passive(1)
     }
 
     public boolean mousedown(Coord c, int button) {

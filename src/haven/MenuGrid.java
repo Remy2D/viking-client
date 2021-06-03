@@ -497,6 +497,15 @@ public class MenuGrid extends Widget implements KeyBinding.Bindable {
                         locked = false;
                     }
                 }
+                if (ad.length > 0 && (ad[0].equals("aggro"))) {
+                    if (!locked) {
+                        locked = true;
+                        ui.fightGobCache.reset();
+                        gameui().syslog.append("Aggro", Color.YELLOW);
+                        gameui().ui.root.multiSessionWindow.runKeyCommand(keyEvent);
+                        locked = false;
+                    }
+                }
             }
             r.pag.newp = 0;
             r.use();

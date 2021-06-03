@@ -60,6 +60,7 @@ public class UI {
     public final ActAudio.Root audio = new ActAudio.Root();
     private static final double scalef;
     public GameUI gui;
+    public final FightGobCache fightGobCache = new FightGobCache();
 
     {
         lastevent = lasttick = Utils.rtime();

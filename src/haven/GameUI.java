@@ -847,8 +847,9 @@ public class GameUI extends ConsoleHost implements Console.Directory {
             menu = (MenuGrid) brpanel.add(child, menugridc);
         } else if (place == "fight") {
             fv = urpanel.add((Fightview) child, 0, 0);
+            ui.fightGobCache.setLastFightview(fv);
         } else if (place == "fsess") {
-            add(child, Coord.z);
+            add(child, Coord.z.add(UI.scale(new Coord(0, 300))));
         } else if (place == "inv") {
             invwnd = new Hidewnd(Coord.z, "Inventory") {
                 public void cresize(Widget ch) {

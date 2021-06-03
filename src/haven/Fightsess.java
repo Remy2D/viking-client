@@ -161,6 +161,11 @@ public class Fightsess extends Widget {
                 fx.slot.remove();
         }
         curfx.clear();
+
+        Reaggro reaggro = new Reaggro(ui);
+        Thread t = new Thread(reaggro);
+        t.start();
+
         super.destroy();
     }
 

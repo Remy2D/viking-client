@@ -10,6 +10,7 @@ import haven.render.Render;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
 
@@ -21,6 +22,7 @@ public class MultiSession {
     public static KeyBinding kb_prevSession = KeyBinding.get("previous_session", KeyMatch.forcode(KeyEvent.VK_PAGE_UP, 0));
 
     public static class MultiSessionWindow extends BetterWindow {
+        public final List<FightEventAware> fightEventAwareList = new ArrayList<>();
 
         public boolean fightExtensionsEnabled;
         public boolean doubleTapEnabled;
@@ -51,13 +53,37 @@ public class MultiSession {
             if (locked) {
                 if (button == 1) {
                     startFightSequence(c, button);
+                    ensureFightOff();
                 } else if (button == 3) {
-                    rightClick();
+                    multisessionRightClick();
                 }
             }
         }
 
-        private void startFightSequence(Coord c, int button) {
+        private void sleep(long ms) {
+            try {
+                Thread.sleep(ms);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        public void ensureNotInFight() {
+            for (int i = 0; i < 20; i++) {
+                ensureFightOff();
+                if (!isSessionInFight()) {
+                    break;
+                }
+            }
+        }
+
+        public void triggerAttackIcon() {
+            if (ui.fightGobCache.getLastAggroedEvent() != null) {
+                runKeyCommandThis(ui.fightGobCache.getLastAggroedEvent());
+            }
+        }
+
+        public void startFightSequence(Coord c, int button) {
             ui.gui.map.mousedown(c, button, Optional.of(this::multisessionGobCallback));
         }
 
@@ -69,7 +95,7 @@ public class MultiSession {
                     new Thread(new HourgrassMonitor(ui.gui, 2000, this::secondCallback)).start();
                     break;
                 case 3:
-                    rightClick();
+                    multisessionRightClick();
                     break;
             }
         }
@@ -79,7 +105,9 @@ public class MultiSession {
                 doubleTap();
             }
             ensureFightOff();
-            rightClick();
+            multisessionRightClick();
+
+            fightEventAwareList.forEach(FightEventAware::fightStarted);
         }
 
         private void doubleTap() {
@@ -87,7 +115,7 @@ public class MultiSession {
             runForEverySession(ui -> {
                 PBotSession pSession = new PBotSession(ui.gui);
 
-                if (!isSessionInFight(pSession)) {
+                if (!isSessionInFight()) {
                     clickGob(pSession);
                 }
             });
@@ -96,19 +124,27 @@ public class MultiSession {
         private void ensureFightOff() {
             System.out.println("Each session fight off");
             runForEverySession(ui -> {
-                PBotSession pSession = new PBotSession(ui.gui);
-
-                if (isSessionInFight(pSession)) {
+                if (isNotWaitingForCancel()) {
+                    System.out.println("Session fight off click");
                     ui.gui.fv.current.give.wdgmsg("click", 1);
                 }
             });
         }
 
-        private boolean isSessionInFight(PBotSession pSession) {
-            return pSession.PBotUtils().combatState() != -1;
+        private boolean isNotWaitingForCancel() {
+            return ui.gui.fv.curgive != null && ui.gui.fv.curgive.state != 1;
         }
 
-        private void leftClickGob() {
+        public boolean isSessionAggroed() {
+            return ui.gui.fv.curgive != null &&
+                    (ui.gui.fv.curgive.state == 0 || ui.gui.fv.curgive.state == 1);
+        }
+
+        private boolean isSessionInFight() {
+            return ui.gui.fv.curgive != null && ui.gui.fv.curgive.state != -1;
+        }
+
+        public void leftClickGob() {
             if (multisessionGob != null) {
                 System.out.println("Each session click: " + multisessionGob.id);
                 runForEverySession(ui -> {
@@ -125,21 +161,30 @@ public class MultiSession {
             pGob.doClick(1, 0, -1, 0);
         }
 
-        private void rightClick() {
-            System.out.println("Each session cancel");
-            runForEverySession(ui -> {
-                PBotSession pSession = new PBotSession(ui.gui);
-                pSession.PBotCharacterAPI().cancelAct();
-                ui.mousegrab.clear();
-            });
+        private void rightClick(UI ui) {
+            System.out.println("Single session cancel " + ui.sess.username);
+            PBotSession pSession = new PBotSession(ui.gui);
+            pSession.PBotCharacterAPI().cancelAct();
+            ui.mousegrab.clear();
+        }
 
+        private void multisessionRightClick() {
+            System.out.println("Each session cancel");
+            runForEverySession(this::rightClick);
             locked = false;
-            multisessionGob = null;
         }
 
         public void runKeyCommand(KeyEvent ev) {
             if (fightExtensionsEnabled) {
                 runForOtherSessions(ui -> ui.keydown(ev));
+                ui.fightGobCache.setLastAggroedEvent(ev);
+                locked = true;
+            }
+        }
+
+        public void runKeyCommandThis(KeyEvent ev) {
+            if (fightExtensionsEnabled) {
+                runForEverySession(ui -> ui.keydown(ev));
                 locked = true;
             }
         }
